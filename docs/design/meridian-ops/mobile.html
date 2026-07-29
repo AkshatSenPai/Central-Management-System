@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300..800;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0&display=block" rel="stylesheet" />
+<style>
+:root{
+--bg:#f6f6f7;--surface:#ffffff;--surface-2:#fafafa;--surface-3:#f0f0f2;
+--border:#e5e5e8;--border-2:#d6d6da;
+--text:#1a1a1f;--text-2:#55555f;--text-3:#8a8a94;
+--accent:#4b53c9;--btn:#4b53c9;--btn-h:#3d44ad;--on-btn:#ffffff;--accent-soft:#eeeffb;--accent-line:#ccceef;
+--ring:0 0 0 3px rgba(75,83,201,.20);
+--ok:#186c3a;--ok-bg:#e9f4ed;--ok-line:#c2dfcc;
+--warn:#8a5606;--warn-bg:#fbf1e0;--warn-line:#ecd9b0;
+--bad:#a8241d;--bad-bg:#fbeceb;--bad-line:#eecac7;
+--avatar:#e9e9ec;--avatar-2:#dfdfe4;--avatar-t:#4a4a54;
+--shadow:0 1px 2px rgba(16,17,26,.05);
+--shadow-md:0 2px 4px rgba(16,17,26,.05),0 6px 16px rgba(16,17,26,.07);
+--shadow-lg:0 12px 40px rgba(16,17,26,.14),0 2px 8px rgba(16,17,26,.06);
+--leave:#fdf8f0;
+--pj1:#5a5fb8;--pj2:#43708d;--pj3:#3f7a60;--pj4:#8a6440;--pj5:#7d5480;--pj6:#69713f;
+--ico:20px/1 'Material Symbols Outlined';
+--ico-s:18px/1 'Material Symbols Outlined';
+--mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+[data-theme="dark"]{
+--bg:#0d1017;--surface:#141824;--surface-2:#1a1f2d;--surface-3:#222839;
+--border:#262d3d;--border-2:#374155;
+--text:#e9ecf3;--text-2:#9ca6ba;--text-3:#7c869a;
+--accent:#93a0fb;--btn:#4f5ad9;--btn-h:#5f6ae4;--on-btn:#ffffff;--accent-soft:#1c2140;--accent-line:#333d6a;
+--ring:0 0 0 3px rgba(147,160,251,.26);
+--ok:#5fc78d;--ok-bg:#102a20;--ok-line:#1f4735;
+--warn:#e5ab52;--warn-bg:#2b2214;--warn-line:#4c3b1d;
+--bad:#f38d87;--bad-bg:#2d1a1d;--bad-line:#502931;
+--avatar:#232a39;--avatar-2:#2c3345;--avatar-t:#c4cbdb;
+--shadow:0 1px 2px rgba(0,0,0,.45);
+--shadow-md:0 2px 6px rgba(0,0,0,.45);
+--shadow-lg:0 16px 44px rgba(3,5,10,.7);
+--leave:#211d13;
+--pj1:#98a1f0;--pj2:#7fb0d0;--pj3:#79bd9b;--pj4:#c9a67c;--pj5:#b892ba;--pj6:#a8b17c;
+}
+[data-theme="dark"][data-tone="black"]{
+--bg:#08090b;--surface:#101115;--surface-2:#16171c;--surface-3:#1e1f25;
+--border:#24252c;--border-2:#35373f;
+--text:#f2f3f5;--text-2:#a5a8b1;--text-3:#83868f;
+--accent:#99a3fb;--btn:#4f5ad9;--btn-h:#5f6ae4;--accent-soft:#171a30;--accent-line:#2f3560;
+--ring:0 0 0 3px rgba(153,163,251,.26);
+--ok:#5fc78d;--ok-bg:#0c2318;--ok-line:#1b3f2a;
+--warn:#e5ab52;--warn-bg:#251d10;--warn-line:#443418;
+--bad:#f38d87;--bad-bg:#271617;--bad-line:#482326;
+--avatar:#1f2027;--avatar-2:#282a32;--avatar-t:#c6c9d2;
+--shadow:0 1px 2px rgba(0,0,0,.6);
+--shadow-md:0 2px 6px rgba(0,0,0,.6);
+--shadow-lg:0 16px 44px rgba(0,0,0,.8);
+--leave:#1e1a12;
+}
+[data-theme="dark"][data-tone="warm"]{
+--bg:#100f0e;--surface:#1a1817;--surface-2:#211f1d;--surface-3:#2b2825;
+--border:#302d2a;--border-2:#443f3b;
+--text:#f0ece8;--text-2:#a9a39c;--text-3:#8a837b;
+--accent:#a49bf3;--btn:#5a53d6;--btn-h:#6a63e1;--accent-soft:#221f38;--accent-line:#3c3663;
+--ok:#68c489;--ok-bg:#16261c;--ok-line:#294730;
+--warn:#e0a44c;--warn-bg:#2a2012;--warn-line:#4a3819;
+--bad:#f18d82;--bad-bg:#2c1a17;--bad-line:#4f2a24;
+--avatar:#2a2724;--avatar-2:#353130;--avatar-t:#cbc5be;
+--leave:#231d12;
+--pj1:#a49bf3;--pj2:#84a9c2;--pj3:#82b795;--pj4:#cba578;--pj5:#bb8fb6;--pj6:#aaae78;
+}
+[data-theme="dark"][data-tone="indigo"]{
+--bg:#0a0b13;--surface:#12131f;--surface-2:#181a29;--surface-3:#202336;
+--border:#252940;--border-2:#363b59;
+--text:#e8e9f6;--text-2:#9fa3c0;--text-3:#7d81a0;
+--accent:#a0a7fd;--btn:#5259dd;--btn-h:#6169e8;--accent-soft:#1c1f45;--accent-line:#343a72;
+--ok:#5fc890;--ok-bg:#0f2a21;--ok-line:#1e4737;
+--warn:#e6ab55;--warn-bg:#2a2116;--warn-line:#4a3a1f;
+--bad:#f48f8c;--bad-bg:#2b1a22;--bad-line:#4e2836;
+--avatar:#212439;--avatar-2:#2a2e46;--avatar-t:#c5c8e0;
+--leave:#221c16;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Public Sans',-apple-system,'Helvetica Neue',Helvetica,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--btn-h);text-decoration:underline}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer}
+::selection{background:var(--accent-soft);color:var(--text)}
+[data-om-starter="ios-frame"]{box-shadow:0 0 0 1px var(--border-2),0 24px 56px rgba(0,0,0,.22)!important}
+[data-om-starter="ios-frame"] *::-webkit-scrollbar{width:0;height:0;display:none}
+[data-om-starter="ios-frame"] *{scrollbar-width:none}
+[data-active="true"]{color:var(--accent)!important}
+[data-tab="on"]{color:var(--text)!important;border-bottom-color:var(--accent)!important;font-weight:600!important}
+[data-seg="on"]{background:var(--surface)!important;color:var(--text)!important;box-shadow:var(--shadow)!important;font-weight:600!important}
+[data-badge="neutral"]{background:var(--surface-3);color:var(--text-2);border-color:var(--border)}
+[data-badge="strong"]{background:var(--surface-3);color:var(--text);border-color:var(--border-2)}
+[data-badge="ok"]{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-line)}
+[data-badge="warn"]{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-line)}
+[data-badge="bad"]{background:var(--bad-bg);color:var(--bad);border-color:var(--bad-line)}
+[data-dot="mute"]{background:var(--text-3)}
+[data-dot="strong"]{background:var(--text)}
+[data-dot="soft"]{background:var(--text-2)}
+[data-dot="ok"]{background:var(--ok)}
+[data-dot="warn"]{background:var(--warn)}
+[data-dot="bad"]{background:var(--bad)}
+[data-pj="1"]{background:var(--pj1);border-color:var(--pj1)}
+[data-pj="2"]{background:var(--pj2);border-color:var(--pj2)}
+[data-pj="3"]{background:var(--pj3);border-color:var(--pj3)}
+[data-pj="4"]{background:var(--pj4);border-color:var(--pj4)}
+[data-pj="5"]{background:var(--pj5);border-color:var(--pj5)}
+[data-pj="6"]{background:var(--pj6);border-color:var(--pj6)}
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" data-theme="{{ theme }}" data-tone="{{ tone }}" style="min-height:100vh;background:var(--bg);color:var(--text);padding:32px 40px 72px">
+
+  <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:34px">
+    <div style="min-width:0">
+      <h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em">Meridian Ops — mobile</h1>
+      <p style="margin:5px 0 0;font-size:13.5px;color:var(--text-2)">Same tokens and components as the desktop app, re-laid out for 402×874. Bottom tabs replace the sidebar; the task drawer becomes a sheet.</p>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:2px;padding:2px;background:var(--surface-3);border-radius:9px;flex:none">
+      <button onClick="{{ setLight }}" data-seg="{{ segLight }}" style="height:30px;padding:0 13px;border:none;border-radius:7px;background:transparent;color:var(--text-2);font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px"><span style="font:17px/1 'Material Symbols Outlined'">light_mode</span>Light</button>
+      <button onClick="{{ setDark }}" data-seg="{{ segDark }}" style="height:30px;padding:0 13px;border:none;border-radius:7px;background:transparent;color:var(--text-2);font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px"><span style="font:17px/1 'Material Symbols Outlined'">dark_mode</span>Dark</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">01</span>
+        <span style="font-size:13.5px;font-weight:600">Sign in</span>
+        <span style="font-size:12.5px;color:var(--text-3)">invite variant links from the footer</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding:54px 24px 44px">
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:26px">
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div style="width:44px;height:44px;border-radius:12px;background:var(--btn);color:var(--on-btn);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;letter-spacing:-.02em">M</div>
+              <div>
+                <h2 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em">Sign in</h2>
+                <p style="margin:5px 0 0;font-size:14px;color:var(--text-2)">Studio operations for the Meridian team.</p>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:13px">
+              <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Work email</span>
+                <input type="email" value="maya@meridian.studio" style="height:46px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface);outline:none;font-size:15px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;color:var(--text-2)">Password<a href="#" style="font-weight:500">Forgot?</a></span>
+                <input type="password" value="••••••••••••" style="height:46px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface);outline:none;font-size:15px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+              </label>
+              <button style="height:46px;border:none;border-radius:11px;background:var(--btn);color:var(--on-btn);font-weight:600;font-size:15px;margin-top:4px" style-hover="background:var(--btn-h)">Sign in</button>
+              <div style="display:flex;align-items:center;gap:12px;color:var(--text-3);font-size:11.5px;margin:2px 0">
+                <div style="flex:1;height:1px;background:var(--border)"></div>OR<div style="flex:1;height:1px;background:var(--border)"></div>
+              </div>
+              <button style="height:46px;border:1px solid var(--border);border-radius:11px;background:var(--surface);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;gap:9px" style-hover="background:var(--surface-2)">
+                <span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--text-3);border-top-color:var(--text);flex:none"></span>Continue with Google
+              </button>
+            </div>
+          </div>
+          <p style="margin:0;text-align:center;font-size:13px;color:var(--text-3)">Got an invite? <a href="#">Accept it here</a></p>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">02</span>
+        <span style="font-size:13.5px;font-weight:600">Today</span>
+        <span style="font-size:12.5px;color:var(--text-3)">home tab</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Today</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Wednesday, 29 July</div>
+            </div>
+            <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">search</span></button>
+            <button style="position:relative;width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)">
+              <span style="font:22px/1 'Material Symbols Outlined'">notifications</span>
+              <span style="position:absolute;top:-1px;right:-1px;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;font-size:9.5px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface)">3</span>
+            </button>
+            <span style="width:30px;height:30px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">ME</span>
+          </div>
+
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 13px;border:1px solid var(--accent-line);background:var(--accent-soft);border-radius:12px">
+              <span style="font:19px/1 'Material Symbols Outlined';color:var(--accent);flex:none;margin-top:1px">push_pin</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13.5px;font-weight:600;line-height:1.35;text-wrap:pretty">Q3 retainer review moves to Thursday 2pm</div>
+                <div style="font-size:12px;color:var(--text-2);margin-top:3px">Alina · 4h ago</div>
+              </div>
+            </div>
+
+            <section style="border:1px solid var(--bad-line);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:7px;padding:10px 13px;background:var(--bad-bg);border-bottom:1px solid var(--bad-line)">
+                <span style="font:18px/1 'Material Symbols Outlined';color:var(--bad)">error</span>
+                <span style="font-size:13px;font-weight:700;color:var(--bad)">2 overdue</span>
+              </div>
+              <sc-for list="{{ overdue }}" as="t" hint-placeholder-count="2">
+                <div style="display:flex;align-items:flex-start;gap:11px;padding:12px 13px;border-bottom:1px solid var(--border)">
+                  <span style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-2);flex:none;margin-top:1px"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14.5px;font-weight:500;line-height:1.3;text-wrap:pretty">{{ t.title }}</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+                      <span data-badge="{{ t.pk }}" style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid">{{ t.priority }}</span>
+                      <span style="font-size:12px;font-weight:700;color:var(--bad)">{{ t.dueLabel }}</span>
+                      <span style="flex:1"></span>
+                      <span style="display:flex">
+                        <sc-for list="{{ t.people }}" as="p" hint-placeholder-count="2">
+                          <span style="width:22px;height:22px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">{{ p }}</span>
+                        </sc-for>
+                      </span>
+                    </div>
+                    <div style="font-size:11.5px;color:var(--text-3);margin-top:5px">{{ t.chip }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">Due today</span>
+                <a href="#" style="font-size:12.5px;font-weight:600">All tasks</a>
+              </div>
+              <sc-for list="{{ todayTasks }}" as="t" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:11px;padding:12px 13px;border-bottom:1px solid var(--border)">
+                  <span style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-2);flex:none"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14.5px;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</div>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                      <span data-pj="{{ t.pj }}" style="width:6px;height:6px;border-radius:50%;flex:none"></span>
+                      <span style="font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.project }}</span>
+                    </div>
+                  </div>
+                  <span data-badge="{{ t.pk }}" style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid;flex:none">{{ t.priority }}</span>
+                </div>
+              </sc-for>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">In progress</span>
+                <span style="font-size:11.5px;color:var(--text-3)">6h 12m this week</span>
+              </div>
+              <sc-for list="{{ inProgress }}" as="t" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:12px 13px;border-bottom:1px solid var(--border)">
+                  <span data-pj="{{ t.pj }}" style="width:3px;height:34px;border-radius:2px;flex:none"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14px;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+                      <span style="flex:1;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden"><span style="display:block;height:100%;background:var(--text-2);border-radius:2px;width:{{ t.pctStr }}"></span></span>
+                      <span style="font-size:11px;color:var(--text-3);font-family:var(--mono);flex:none">{{ t.logged }}</span>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </section>
+          </div>
+
+          <dc-import name="MobileTabBar" home-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">03</span>
+        <span style="font-size:13.5px;font-weight:600">My Tasks</span>
+        <span style="font-size:12.5px;color:var(--text-3)">grouped by status</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;height:50px;padding:0 16px">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">My Tasks</div>
+                <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">12 assigned to you</div>
+              </div>
+              <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">search</span></button>
+              <button style="height:36px;padding:0 13px;border:none;border-radius:10px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">add</span>New</button>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 16px 11px;overflow-x:auto">
+              <span data-seg="on" style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:transparent;color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Mine</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">All tasks</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border)">Client<span style="font:16px/1 'Material Symbols Outlined';color:var(--text-3)">expand_more</span></span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border)">Priority<span style="font:16px/1 'Material Symbols Outlined';color:var(--text-3)">expand_more</span></span>
+            </div>
+          </div>
+
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:18px">
+            <sc-for list="{{ taskGroups }}" as="g" hint-placeholder-count="3">
+              <section>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-left:2px">
+                  <span data-dot="{{ g.dot }}" style="width:7px;height:7px;border-radius:50%;flex:none"></span>
+                  <span style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2)">{{ g.name }}</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--text-3)">{{ g.count }}</span>
+                </div>
+                <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+                  <sc-for list="{{ g.items }}" as="t" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:flex-start;gap:11px;padding:12px 13px;border-bottom:1px solid var(--border)">
+                      <span style="width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-2);flex:none;margin-top:1px"></span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:14.5px;font-weight:500;line-height:1.3;text-wrap:pretty">{{ t.title }}</div>
+                        <div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap">
+                          <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);font-size:11.5px;color:var(--text-2);max-width:190px">
+                            <span data-pj="{{ t.pj }}" style="width:6px;height:6px;border-radius:50%;flex:none"></span>
+                            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.chip }}</span>
+                          </span>
+                          <span data-badge="{{ t.pk }}" style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid">{{ t.priority }}</span>
+                          <span style="font-size:12px;color:{{ t.dueColor }};font-weight:{{ t.dueWeight }}">{{ t.dueLabel }}</span>
+                          <span style="flex:1"></span>
+                          <span style="display:flex">
+                            <sc-for list="{{ t.people }}" as="p" hint-placeholder-count="2">
+                              <span style="width:22px;height:22px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">{{ p }}</span>
+                            </sc-for>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-for>
+          </div>
+
+          <dc-import name="MobileTabBar" tasks-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">04</span>
+        <span style="font-size:13.5px;font-weight:600">Project board</span>
+        <span style="font-size:12.5px;color:var(--text-3)">columns page horizontally</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px 12px">
+            <div style="display:flex;align-items:center;gap:8px;height:50px">
+              <button style="width:32px;height:32px;margin-left:-6px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">arrow_back</span></button>
+              <div style="min-width:0;flex:1">
+                <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Harlow &amp; Fitch</div>
+                <div style="font-size:16px;font-weight:700;letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Spring Campaign Site</div>
+              </div>
+              <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">more_horiz</span></button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+              <span data-badge="ok" style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:7px;font-size:11.5px;font-weight:700;border:1px solid;flex:none"><span data-dot="ok" style="width:6px;height:6px;border-radius:50%"></span>On Track</span>
+              <span style="flex:1;height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden"><span style="display:block;height:100%;background:var(--text-2);border-radius:3px;width:68%"></span></span>
+              <span style="font-size:12.5px;font-weight:700;flex:none">68%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;margin-top:10px;font-size:12px;color:var(--text-2);flex-wrap:wrap">
+              <span style="display:flex;align-items:center;gap:5px"><span style="font:16px/1 'Material Symbols Outlined';color:var(--text-3)">event</span>Due 14 Aug</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="font:16px/1 'Material Symbols Outlined';color:var(--text-3)">schedule</span>142h / 180h</span>
+              <span style="flex:1"></span>
+              <span style="display:flex">
+                <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">DR</span>
+                <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">TI</span>
+                <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">PK</span>
+              </span>
+            </div>
+          </div>
+
+          <div style="flex:1;display:flex;gap:12px;padding:14px 16px 20px;overflow-x:auto;scroll-snap-type:x mandatory">
+            <sc-for list="{{ board }}" as="col" hint-placeholder-count="4">
+              <div style="flex:none;width:302px;scroll-snap-align:start;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);padding:11px">
+                <div style="display:flex;align-items:center;gap:8px;padding:2px 3px 11px">
+                  <span data-dot="{{ col.dot }}" style="width:7px;height:7px;border-radius:50%;flex:none"></span>
+                  <span style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2)">{{ col.name }}</span>
+                  <span style="font-size:12px;font-weight:600;color:var(--text-3)">{{ col.count }}</span>
+                  <span style="flex:1"></span>
+                  <span style="font:19px/1 'Material Symbols Outlined';color:var(--text-3)">add</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <sc-for list="{{ col.items }}" as="t" hint-placeholder-count="2">
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 12px">
+                      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                        <span style="font-size:14px;font-weight:500;line-height:1.35;text-wrap:pretty">{{ t.title }}</span>
+                        <span data-badge="{{ t.pk }}" style="display:inline-flex;align-items:center;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ t.priority }}</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:7px;margin-top:10px">
+                        <span style="flex:1;height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden"><span style="display:block;height:100%;background:var(--text-3);border-radius:2px;width:{{ t.pctStr }}"></span></span>
+                        <span style="font-size:10.5px;color:var(--text-3);font-weight:600">{{ t.checklistLabel }}</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:9px;margin-top:10px">
+                        <span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:{{ t.dueColor }};font-weight:{{ t.dueWeight }}"><span style="font:15px/1 'Material Symbols Outlined'">event</span>{{ t.dueShort }}</span>
+                        <span style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;color:var(--text-3)"><span style="font:15px/1 'Material Symbols Outlined'">chat_bubble</span>{{ t.comments }}</span>
+                        <span style="flex:1"></span>
+                        <span style="display:flex">
+                          <sc-for list="{{ t.people }}" as="p" hint-placeholder-count="2">
+                            <span style="width:22px;height:22px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">{{ p }}</span>
+                          </sc-for>
+                        </span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <dc-import name="MobileTabBar" clients-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">05</span>
+        <span style="font-size:13.5px;font-weight:600">Client detail</span>
+        <span style="font-size:12.5px;color:var(--text-3)">tabs collapse to a scroller</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px">
+            <div style="display:flex;align-items:center;gap:8px;height:50px">
+              <button style="width:32px;height:32px;margin-left:-6px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">arrow_back</span></button>
+              <span style="font-size:15px;font-weight:600;flex:1;min-width:0">Clients</span>
+              <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">edit</span></button>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:2px 0 14px">
+              <span style="width:48px;height:48px;border-radius:13px;background:var(--surface-3);color:var(--text-2);font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">HF</span>
+              <div style="min-width:0;flex:1">
+                <div style="font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.2">Harlow &amp; Fitch</div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:6px;flex-wrap:wrap">
+                  <span data-badge="ok" style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid"><span data-dot="ok" style="width:6px;height:6px;border-radius:50%"></span>Active</span>
+                  <span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--border);background:var(--surface-3);color:var(--text-2)">Retainer</span>
+                </div>
+                <div style="font-size:12.5px;color:var(--text-3);margin-top:6px">Retail &amp; apparel · lead Sarah Whitfield</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:20px;overflow-x:auto">
+              <div data-tab="on" style="flex:none;padding:10px 0;border-bottom:2px solid transparent;font-size:14px;color:var(--text-2)">Overview</div>
+              <div style="flex:none;padding:10px 0;border-bottom:2px solid transparent;font-size:14px;color:var(--text-2)">Notes</div>
+              <div style="flex:none;padding:10px 0;border-bottom:2px solid transparent;font-size:14px;color:var(--text-2)">Invoices</div>
+              <div style="flex:none;padding:10px 0;border-bottom:2px solid transparent;font-size:14px;color:var(--text-2)">Contacts</div>
+            </div>
+          </div>
+
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 13px">
+                <div style="font-size:11.5px;color:var(--text-3)">Outstanding</div>
+                <div style="font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--warn);margin-top:3px">£18,400</div>
+              </div>
+              <div style="flex:1;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 13px">
+                <div style="font-size:11.5px;color:var(--text-3)">Retainer</div>
+                <div style="font-size:19px;font-weight:700;letter-spacing:-.02em;margin-top:3px">£9,500</div>
+              </div>
+            </div>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">Projects</span>
+                <span style="font-size:11.5px;color:var(--text-3)">2 active</span>
+              </div>
+              <sc-for list="{{ clientProjects }}" as="p" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:12px;padding:13px">
+                  <span data-pj="{{ p.pj }}" style="width:3px;height:38px;border-radius:2px;flex:none"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
+                      <span style="flex:1;height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden"><span style="display:block;height:100%;background:var(--text-2);border-radius:3px;width:{{ p.pctStr }}"></span></span>
+                      <span style="font-size:11.5px;font-weight:600;color:var(--text-2);flex:none">{{ p.pctStr }}</span>
+                      <span data-badge="{{ p.hk }}" style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ p.health }}</span>
+                    </div>
+                  </div>
+                  <span style="font:20px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">chevron_right</span>
+                </div>
+              </sc-for>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">Latest meeting note</span>
+                <a href="#" style="font-size:12.5px;font-weight:600">All 3</a>
+              </div>
+              <div style="padding:13px">
+                <div style="display:flex;align-items:baseline;gap:8px">
+                  <span style="font-size:14px;font-weight:600;flex:1;min-width:0">Spring campaign — creative review</span>
+                  <span style="font-size:11.5px;color:var(--text-3);flex:none">24 Jul</span>
+                </div>
+                <p style="margin:6px 0 0;font-size:13.5px;color:var(--text-2);line-height:1.55;text-wrap:pretty">Rowan approved direction B. Wants the lookbook module moved above the size guide and a warmer photography treatment.</p>
+                <div style="display:flex;align-items:center;gap:9px;margin-top:10px">
+                  <span style="display:flex">
+                    <span style="width:22px;height:22px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">ME</span>
+                    <span style="width:22px;height:22px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">SW</span>
+                    <span style="width:22px;height:22px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">PK</span>
+                  </span>
+                  <span style="font-size:11.5px;color:var(--text-3)">3 action items · 1 open</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <dc-import name="MobileTabBar" clients-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">06</span>
+        <span style="font-size:13.5px;font-weight:600">Team</span>
+        <span style="font-size:12.5px;color:var(--text-3)">who is working on what</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Team</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">8 people · 1 on leave</div>
+            </div>
+            <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">search</span></button>
+            <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">person_add</span></button>
+          </div>
+
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:11px">
+            <sc-for list="{{ team }}" as="m" hint-placeholder-count="5">
+              <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <span style="width:40px;height:40px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ m.i }}</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.n }}</span>
+                      <sc-if value="{{ m.isAdmin }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:inline-flex;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:700;border:1px solid var(--border);background:var(--surface-3);color:var(--text-2);flex:none">Admin</span>
+                      </sc-if>
+                    </div>
+                    <div style="font-size:12.5px;color:var(--text-3);margin-top:1px">{{ m.t }}</div>
+                  </div>
+                  <div style="text-align:right;flex:none">
+                    <div style="font-size:17px;font-weight:700;line-height:1.1">{{ m.open }}</div>
+                    <div style="font-size:10.5px;color:var(--text-3)">open</div>
+                  </div>
+                </div>
+                <sc-if value="{{ m.onLeave }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:9px;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn);font-size:12px;font-weight:600">
+                    <span style="font:15px/1 'Material Symbols Outlined'">beach_access</span>{{ m.leave }}
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.hasTasks }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+                    <sc-for list="{{ m.tasks }}" as="t" hint-placeholder-count="2">
+                      <div style="display:flex;align-items:center;gap:9px">
+                        <span data-pj="{{ t.pj }}" style="width:3px;height:30px;border-radius:2px;flex:none"></span>
+                        <div style="min-width:0;flex:1">
+                          <div style="font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</div>
+                          <div style="font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.chip }}</div>
+                        </div>
+                        <span data-badge="{{ t.pk }}" style="display:inline-flex;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:700;border:1px solid;flex:none">{{ t.priority }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.idle }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12.5px;color:var(--text-3);padding-top:10px;border-top:1px solid var(--border)">Nothing in progress. <a href="#" style="font-weight:600">Assign a task</a></div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <dc-import name="MobileTabBar" more-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">07</span>
+        <span style="font-size:13.5px;font-weight:600">Task detail</span>
+        <span style="font-size:12.5px;color:var(--text-3)">sheet over the current view</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px;position:relative">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);opacity:.45">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Today</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Wednesday, 29 July</div>
+            </div>
+            <span style="width:30px;height:30px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">ME</span>
+          </div>
+          <div style="flex:1;background:rgba(10,10,14,.42)"></div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;top:96px;background:var(--surface);border-radius:18px 18px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden">
+            <div style="flex:none;display:flex;flex-direction:column;align-items:center;padding:9px 0 0">
+              <span style="width:38px;height:4px;border-radius:2px;background:var(--border-2)"></span>
+            </div>
+            <div style="flex:none;display:flex;align-items:center;gap:9px;padding:11px 16px 12px;border-bottom:1px solid var(--border)">
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px 2px 6px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);font-size:11.5px;color:var(--text-2);min-width:0">
+                <span data-pj="1" style="width:6px;height:6px;border-radius:50%;flex:none"></span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Spring Campaign Site</span>
+              </span>
+              <span style="font-family:var(--mono);font-size:11.5px;color:var(--text-3);flex:none">MER-001</span>
+              <span style="flex:1"></span>
+              <button style="width:30px;height:30px;border:none;border-radius:9px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="color:var(--text)"><span style="font:19px/1 'Material Symbols Outlined'">close</span></button>
+            </div>
+
+            <div style="flex:1;overflow-y:auto;padding:15px 16px 18px">
+              <h2 style="margin:0 0 14px;font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.28;text-wrap:pretty">Hero module responsive breakpoints</h2>
+
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+                <button style="display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:13px;font-weight:600" style-hover="background:var(--surface-2)">
+                  <span data-dot="strong" style="width:7px;height:7px;border-radius:50%"></span>In Progress<span style="font:17px/1 'Material Symbols Outlined';color:var(--text-3)">expand_more</span>
+                </button>
+                <button data-badge="warn" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:9px;border:1px solid;font-size:13px;font-weight:700">High<span style="font:17px/1 'Material Symbols Outlined';opacity:.7">expand_more</span></button>
+                <button style="display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:13px;font-weight:600;color:var(--warn)"><span style="font:17px/1 'Material Symbols Outlined';color:var(--text-3)">event</span>Today</button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+                <span style="font-size:12px;color:var(--text-3);flex:none">Assignees</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 3px;border:1px solid var(--border);border-radius:16px;background:var(--surface-2);font-size:13px">
+                  <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">DR</span>Dev
+                </span>
+                <span style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 3px;border:1px solid var(--border);border-radius:16px;background:var(--surface-2);font-size:13px">
+                  <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">TI</span>Tom
+                </span>
+                <button style="width:32px;height:32px;border:1px dashed var(--border-2);border-radius:50%;background:transparent;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex:none" style-hover="border-color:var(--accent);color:var(--accent)"><span style="font:18px/1 'Material Symbols Outlined'">add</span></button>
+              </div>
+
+              <div style="height:1px;background:var(--border);margin-bottom:16px"></div>
+
+              <div style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px">Description</div>
+              <p style="margin:0 0 16px;font-size:14px;color:var(--text-2);line-height:1.6;text-wrap:pretty">The hero module needs to hold up from 360px to 1600px without the headline reflowing to four lines. Use the <strong style="color:var(--text);font-weight:600">campaign type scale</strong> and clamp the display size between 32 and 68px.</p>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">Checklist</span>
+                <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">3/5</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin-bottom:10px"><div style="height:100%;background:var(--ok);border-radius:3px;width:60%"></div></div>
+              <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:18px">
+                <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:11px;padding:8px 2px">
+                    <span data-badge="{{ c.box }}" style="width:19px;height:19px;border-radius:6px;border:1.5px solid;display:flex;align-items:center;justify-content:center;flex:none;font:15px/1 'Material Symbols Outlined'">{{ c.mark }}</span>
+                    <span style="font-size:14px;color:{{ c.color }};text-decoration:{{ c.strike }};line-height:1.35">{{ c.text }}</span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:11px">Comments</div>
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <sc-for list="{{ comments }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;gap:10px">
+                    <span style="width:30px;height:30px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ c.i }}</span>
+                    <div style="min-width:0;flex:1">
+                      <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:13px;font-weight:600">{{ c.n }}</span><span style="font-size:11.5px;color:var(--text-3)">{{ c.when }}</span></div>
+                      <div style="font-size:13.5px;color:var(--text-2);line-height:1.55;margin-top:3px;text-wrap:pretty">{{ c.pre }}<a href="#" style="font-weight:600">{{ c.mention }}</a>{{ c.post }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px 28px;border-top:1px solid var(--border);background:var(--surface-2)">
+              <button style="flex:1;height:44px;border:1px solid var(--border);border-radius:11px;background:var(--surface);font-size:14px;font-weight:600;color:var(--text-2);display:flex;align-items:center;justify-content:center;gap:7px" style-hover="color:var(--text)"><span style="font:19px/1 'Material Symbols Outlined'">chat_bubble</span>Comment</button>
+              <button style="flex:1;height:44px;border:none;border-radius:11px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">play_arrow</span>Start timer</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">08</span>
+        <span style="font-size:13.5px;font-weight:600">Accept invite</span>
+        <span style="font-size:12.5px;color:var(--text-3)">set name and password</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding:54px 24px 44px">
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:24px">
+            <div style="display:flex;flex-direction:column;gap:13px;align-items:flex-start">
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent)">Invited by Maya Ellison</span>
+              <div>
+                <h2 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em">Set up your account</h2>
+                <p style="margin:5px 0 0;font-size:14px;color:var(--text-2)">You're joining Meridian as a <strong style="color:var(--text);font-weight:600">Member</strong>.</p>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:13px">
+              <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Email</span>
+                <input type="email" value="jordan@meridian.studio" disabled="disabled" style="height:46px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface-3);color:var(--text-3);outline:none;font-size:15px" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Full name</span>
+                <input type="text" placeholder="Jordan Reyes" style="height:46px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface);outline:none;font-size:15px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Create password</span>
+                <input type="password" placeholder="At least 12 characters" style="height:46px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface);outline:none;font-size:15px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+                <span style="display:flex;gap:5px;margin-top:3px">
+                  <span style="flex:1;height:4px;border-radius:2px;background:var(--ok)"></span>
+                  <span style="flex:1;height:4px;border-radius:2px;background:var(--ok)"></span>
+                  <span style="flex:1;height:4px;border-radius:2px;background:var(--surface-3)"></span>
+                </span>
+              </label>
+              <button style="height:46px;border:none;border-radius:11px;background:var(--btn);color:var(--on-btn);font-weight:600;font-size:15px;margin-top:4px" style-hover="background:var(--btn-h)">Create account</button>
+            </div>
+          </div>
+          <p style="margin:0;text-align:center;font-size:13px;color:var(--text-3)"><a href="#">Back to sign in</a></p>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">09</span>
+        <span style="font-size:13.5px;font-weight:600">Clients</span>
+        <span style="font-size:12.5px;color:var(--text-3)">table becomes rows</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Clients</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">5 accounts · 4 active retainers</div>
+            </div>
+            <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">search</span></button>
+            <button style="height:36px;padding:0 13px;border:none;border-radius:10px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">add</span>New</button>
+          </div>
+          <div style="flex:1;padding:14px 16px 20px">
+            <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <sc-for list="{{ clients }}" as="c" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:12px;padding:13px;border-bottom:1px solid var(--border)">
+                  <span style="width:38px;height:38px;border-radius:11px;background:var(--surface-3);color:var(--text-2);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ c.initials }}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div>
+                    <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+                      <span data-badge="{{ c.sk }}" style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ c.status }}</span>
+                      <span style="font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.sector }}</span>
+                    </div>
+                  </div>
+                  <div style="text-align:right;flex:none">
+                    <div style="font-size:13.5px;font-weight:600;color:{{ c.balColor }}">{{ c.balance }}</div>
+                    <div style="font-size:10.5px;color:var(--text-3)">outstanding</div>
+                  </div>
+                  <span style="font:20px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">chevron_right</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <dc-import name="MobileTabBar" clients-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">10</span>
+        <span style="font-size:13.5px;font-weight:600">Projects</span>
+        <span style="font-size:12.5px;color:var(--text-3)">health at a glance</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;height:50px;padding:0 16px">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Projects</div>
+                <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">6 active across 5 clients</div>
+              </div>
+              <button style="height:36px;padding:0 13px;border:none;border-radius:10px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">add</span>New</button>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 16px 11px;overflow-x:auto">
+              <span data-seg="on" style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:transparent;color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">All 6</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">On Track 4</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">At Risk 1</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Blocked 1</span>
+            </div>
+          </div>
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ projects }}" as="p" hint-placeholder-count="6">
+              <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:13px">
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                  <span data-pj="{{ p.pj }}" style="width:3px;height:34px;border-radius:2px;flex:none"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14.5px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+                    <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.client }} · due {{ p.due }}</div>
+                  </div>
+                  <span data-badge="{{ p.hk }}" style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ p.health }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;margin-top:11px">
+                  <span style="flex:1;height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden"><span style="display:block;height:100%;background:var(--text-2);border-radius:3px;width:{{ p.pctStr }}"></span></span>
+                  <span style="font-size:12px;font-weight:700;flex:none">{{ p.pctStr }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <dc-import name="MobileTabBar" clients-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">11</span>
+        <span style="font-size:13.5px;font-weight:600">Calendar</span>
+        <span style="font-size:12.5px;color:var(--text-3)">month grid + day agenda</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;height:50px;padding:0 16px">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">July 2026</div>
+                <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Everyone · all projects</div>
+              </div>
+              <button style="width:34px;height:34px;border:1px solid var(--border);border-right:none;border-radius:10px 0 0 10px;background:var(--surface);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-2)"><span style="font:20px/1 'Material Symbols Outlined'">chevron_left</span></button>
+              <button style="width:34px;height:34px;border:1px solid var(--border);border-radius:0 10px 10px 0;background:var(--surface);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none;margin-left:-8px" style-hover="background:var(--surface-2)"><span style="font:20px/1 'Material Symbols Outlined'">chevron_right</span></button>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 16px 11px;overflow-x:auto">
+              <span data-seg="on" style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:transparent;color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Month</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Week</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border)"><span style="font:16px/1 'Material Symbols Outlined';color:var(--text-3)">person</span>Everyone</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border)"><span style="font:16px/1 'Material Symbols Outlined';color:var(--text-3)">layers</span>Projects</span>
+            </div>
+          </div>
+
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">M</div>
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">T</div>
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">W</div>
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">T</div>
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">F</div>
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">S</div>
+              <div style="padding:7px 0;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)">S</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--border)">
+              <sc-for list="{{ monthCells }}" as="c" hint-placeholder-count="35">
+                <div style="height:58px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:{{ c.bg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+                  <span style="font-size:13px;font-weight:{{ c.numWeight }};color:{{ c.numColor }}">{{ c.n }}</span>
+                  <span style="display:flex;gap:3px;height:5px;align-items:center">
+                    <sc-for list="{{ c.dots }}" as="d" hint-placeholder-count="0">
+                      <span data-pj="{{ d.pj }}" style="width:5px;height:5px;border-radius:50%"></span>
+                    </sc-for>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="flex:1;padding:14px 16px 20px">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:9px;padding-left:2px">
+              <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">Wednesday 29 July</span>
+              <span style="font-size:12px;color:var(--text-3)">3 due</span>
+            </div>
+            <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <sc-for list="{{ agenda }}" as="t" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:12px 13px;border-bottom:1px solid var(--border)">
+                  <span data-pj="{{ t.pj }}" style="width:3px;height:32px;border-radius:2px;flex:none"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</div>
+                    <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.project }}</div>
+                  </div>
+                  <span data-badge="{{ t.pk }}" style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ t.priority }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
+              <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+                <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2);max-width:170px">
+                  <span data-pj="{{ l.pj }}" style="width:8px;height:8px;border-radius:3px;flex:none"></span>
+                  <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.name }}</span>
+                </span>
+              </sc-for>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2)">
+                <span style="width:8px;height:8px;border-radius:3px;background:var(--leave);border:1px solid var(--warn-line);flex:none"></span>Leave
+              </span>
+            </div>
+          </div>
+
+          <dc-import name="MobileTabBar" calendar-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">12</span>
+        <span style="font-size:13.5px;font-weight:600">Vault</span>
+        <span style="font-size:12.5px;color:var(--text-3)">files, notes, credentials</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;height:50px;padding:0 16px">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Vault</div>
+                <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Private to you unless shared</div>
+              </div>
+              <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">search</span></button>
+              <button style="height:36px;padding:0 13px;border:none;border-radius:10px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">add</span>New</button>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 16px 11px;overflow-x:auto">
+              <span data-seg="on" style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:transparent;color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">All 9</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Shared 3</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Files 4</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Credentials 3</span>
+            </div>
+          </div>
+          <div style="flex:1;padding:14px 16px 20px">
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface);margin-bottom:12px">
+              <span style="font:19px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">shield_lock</span>
+              <span style="font-size:12.5px;color:var(--text-2);line-height:1.4">End-to-end encrypted. Every reveal is logged.</span>
+            </div>
+            <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <sc-for list="{{ vaultItems }}" as="v" hint-placeholder-count="7">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 13px;border-bottom:1px solid var(--border)">
+                  <span style="width:36px;height:36px;border-radius:10px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none;font:20px/1 'Material Symbols Outlined'">{{ v.icon }}</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.name }}</div>
+                    <div style="font-size:11.5px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.meta }}</div>
+                  </div>
+                  <sc-if value="{{ v.shared }}" hint-placeholder-val="{{ false }}">
+                    <span title="Shared" style="font:18px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">group</span>
+                  </sc-if>
+                  <span style="font:20px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">chevron_right</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <dc-import name="MobileTabBar" more-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">13</span>
+        <span style="font-size:13.5px;font-weight:600">Credential</span>
+        <span style="font-size:12.5px;color:var(--text-3)">masked fields, tap to reveal</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px 14px">
+            <div style="display:flex;align-items:center;gap:8px;height:50px">
+              <button style="width:32px;height:32px;margin-left:-6px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">arrow_back</span></button>
+              <span style="font-size:15px;font-weight:600;flex:1;min-width:0">Vault</span>
+              <button style="width:36px;height:36px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">more_horiz</span></button>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <span style="width:44px;height:44px;border-radius:12px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none;font:24px/1 'Material Symbols Outlined'">key</span>
+              <div style="min-width:0;flex:1">
+                <div style="font-size:18px;font-weight:700;letter-spacing:-.02em;line-height:1.25">Northbeam SFTP</div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:5px">
+                  <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid var(--border);background:var(--surface-3);color:var(--text-2)">Credential</span>
+                  <span style="font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">updated 21 Jul by Tom</span>
+                </div>
+              </div>
+            </div>
+            <button style="width:100%;height:40px;margin-top:13px;border:1px solid var(--border);border-radius:11px;background:var(--surface-2);color:var(--text-2);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px" style-hover="color:var(--text);border-color:var(--border-2)"><span style="font:19px/1 'Material Symbols Outlined'">person_add</span>Share with teammates</button>
+          </div>
+
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px">
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:12px">
+              <sc-for list="{{ credFields }}" as="f" hint-placeholder-count="4">
+                <div>
+                  <div style="font-size:11.5px;color:var(--text-3);margin-bottom:5px">{{ f.label }}</div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="flex:1;min-width:0;font-family:var(--mono);font-size:13px;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.value }}</span>
+                    <sc-if value="{{ f.secret }}" hint-placeholder-val="{{ true }}">
+                      <button title="Reveal" style="width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-2);color:var(--text)"><span style="font:19px/1 'Material Symbols Outlined'">visibility</span></button>
+                    </sc-if>
+                    <button title="Copy" style="width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-2);color:var(--text)"><span style="font:19px/1 'Material Symbols Outlined'">content_copy</span></button>
+                  </div>
+                </div>
+              </sc-for>
+              <div>
+                <div style="font-size:11.5px;color:var(--text-3);margin-bottom:5px">Note</div>
+                <p style="margin:0;font-size:13.5px;color:var(--text-2);line-height:1.55;text-wrap:pretty">Rotate on the first Monday of each quarter. IP allowlist is managed by Northbeam IT — email Ines before adding a new machine.</p>
+              </div>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em;flex:1">Shared with</span>
+                <span style="display:flex">
+                  <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">TI</span>
+                  <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface);margin-left:-6px">PK</span>
+                </span>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="width:28px;height:28px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">TI</span>
+                <span style="font-size:13.5px;flex:1;min-width:0">Tom Iversen</span>
+                <span data-badge="strong" style="display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">Edit</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 13px">
+                <span style="width:28px;height:28px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">PK</span>
+                <span style="font-size:13.5px;flex:1;min-width:0">Priya Kohli</span>
+                <span data-badge="neutral" style="display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">Read only</span>
+              </div>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">Access log</span>
+                <a href="#" style="font-size:12.5px;font-weight:600">Export</a>
+              </div>
+              <sc-for list="{{ accessLog }}" as="l" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--border)">
+                  <span style="width:26px;height:26px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ l.i }}</span>
+                  <span style="font-size:12.5px;color:var(--text-2);flex:1;min-width:0;line-height:1.4"><strong style="color:var(--text);font-weight:600">{{ l.n }}</strong> {{ l.what }}</span>
+                  <span style="font-size:11px;color:var(--text-3);flex:none;font-family:var(--mono)">{{ l.when }}</span>
+                </div>
+              </sc-for>
+            </section>
+          </div>
+
+          <dc-import name="MobileTabBar" more-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">14</span>
+        <span style="font-size:13.5px;font-weight:600">Share sheet</span>
+        <span style="font-size:12.5px;color:var(--text-3)">read-only or edit, per person</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px;position:relative">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);opacity:.45">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Vault</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Private to you unless shared</div>
+            </div>
+          </div>
+          <div style="flex:1;background:rgba(10,10,14,.42)"></div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:18px 18px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden">
+            <div style="flex:none;display:flex;flex-direction:column;align-items:center;padding:9px 0 0">
+              <span style="width:38px;height:4px;border-radius:2px;background:var(--border-2)"></span>
+            </div>
+            <div style="flex:none;display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid var(--border)">
+              <span style="font-size:16px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Share “Northbeam SFTP”</span>
+              <button style="width:30px;height:30px;border:none;border-radius:9px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="color:var(--text)"><span style="font:19px/1 'Material Symbols Outlined'">close</span></button>
+            </div>
+            <div style="padding:14px 16px 6px">
+              <input type="text" placeholder="Search teammates…" style="width:100%;height:42px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface-2);outline:none;font-size:14px" style-focus="border-color:var(--accent);background:var(--surface);box-shadow:var(--ring)" />
+            </div>
+            <div style="padding:4px 10px 8px;display:flex;flex-direction:column;gap:1px">
+              <sc-for list="{{ shareList }}" as="p" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 6px;border-radius:10px">
+                  <span data-badge="{{ p.box }}" style="width:20px;height:20px;border-radius:6px;border:1.5px solid;display:flex;align-items:center;justify-content:center;flex:none;font:15px/1 'Material Symbols Outlined'">{{ p.mark }}</span>
+                  <span style="width:32px;height:32px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ p.i }}</span>
+                  <span style="min-width:0;flex:1">
+                    <span style="display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.n }}</span>
+                    <span style="display:block;font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.t }}</span>
+                  </span>
+                  <sc-if value="{{ p.on }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:flex;gap:2px;padding:2px;background:var(--surface-3);border-radius:8px;flex:none">
+                      <span data-seg="{{ p.segRead }}" style="height:26px;padding:0 9px;border-radius:6px;font-size:11.5px;font-weight:500;color:var(--text-2);display:inline-flex;align-items:center">Read</span>
+                      <span data-seg="{{ p.segEdit }}" style="height:26px;padding:0 9px;border-radius:6px;font-size:11.5px;font-weight:500;color:var(--text-2);display:inline-flex;align-items:center">Edit</span>
+                    </span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px 28px;border-top:1px solid var(--border);background:var(--surface-2)">
+              <span style="font-size:11.5px;color:var(--text-3);flex:1">2 selected · every view is logged</span>
+              <button style="height:40px;padding:0 14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);font-size:14px;font-weight:600;color:var(--text-2);flex:none" style-hover="color:var(--text)">Cancel</button>
+              <button style="height:40px;padding:0 16px;border:none;border-radius:11px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;flex:none" style-hover="background:var(--btn-h)">Share</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">15</span>
+        <span style="font-size:13.5px;font-weight:600">Announcements</span>
+        <span style="font-size:12.5px;color:var(--text-3)">pinned first</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Announcements</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Visible to the whole workspace</div>
+            </div>
+            <button style="height:36px;padding:0 13px;border:none;border-radius:10px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">edit</span>Post</button>
+          </div>
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ announcements }}" as="a" hint-placeholder-count="3">
+              <article style="border:1px solid {{ a.border }};background:{{ a.bg }};border-radius:12px;padding:14px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap">
+                  <sc-if value="{{ a.pinned }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:700;background:var(--surface);color:var(--accent);border:1px solid var(--accent-line)"><span style="font:13px/1 'Material Symbols Outlined'">push_pin</span>Pinned</span>
+                  </sc-if>
+                  <span style="font-size:11.5px;color:var(--text-3);margin-left:auto">{{ a.when }}</span>
+                </div>
+                <div style="font-size:15px;font-weight:700;letter-spacing:-.01em;line-height:1.3;text-wrap:pretty">{{ a.title }}</div>
+                <p style="margin:7px 0 0;font-size:13.5px;color:var(--text-2);line-height:1.6;text-wrap:pretty">{{ a.body }}</p>
+                <div style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border)">
+                  <span style="width:26px;height:26px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ a.i }}</span>
+                  <span style="font-size:12.5px;color:var(--text-2);flex:1;min-width:0">{{ a.author }}</span>
+                  <span style="font-size:11.5px;color:var(--text-3);display:flex;align-items:center;gap:5px;flex:none"><span style="font:15px/1 'Material Symbols Outlined'">visibility</span>{{ a.reads }}</span>
+                </div>
+              </article>
+            </sc-for>
+          </div>
+          <dc-import name="MobileTabBar" more-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">16</span>
+        <span style="font-size:13.5px;font-weight:600">Invoices</span>
+        <span style="font-size:12.5px;color:var(--text-3)">outstanding called out</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;height:50px;padding:0 16px">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Invoices</div>
+                <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Terms are 30 days · avg 21 to pay</div>
+              </div>
+              <button style="height:36px;padding:0 13px;border:none;border-radius:10px;background:var(--btn);color:var(--on-btn);font-size:14px;font-weight:600;display:flex;align-items:center;gap:5px;flex:none" style-hover="background:var(--btn-h)"><span style="font:19px/1 'Material Symbols Outlined'">add</span>Record</button>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 16px 11px;overflow-x:auto">
+              <span data-seg="on" style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:transparent;color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">All</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Outstanding 4</span>
+              <span style="flex:none;height:30px;padding:0 12px;border-radius:15px;background:var(--surface-2);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;border:1px solid var(--border)">Paid 11</span>
+            </div>
+          </div>
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 13px">
+                <div style="font-size:11.5px;color:var(--text-3)">Outstanding</div>
+                <div style="font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--warn);margin-top:3px">£28,750</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:2px">4 invoices</div>
+              </div>
+              <div style="flex:1;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 13px">
+                <div style="font-size:11.5px;color:var(--text-3)">Overdue</div>
+                <div style="font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--bad);margin-top:3px">£3,150</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:2px">1 · 18 days late</div>
+              </div>
+            </div>
+            <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <sc-for list="{{ invoices }}" as="i" hint-placeholder-count="5">
+                <div style="padding:12px 13px;border-bottom:1px solid var(--border)">
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <span style="font-family:var(--mono);font-size:11.5px;color:var(--text-3);flex:1;min-width:0">{{ i.number }}</span>
+                    <span data-badge="{{ i.sk }}" style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ i.status }}</span>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:10px;margin-top:6px">
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ i.client }}</div>
+                      <div style="font-size:11.5px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ i.desc }}</div>
+                    </div>
+                    <div style="text-align:right;flex:none">
+                      <div style="font-size:15px;font-weight:700;letter-spacing:-.01em">{{ i.amount }}</div>
+                      <div style="font-size:11px;color:{{ i.dueColor }};font-weight:{{ i.dueWeight }}">due {{ i.due }}</div>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <dc-import name="MobileTabBar" more-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">17</span>
+        <span style="font-size:13.5px;font-weight:600">Settings</span>
+        <span style="font-size:12.5px;color:var(--text-3)">profile, theme, members</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Settings</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Profile &amp; workspace</div>
+            </div>
+          </div>
+          <div style="flex:1;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px">
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 13px">
+                <span style="width:48px;height:48px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">ME</span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:15.5px;font-weight:600">Maya Ellison</div>
+                  <div style="font-size:12.5px;color:var(--text-3);margin-top:1px">Studio Director · Admin</div>
+                  <div style="font-size:12px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">maya@meridian.studio</div>
+                </div>
+                <span style="font:20px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">chevron_right</span>
+              </div>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:13px">
+              <div style="font-size:13.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px">Appearance</div>
+              <div style="font-size:12.5px;color:var(--text-3);margin-bottom:11px">Follows your device by default.</div>
+              <div style="display:flex;gap:2px;padding:2px;background:var(--surface-3);border-radius:11px">
+                <span data-seg="{{ segLight }}" style="flex:1;height:36px;border-radius:9px;color:var(--text-2);font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font:18px/1 'Material Symbols Outlined'">light_mode</span>Light</span>
+                <span data-seg="{{ segDark }}" style="flex:1;height:36px;border-radius:9px;color:var(--text-2);font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font:18px/1 'Material Symbols Outlined'">dark_mode</span>Dark</span>
+              </div>
+            </section>
+
+            <section style="border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--border)">
+                <span style="font-size:13.5px;font-weight:700;letter-spacing:-.01em">Members</span>
+                <button style="height:30px;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:12.5px;font-weight:600;color:var(--text-2);display:flex;align-items:center;gap:5px" style-hover="color:var(--text)"><span style="font:16px/1 'Material Symbols Outlined'">person_add</span>Invite</button>
+              </div>
+              <sc-for list="{{ members }}" as="m" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--border)">
+                  <span style="width:32px;height:32px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ m.i }}</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.n }}</div>
+                    <div style="font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.email }}</div>
+                  </div>
+                  <span data-badge="{{ m.rk }}" style="display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid;flex:none">{{ m.r }}</span>
+                </div>
+              </sc-for>
+            </section>
+
+            <button style="width:100%;height:44px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text-2);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px" style-hover="color:var(--text);border-color:var(--border-2)"><span style="font:19px/1 'Material Symbols Outlined'">logout</span>Sign out</button>
+
+            <div style="border:1px solid var(--bad-line);background:var(--surface);border-radius:12px;padding:13px">
+              <div style="font-size:13.5px;font-weight:700;color:var(--bad)">Delete workspace</div>
+              <p style="margin:4px 0 11px;font-size:12.5px;color:var(--text-3);line-height:1.5">Removes all clients, projects, tasks, and vault items. This cannot be undone.</p>
+              <button style="height:38px;padding:0 14px;border:1px solid var(--bad-line);border-radius:10px;background:var(--bad-bg);color:var(--bad);font-size:13.5px;font-weight:600" style-hover="filter:brightness(.97)">Delete</button>
+            </div>
+          </div>
+          <dc-import name="MobileTabBar" more-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">18</span>
+        <span style="font-size:13.5px;font-weight:600">Notifications</span>
+        <span style="font-size:12.5px;color:var(--text-3)">pushed from the bell</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border)">
+            <button style="width:32px;height:32px;margin-left:-6px;border:none;border-radius:10px;background:transparent;color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:var(--surface-3)"><span style="font:22px/1 'Material Symbols Outlined'">arrow_back</span></button>
+            <div style="min-width:0;flex:1;display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px;font-weight:700;letter-spacing:-.02em">Notifications</span>
+              <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:6px;font-size:10.5px;font-weight:700;background:var(--accent-soft);color:var(--accent);flex:none">3 new</span>
+            </div>
+            <button style="border:none;background:none;color:var(--accent);font-size:13px;font-weight:600;padding:0;flex:none">Mark all read</button>
+          </div>
+          <div style="flex:1">
+            <sc-for list="{{ notifications }}" as="n" hint-placeholder-count="5">
+              <div style="display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface)">
+                <span style="width:34px;height:34px;border-radius:10px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none;font:20px/1 'Material Symbols Outlined'">{{ n.icon }}</span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:13.5px;color:var(--text);line-height:1.45;text-wrap:pretty">{{ n.text }}</div>
+                  <div style="font-size:11.5px;color:var(--text-3);margin-top:4px">{{ n.meta }}</div>
+                </div>
+                <sc-if value="{{ n.unread }}" hint-placeholder-val="{{ true }}">
+                  <span style="width:8px;height:8px;border-radius:50%;background:var(--btn);flex:none;margin-top:6px"></span>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div style="padding:26px 24px;text-align:center">
+              <div style="font-size:13px;color:var(--text-3);line-height:1.5">That's everything from the last 7 days.</div>
+              <button style="height:36px;padding:0 14px;margin-top:11px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-size:13px;font-weight:600;color:var(--text-2)" style-hover="color:var(--text)">Notification settings</button>
+            </div>
+          </div>
+          <dc-import name="MobileTabBar" home-active="{{ yes }}" hint-size="100%,82px" style="position:sticky;bottom:0;margin-top:auto;flex:none;z-index:5"></dc-import>
+        </div>
+      </x-import>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;align-items:baseline;gap:9px;padding-left:4px">
+        <span style="font:11px/1 var(--mono);color:var(--text-3);letter-spacing:.08em">19</span>
+        <span style="font-size:13.5px;font-weight:600">More</span>
+        <span style="font-size:12.5px;color:var(--text-3)">the five nav items that don't fit</span>
+      </div>
+      <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+        <div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);padding-top:54px;position:relative">
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);opacity:.45">
+            <div style="min-width:0;flex:1">
+              <div style="font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15">Today</div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.2">Wednesday, 29 July</div>
+            </div>
+            <span style="width:30px;height:30px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">ME</span>
+          </div>
+          <div style="flex:1;background:rgba(10,10,14,.42)"></div>
+
+          <div style="position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:18px 18px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden">
+            <div style="flex:none;display:flex;flex-direction:column;align-items:center;padding:9px 0 0">
+              <span style="width:38px;height:4px;border-radius:2px;background:var(--border-2)"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)">
+              <span style="width:42px;height:42px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">ME</span>
+              <div style="min-width:0;flex:1">
+                <div style="font-size:15px;font-weight:600">Maya Ellison</div>
+                <div style="font-size:12.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">maya@meridian.studio</div>
+              </div>
+              <span style="display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid var(--border);background:var(--surface-3);color:var(--text-2);flex:none">Admin</span>
+            </div>
+            <div style="padding:6px 10px">
+              <sc-for list="{{ moreLinks }}" as="l" hint-placeholder-count="6">
+                <a href="#" style="display:flex;align-items:center;gap:13px;padding:12px 8px;border-radius:11px;color:var(--text);text-decoration:none" style-hover="background:var(--surface-2);text-decoration:none">
+                  <span style="width:36px;height:36px;border-radius:10px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none;font:20px/1 'Material Symbols Outlined'">{{ l.icon }}</span>
+                  <span style="min-width:0;flex:1">
+                    <span style="display:block;font-size:14.5px;font-weight:600">{{ l.label }}</span>
+                    <span style="display:block;font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.meta }}</span>
+                  </span>
+                  <span style="font:20px/1 'Material Symbols Outlined';color:var(--text-3);flex:none">chevron_right</span>
+                </a>
+              </sc-for>
+            </div>
+            <div style="padding:8px 18px 30px;border-top:1px solid var(--border);margin-top:4px">
+              <button style="width:100%;height:44px;margin-top:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--text-2);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px" style-hover="color:var(--text)"><span style="font:19px/1 'Material Symbols Outlined'">logout</span>Sign out</button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light' | 'dark'&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;darkTone&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;black&quot;,&quot;slate&quot;,&quot;warm&quot;,&quot;indigo&quot;],&quot;default&quot;:&quot;black&quot;,&quot;tsType&quot;:&quot;'black' | 'slate' | 'warm' | 'indigo'&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#4b53c9&quot;,&quot;#2f6fb8&quot;,&quot;#4a5568&quot;,&quot;#3f7a60&quot;],&quot;default&quot;:&quot;#4b53c9&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;}}">
+const TEAM = [
+  {id:'u1',n:'Maya Ellison',i:'ME',t:'Studio Director',r:'Admin',open:4},
+  {id:'u2',n:'Dev Raman',i:'DR',t:'Senior Designer',r:'Member',open:6},
+  {id:'u3',n:'Priya Kohli',i:'PK',t:'Design Lead',r:'Member',open:5},
+  {id:'u4',n:'Tom Iversen',i:'TI',t:'Frontend Engineer',r:'Member',open:7},
+  {id:'u6',n:'Ben Cho',i:'BC',t:'Copywriter',r:'Member',open:2,leave:'On leave until 3 Aug'}
+];
+
+const PROJECTS = [
+  {id:'p1',name:'Spring Campaign Site',client:'Harlow & Fitch',clientId:'c1',pct:68,health:'On Track',hk:'ok',pj:1,due:'14 Aug'},
+  {id:'p2',name:'Brand Guidelines v3',client:'Harlow & Fitch',clientId:'c1',pct:42,health:'At Risk',hk:'warn',pj:2,due:'28 Aug'},
+  {id:'p3',name:'Logistics Portal Redesign',client:'Northbeam Logistics',clientId:'c2',pct:81,health:'On Track',hk:'ok',pj:3,due:'4 Sep'},
+  {id:'p4',name:'Patient Portal UX',client:'Verity Health',clientId:'c3',pct:35,health:'Blocked',hk:'bad',pj:4,due:'21 Aug'},
+  {id:'p5',name:'Q3 Report Microsite',client:'Pallas Financial',clientId:'c4',pct:24,health:'On Track',hk:'ok',pj:5,due:'18 Sep'},
+  {id:'p6',name:'Packaging System',client:'Corsair Coffee',clientId:'c5',pct:90,health:'On Track',hk:'ok',pj:6,due:'7 Aug'}
+];
+
+const TASKS = [
+  {id:'t1',title:'Hero module responsive breakpoints',p:'p1',pri:'High',st:'In Progress',due:0,people:['DR','TI'],done:3,total:5,comments:4,logged:'3h 20m'},
+  {id:'t2',title:'Finalise colour tokens for guidelines',p:'p2',pri:'Urgent',st:'In Progress',due:-1,people:['PK'],done:2,total:6,comments:7,logged:'5h 05m'},
+  {id:'t3',title:'Shipment tracking table spec',p:'p3',pri:'Medium',st:'Review',due:1,people:['TI','AN'],done:4,total:4,comments:2,logged:'2h 10m'},
+  {id:'t4',title:'Accessibility audit — patient intake forms',p:'p4',pri:'Urgent',st:'To Do',due:-5,people:['PK','ME'],done:0,total:8,comments:9,logged:'0h 00m'},
+  {id:'t5',title:'Write launch email sequence',p:'p1',pri:'Medium',st:'To Do',due:2,people:['BC'],done:0,total:3,comments:0,logged:'0h 00m'},
+  {id:'t6',title:'Motion study for packaging reveal',p:'p6',pri:'Low',st:'In Progress',due:0,people:['LF'],done:1,total:2,comments:1,logged:'1h 45m'},
+  {id:'t8',title:'Client review deck — round 2',p:'p1',pri:'High',st:'Review',due:0,people:['ME','SW'],done:2,total:3,comments:5,logged:'1h 30m'},
+  {id:'t9',title:'Component audit before handoff',p:'p3',pri:'High',st:'In Progress',due:3,people:['TI'],done:5,total:9,comments:3,logged:'6h 15m'},
+  {id:'t12',title:'Security questionnaire response',p:'p4',pri:'High',st:'To Do',due:4,people:['ME'],done:0,total:5,comments:0,logged:'0h 00m'},
+  {id:'t13',title:'Typography spec for editorial pages',p:'p2',pri:'Medium',st:'To Do',due:7,people:['PK','BC'],done:0,total:4,comments:1,logged:'0h 00m'},
+  {id:'t16',title:'Retainer scope note for August',p:'p2',pri:'High',st:'Review',due:2,people:['SW','AN'],done:1,total:2,comments:4,logged:'0h 45m'},
+  {id:'t11',title:'Update sitemap after scope change',p:'p1',pri:'Medium',st:'Done',due:-4,people:['DR'],done:3,total:3,comments:2,logged:'2h 30m'}
+];
+
+const CHECKLIST = [
+  {text:'Audit current breakpoints in staging',done:true},
+  {text:'Define clamp() range for display size',done:true},
+  {text:'Mobile CTA placement above fold',done:true},
+  {text:'4:5 image crop below 640px',done:false},
+  {text:'Review with Tom before handoff',done:false}
+];
+
+const COMMENTS = [
+  {i:'TI',n:'Tom Iversen',when:'2h ago',pre:'Clamp range works, but the 4:5 crop breaks on the tallest product shots. ',mention:'@Dev Raman',post:' can you confirm the art direction rule?'},
+  {i:'DR',n:'Dev Raman',when:'1h ago',pre:'Rule is: crop from the top, keep 8% headroom. I updated the spec sheet. ',mention:'@Priya Kohli',post:' flagged the same thing on guidelines.'},
+  {i:'PK',n:'Priya Kohli',when:'26m ago',pre:'Confirmed — matches the guidelines. ',mention:'@Maya Ellison',post:' no need to escalate, we are fine for Thursday.'}
+];
+
+const CLIENTS = [
+  {id:'c1',name:'Harlow & Fitch',initials:'HF',sector:'Retail & apparel',status:'Active',sk:'ok',projects:2,balance:'£18,400',bal:1},
+  {id:'c2',name:'Northbeam Logistics',initials:'NL',sector:'Freight & supply chain',status:'Active',sk:'ok',projects:1,balance:'£0',bal:0},
+  {id:'c3',name:'Verity Health',initials:'VH',sector:'Healthcare',status:'Active',sk:'ok',projects:1,balance:'£7,200',bal:1},
+  {id:'c4',name:'Pallas Financial',initials:'PF',sector:'Financial services',status:'Active',sk:'ok',projects:1,balance:'£0',bal:0},
+  {id:'c5',name:'Corsair Coffee',initials:'CC',sector:'Food & beverage',status:'Paused',sk:'neutral',projects:1,balance:'£3,150',bal:2}
+];
+
+const VAULT = [
+  {id:'v1',icon:'description',name:'H&F campaign contract.pdf',meta:'File · 1.2 MB · added 12 Jun'},
+  {id:'v2',icon:'sticky_note_2',name:'Studio door + wifi codes',meta:'Note · updated 3 Jul'},
+  {id:'v3',icon:'key',name:'Northbeam SFTP',meta:'Credential · updated 21 Jul',shared:true},
+  {id:'v4',icon:'key',name:'Figma organisation admin',meta:'Credential · updated 9 Jul'},
+  {id:'v5',icon:'description',name:'Insurance certificate 2026.pdf',meta:'File · 480 KB · added 4 Feb'},
+  {id:'v6',icon:'sticky_note_2',name:'Freelancer day rates 2026',meta:'Note · updated 17 Jul'},
+  {id:'v7',icon:'key',name:'Analytics service account',meta:'Credential · updated 28 Jun',shared:true}
+];
+
+const CRED_FIELDS = [
+  {label:'Host',value:'sftp.northbeam.co',secret:false},
+  {label:'Username',value:'meridian_ops',secret:false},
+  {label:'Password',value:'••••••••••••',secret:true},
+  {label:'API key',value:'••••••••••••••••',secret:true}
+];
+
+const ACCESS_LOG = [
+  {i:'TI',n:'Tom Iversen',what:'revealed the password',when:'2h ago'},
+  {i:'AN',n:'Alina Novak',what:'opened this item',when:'Yesterday 16:04'},
+  {i:'ME',n:'Maya Ellison',what:'updated the API key',when:'21 Jul 09:12'}
+];
+
+const ANNOUNCEMENTS = [
+  {pinned:true,title:'Q3 retainer review moves to Thursday 2pm',when:'4h ago',i:'AN',author:'Alina Novak',reads:'7 of 8 read',
+   body:'Rowan asked to shift the review so their ecommerce lead can join. Same agenda: hours to date, August scope, and the photography budget.'},
+  {title:'New task statuses are live',when:'Yesterday',i:'ME',author:'Maya Ellison',reads:'8 of 8 read',
+   body:'Boards now use To Do / In Progress / Review / Done everywhere. “Review” means it is waiting on someone else. If it is waiting on you, it is still In Progress.'},
+  {title:'Studio closed Friday 14 August',when:'21 Jul',i:'AN',author:'Alina Novak',reads:'8 of 8 read',
+   body:'Building maintenance. Work from home or take the day — log it as leave either way so the calendar stays honest.'}
+];
+
+const INVOICES = [
+  {number:'INV-2026-081',client:'Harlow & Fitch',desc:'July retainer',amount:'£9,500',status:'Outstanding',sk:'warn',due:'12 Aug',late:false},
+  {number:'INV-2026-080',client:'Verity Health',desc:'Portal discovery phase',amount:'£7,200',status:'Outstanding',sk:'warn',due:'9 Aug',late:false},
+  {number:'INV-2026-079',client:'Corsair Coffee',desc:'Packaging system — phase 2',amount:'£3,150',status:'Overdue',sk:'bad',due:'11 Jul',late:true},
+  {number:'INV-2026-074',client:'Harlow & Fitch',desc:'Campaign photography direction',amount:'£8,900',status:'Outstanding',sk:'warn',due:'5 Aug',late:false},
+  {number:'INV-2026-071',client:'Northbeam Logistics',desc:'Portal redesign — phase 3',amount:'£14,000',status:'Paid',sk:'ok',due:'18 Jul',late:false}
+];
+
+const NOTIFS = [
+  {icon:'assignment_ind',text:'Alina Novak assigned you “Security questionnaire response”',meta:'Patient Portal UX · 22m ago',unread:true},
+  {icon:'alternate_email',text:'Priya Kohli mentioned you in “Finalise colour tokens”',meta:'Brand Guidelines v3 · 1h ago',unread:true},
+  {icon:'schedule',text:'“Client review deck — round 2” is due today',meta:'Spring Campaign Site · 3h ago',unread:true},
+  {icon:'folder_shared',text:'Tom Iversen shared “Northbeam SFTP” with you',meta:'Vault · Yesterday',unread:false},
+  {icon:'check_circle',text:'Luis Ferreira completed “Print spec sheet”',meta:'Packaging System · Yesterday',unread:false}
+];
+
+const MORE_LINKS = [
+  {icon:'layers',label:'Projects',meta:'6 active'},
+  {icon:'groups',label:'Team',meta:'8 people · 1 on leave'},
+  {icon:'lock',label:'Vault',meta:'9 items'},
+  {icon:'campaign',label:'Announcements',meta:'1 pinned'},
+  {icon:'receipt_long',label:'Invoices',meta:'£28,750 outstanding'},
+  {icon:'settings',label:'Settings',meta:'Profile & workspace'}
+];
+
+const LEAVE_DAYS = ['30 Jul','31 Jul','3 Aug'];
+
+const PRI_KIND = {Low:'neutral',Medium:'strong',High:'warn',Urgent:'bad'};
+const ST_DOT = {'To Do':'mute','In Progress':'strong','Review':'soft','Done':'ok'};
+
+class Component extends DCLogic {
+  rootRef = React.createRef();
+  state = {theme: 'light'};
+
+  componentDidMount() {
+    this.setState({theme: this.props.defaultTheme || 'light'});
+    this.syncRoot();
+  }
+  componentDidUpdate(prev, prevProps) {
+    if (prev.theme !== this.state.theme || (prevProps && prevProps.darkTone !== this.props.darkTone)) this.syncRoot();
+    if (prevProps && prevProps.defaultTheme !== this.props.defaultTheme && this.props.defaultTheme) this.setState({theme: this.props.defaultTheme});
+    this.syncAccent();
+  }
+  syncRoot() {
+    const tone = this.props.darkTone || 'black';
+    ['data-theme', 'data-tone'].forEach((a, k) => {
+      document.documentElement.setAttribute(a, k ? tone : this.state.theme);
+      document.body.setAttribute(a, k ? tone : this.state.theme);
+    });
+    this.syncAccent();
+  }
+  lighten(hex, amt) {
+    const v = String(hex).replace('#', '');
+    const h = v.length === 3 ? v.split('').map(c => c + c).join('') : v;
+    if (h.length !== 6) return hex;
+    const p = i => parseInt(h.slice(i, i + 2), 16);
+    const m = c => Math.round(c + (255 - c) * amt).toString(16).padStart(2, '0');
+    return '#' + m(p(0)) + m(p(2)) + m(p(4));
+  }
+  darken(hex, amt) {
+    const v = String(hex).replace('#', '');
+    const h = v.length === 3 ? v.split('').map(c => c + c).join('') : v;
+    if (h.length !== 6) return hex;
+    const p = i => parseInt(h.slice(i, i + 2), 16);
+    const m = c => Math.round(c * (1 - amt)).toString(16).padStart(2, '0');
+    return '#' + m(p(0)) + m(p(2)) + m(p(4));
+  }
+  rgbTriplet(hex) {
+    const v = String(hex).replace('#', '');
+    const h = v.length === 3 ? v.split('').map(c => c + c).join('') : v;
+    if (h.length !== 6) return '75,83,201';
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
+  }
+  syncAccent() {
+    const a = this.props.accent;
+    const dark = this.state.theme === 'dark';
+    const keys = ['--accent','--btn','--btn-h','--accent-soft','--accent-line','--ring'];
+    const nodes = [document.documentElement, this.rootRef.current].filter(Boolean);
+    nodes.forEach(n => {
+      if (!a) { keys.forEach(k => n.style.removeProperty(k)); return; }
+      n.style.setProperty('--accent', dark ? this.lighten(a, 0.46) : a);
+      n.style.setProperty('--btn', a);
+      n.style.setProperty('--btn-h', dark ? this.lighten(a, 0.16) : this.darken(a, 0.18));
+      n.style.setProperty('--accent-soft', 'color-mix(in oklab, ' + a + ' ' + (dark ? '17%' : '11%') + ', var(--surface))');
+      n.style.setProperty('--accent-line', 'color-mix(in oklab, ' + a + ' ' + (dark ? '40%' : '30%') + ', var(--surface))');
+      n.style.setProperty('--ring', '0 0 0 3px rgba(' + this.rgbTriplet(a) + ',' + (dark ? '.3' : '.22') + ')');
+    });
+  }
+
+  monthCells(all) {
+    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const cells = [];
+    for (let k = 0; k < 35; k++) {
+      const d = new Date(2026, 5, 29 + k);
+      const key = d.getDate() + ' ' + M[d.getMonth()];
+      const inMonth = d.getMonth() === 6;
+      const isToday = inMonth && d.getDate() === 29;
+      const due = all.filter(t => t.dueShort === key);
+      const hasLeave = LEAVE_DAYS.indexOf(key) >= 0;
+      cells.push({
+        n: d.getDate(),
+        dots: due.slice(0, 3).map(t => ({pj: t.pj})),
+        hasLeave,
+        bg: isToday ? 'var(--accent-soft)' : hasLeave ? 'var(--leave)' : inMonth ? 'var(--surface)' : 'var(--surface-2)',
+        numColor: isToday ? 'var(--accent)' : inMonth ? 'var(--text)' : 'var(--text-3)',
+        numWeight: isToday ? '700' : inMonth ? '600' : '400'
+      });
+    }
+    return cells;
+  }
+
+  dueInfo(d) {
+    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const base = new Date(2026, 6, 29 + d);
+    const full = base.getDate() + ' ' + M[base.getMonth()];
+    let label = full, color = 'var(--text-2)', weight = '500';
+    if (d < 0) { label = Math.abs(d) + 'd overdue'; color = 'var(--bad)'; weight = '700'; }
+    else if (d === 0) { label = 'Today'; color = 'var(--warn)'; weight = '700'; }
+    else if (d === 1) { label = 'Tomorrow'; color = 'var(--warn)'; weight = '600'; }
+    return {label, color, weight, full};
+  }
+  deco(t) {
+    const p = PROJECTS.find(x => x.id === t.p) || PROJECTS[0];
+    const d = this.dueInfo(t.due);
+    const pct = t.total ? Math.round(t.done / t.total * 100) : 0;
+    return {...t, pj: String(p.pj), project: p.name, client: p.client,
+      chip: p.client + ' · ' + p.name, priority: t.pri, pk: PRI_KIND[t.pri],
+      status: t.st, dueLabel: d.label, dueColor: d.color, dueWeight: d.weight, dueShort: d.full,
+      pctStr: pct + '%', checklistLabel: t.done + '/' + t.total};
+  }
+
+  renderVals() {
+    const s = this.state;
+    const all = TASKS.map(t => this.deco(t));
+    const boardItems = all.filter(t => t.p === 'p1' || t.p === 'p2');
+
+    return {
+      rootRef: this.rootRef, yes: true,
+      theme: s.theme, tone: this.props.darkTone || 'black', isDark: s.theme === 'dark',
+      setLight: () => this.setState({theme: 'light'}), setDark: () => this.setState({theme: 'dark'}),
+      segLight: s.theme === 'light' ? 'on' : 'off', segDark: s.theme === 'dark' ? 'on' : 'off',
+
+      overdue: all.filter(t => t.due < 0 && t.status !== 'Done'),
+      todayTasks: all.filter(t => t.due >= 0 && t.due <= 1 && t.status !== 'Done').slice(0, 4),
+      inProgress: all.filter(t => t.status === 'In Progress').slice(0, 3),
+
+      taskGroups: ['To Do','In Progress','Review'].map(name => {
+        const items = all.filter(t => t.status === name);
+        return {name, dot: ST_DOT[name], count: items.length, items};
+      }).filter(g => g.items.length > 0),
+
+      board: ['To Do','In Progress','Review','Done'].map(name => {
+        const items = boardItems.filter(t => t.status === name);
+        return {name, dot: ST_DOT[name], count: items.length, items};
+      }),
+
+      clientProjects: PROJECTS.filter(p => p.clientId === 'c1').map(p => ({...p, pctStr: p.pct + '%', pj: String(p.pj)})),
+
+      team: TEAM.map(m => {
+        const ts = all.filter(t => t.status === 'In Progress' && t.people.indexOf(m.i) >= 0);
+        return {...m, isAdmin: m.r === 'Admin', onLeave: !!m.leave, leave: m.leave || '',
+          tasks: ts, hasTasks: ts.length > 0, idle: ts.length === 0};
+      }),
+
+      checklist: CHECKLIST.map(c => ({text: c.text, mark: c.done ? 'check' : '', box: c.done ? 'ok' : 'neutral',
+        color: c.done ? 'var(--text-3)' : 'var(--text)', strike: c.done ? 'line-through' : 'none'})),
+      comments: COMMENTS,
+
+      clients: CLIENTS.map(c => ({...c, balColor: c.bal === 1 ? 'var(--warn)' : c.bal === 2 ? 'var(--bad)' : 'var(--text-3)'})),
+      projects: PROJECTS.map(p => ({...p, pctStr: p.pct + '%', pj: String(p.pj)})),
+      monthCells: this.monthCells(all),
+      agenda: all.filter(t => t.due === 0),
+      legend: PROJECTS.slice(0, 4).map(p => ({name: p.name, pj: String(p.pj)})),
+      vaultItems: VAULT.map(v => ({...v, shared: !!v.shared})),
+      credFields: CRED_FIELDS.map(f => ({...f, secret: !!f.secret})),
+      accessLog: ACCESS_LOG,
+      shareList: TEAM.filter(m => m.id !== 'u1').map(m => {
+        const cur = m.i === 'TI' ? 'edit' : m.i === 'PK' ? 'read' : null;
+        return {...m, on: !!cur, box: cur ? 'ok' : 'neutral', mark: cur ? 'check' : '',
+          segRead: cur === 'read' ? 'on' : 'off', segEdit: cur === 'edit' ? 'on' : 'off'};
+      }),
+      announcements: ANNOUNCEMENTS.map(a => ({...a, pinned: !!a.pinned,
+        bg: a.pinned ? 'var(--accent-soft)' : 'var(--surface)',
+        border: a.pinned ? 'var(--accent-line)' : 'var(--border)'})),
+      invoices: INVOICES.map(i => ({...i, dueColor: i.late ? 'var(--bad)' : 'var(--text-2)', dueWeight: i.late ? '700' : '500'})),
+      notifications: NOTIFS.map(n => ({...n, unread: !!n.unread})),
+      members: TEAM.map(m => ({...m, email: m.n.toLowerCase().split(' ')[0] + '@meridian.studio', rk: m.r === 'Admin' ? 'strong' : 'neutral'})),
+      moreLinks: MORE_LINKS
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "design-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "docs/design/meridian-ops", "-l", "5050"],
+      "port": 5050
+    }
+  ]
+}

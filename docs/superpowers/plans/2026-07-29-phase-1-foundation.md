@@ -2448,6 +2448,17 @@ git commit -m "feat: member profile page with validated updates"
 
 ---
 
+## Amendment (2026-07-29): Design hand-off arrived before execution
+
+The Claude Design output now lives at `docs/design/meridian-ops/` (`desktop.html`, `mobile.html`). It defines the complete token system: CSS variables for light (`:root`) and dark (`[data-theme="dark"]`) themes near the top of `desktop.html` — surfaces, borders, 3-step text ramp, one indigo accent (`--accent`, `--btn`), status colors (`--ok`/`--warn`/`--bad` with `-bg`/`-line` variants), shadows, and fonts (Public Sans for UI, IBM Plex Mono for numbers).
+
+**Impact on tasks (applies to Tasks 6, 7, 8, 9, 11 — any task rendering UI):**
+
+- The product name in the sidebar and `<title>` is **"Meridian Ops"** (not "Internal CMS").
+- In Task 7 Step 1, additionally: copy the `:root` and `[data-theme="dark"]` CSS-variable blocks from `docs/design/meridian-ops/desktop.html` into `globals.css`, and load Public Sans via `next/font/google` in the root layout.
+- next-themes must use `attribute="data-theme"` (matching the design's `[data-theme="dark"]` selector) instead of `attribute="class"`, and the Tailwind dark variant in `globals.css` becomes `@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));`.
+- Where task code hardcodes colors (e.g. `bg-indigo-600`, `border-gray-200`), prefer the design tokens via arbitrary values: `bg-[var(--btn)]`, `text-[var(--text-2)]`, `border-[var(--border)]`, `bg-[var(--bg)]`, etc. Exact visual parity with the mockup is NOT required in Phase 1 — token wiring is, so later phases inherit the right palette automatically.
+
 ## Phase 1 Done Criteria
 
 - [ ] Fresh clone + `.env` from `.env.example` + `npx prisma migrate dev` + `npx prisma db seed` + `npm run dev` gives a working app.

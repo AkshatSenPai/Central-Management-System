@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;align-items:flex-start;gap:2px;padding:7px 6px 26px;background:var(--surface);border-top:1px solid var(--border);backdrop-filter:saturate(1.2)">
+  <a href="#" data-active="{{ homeActive }}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 4px;border-radius:9px;color:var(--text-3);text-decoration:none" style-hover="text-decoration:none">
+    <span style="font:24px/1 'Material Symbols Outlined'">space_dashboard</span>
+    <span style="font-size:10.5px;font-weight:600;letter-spacing:.01em">Home</span>
+  </a>
+  <a href="#" data-active="{{ tasksActive }}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 4px;border-radius:9px;color:var(--text-3);text-decoration:none" style-hover="text-decoration:none">
+    <span style="font:24px/1 'Material Symbols Outlined'">check_circle</span>
+    <span style="font-size:10.5px;font-weight:600;letter-spacing:.01em">Tasks</span>
+  </a>
+  <a href="#" data-active="{{ clientsActive }}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 4px;border-radius:9px;color:var(--text-3);text-decoration:none" style-hover="text-decoration:none">
+    <span style="font:24px/1 'Material Symbols Outlined'">business_center</span>
+    <span style="font-size:10.5px;font-weight:600;letter-spacing:.01em">Clients</span>
+  </a>
+  <a href="#" data-active="{{ calendarActive }}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 4px;border-radius:9px;color:var(--text-3);text-decoration:none" style-hover="text-decoration:none">
+    <span style="font:24px/1 'Material Symbols Outlined'">calendar_month</span>
+    <span style="font-size:10.5px;font-weight:600;letter-spacing:.01em">Calendar</span>
+  </a>
+  <a href="#" data-active="{{ moreActive }}" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 4px;border-radius:9px;color:var(--text-3);text-decoration:none" style-hover="text-decoration:none">
+    <span style="font:24px/1 'Material Symbols Outlined'">more_horiz</span>
+    <span style="font-size:10.5px;font-weight:600;letter-spacing:.01em">More</span>
+  </a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:402,&quot;height&quot;:100},&quot;homeActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;tasksActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;clientsActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;calendarActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;moreActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}"></script>
+</body>
+</html>
