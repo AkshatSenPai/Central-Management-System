@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { generateInviteToken, inviteExpiry, inviteStatus } from "@/lib/invites";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { hashPassword } from "@/lib/password";
@@ -48,14 +48,21 @@ export async function redeemInvite(
   if (existing) return err("A member with this email already exists");
 
   const passwordHash = await hashPassword(input.password);
-  await db.$transaction([
-    db.user.create({
-      data: { email: invite.email, name, passwordHash, role: invite.role },
-    }),
-    db.invite.update({
-      where: { id: invite.id },
-      data: { acceptedAt: new Date() },
-    }),
-  ]);
+  try {
+    await db.$transaction([
+      db.user.create({
+        data: { email: invite.email, name, passwordHash, role: invite.role },
+      }),
+      db.invite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date() },
+      }),
+    ]);
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return err("A member with this email already exists");
+    }
+    throw e;
+  }
   return ok(undefined);
 }

@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { redeemInvite } from "@/lib/invite-service";
 
 type FakeParts = {
   invite?: unknown;
   existingUser?: unknown;
+  transactionError?: unknown;
 };
 
 function fakeDb(parts: FakeParts) {
@@ -25,7 +26,10 @@ function fakeDb(parts: FakeParts) {
         return args.data;
       },
     },
-    $transaction: async (ops: unknown[]) => Promise.all(ops as Promise<unknown>[]),
+    $transaction: async (ops: unknown[]) => {
+      if (parts.transactionError) throw parts.transactionError;
+      return Promise.all(ops as Promise<unknown>[]);
+    },
   } as unknown as PrismaClient;
   return { db, userCreates, inviteUpdates };
 }
@@ -100,5 +104,26 @@ describe("redeemInvite", () => {
     });
     expect(String(userCreates[0].passwordHash)).toMatch(/^\$argon2/);
     expect(inviteUpdates[0]).toHaveProperty("acceptedAt");
+  });
+
+  it("maps a concurrent-redemption unique-constraint race to a friendly error", async () => {
+    const raceError = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "test",
+    });
+    const { db } = fakeDb({ invite: validInvite, transactionError: raceError });
+    expect(await redeemInvite(db, goodInput)).toEqual({
+      ok: false,
+      error: "A member with this email already exists",
+    });
+  });
+
+  it("rethrows a non-unique-constraint transaction failure", async () => {
+    const otherError = new Prisma.PrismaClientKnownRequestError("Some other DB error", {
+      code: "P2025",
+      clientVersion: "test",
+    });
+    const { db } = fakeDb({ invite: validInvite, transactionError: otherError });
+    await expect(redeemInvite(db, goodInput)).rejects.toBe(otherError);
   });
 });
