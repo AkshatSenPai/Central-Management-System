@@ -26,6 +26,8 @@ model User {
   accounts       Account[]
   sessions       Session[]
   invitesCreated Invite[]  @relation("InviteCreator")
+  activity       ActivityLog[] @relation("ActivityActor")
+  clientsLed     Client[]      @relation("ClientAccountLead")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -74,4 +76,116 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  FORMER
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  DONE
+}
+
+enum ProjectHealth {
+  ON_TRACK
+  AT_RISK
+  BLOCKED
+}
+
+enum ProgressMode {
+  AUTO
+  MANUAL
+}
+
+model Client {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  status         ClientStatus    @default(ACTIVE)
+  sector         String?
+  website        String?
+  engagementType String?
+  clientSince    DateTime?
+  notes          String?
+  accountLead    User?           @relation("ClientAccountLead", fields: [accountLeadId], references: [id])
+  accountLeadId  String?
+  contacts       ClientContact[]
+  projects       Project[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([accountLeadId])
+}
+
+model ClientContact {
+  id        String   @id @default(cuid())
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId  String
+  name      String
+  email     String?
+  phone     String?
+  role      String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  client         Client        @relation(fields: [clientId], references: [id])
+  clientId       String
+  name           String
+  description    String?
+  status         ProjectStatus @default(PLANNING)
+  health         ProjectHealth @default(ON_TRACK)
+  progressMode   ProgressMode  @default(AUTO)
+  manualProgress Int?
+  startDate      DateTime?
+  dueDate        DateTime?
+  milestones     Milestone[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([clientId, name])
+  @@index([clientId])
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  title       String
+  dueDate     DateTime?
+  completedAt DateTime?
+  order       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId])
+}
+
+/// Generic audit trail (spec §7). `entityType` and `action` are plain String
+/// columns typed as TypeScript unions so later phases add verbs without a
+/// migration. `clientId` is a denormalised scope key with deliberately NO
+/// relation and no onDelete — the audit trail must survive a client
+/// hard-delete. Do not "fix" it by adding a relation.
+model ActivityLog {
+  id         String   @id @default(cuid())
+  actor      User     @relation("ActivityActor", fields: [actorId], references: [id])
+  actorId    String
+  entityType String
+  entityId   String
+  action     String
+  meta       Json?
+  clientId   String?
+  at         DateTime @default(now())
+
+  @@index([clientId, at])
+  @@index([entityType, entityId, at])
 }
