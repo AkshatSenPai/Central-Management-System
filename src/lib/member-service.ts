@@ -1,10 +1,23 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 
 /** Internal sentinel thrown inside a transaction when the post-update recount
  * shows zero active admins remain — caught and mapped to the friendly guard
  * error for the calling function. Never escapes this module. */
 class AdminInvariantError extends Error {}
+
+/** Serializable closes the mutual-demotion window READ COMMITTED leaves open:
+ * two concurrent transactions can each see the other's admin as still active
+ * in their recount, both commit, and zero active admins remain. */
+const SERIALIZABLE = { isolationLevel: "Serializable" } as const;
+
+/** Under Serializable, the losing side of a conflicting pair fails with P2034
+ * instead of committing — the caller just needs to retry. */
+function isSerializationConflict(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034";
+}
+
+const CONFLICT_MESSAGE = "Another member change happened at the same time. Try again.";
 
 async function countActiveAdmins(db: PrismaClient): Promise<number> {
   return db.user.count({ where: { role: "ADMIN", active: true } });
@@ -38,11 +51,12 @@ export async function setMemberActive(
         });
         const remaining = await tx.user.count({ where: { role: "ADMIN", active: true } });
         if (remaining < 1) throw new AdminInvariantError();
-      });
+      }, SERIALIZABLE);
     } catch (e) {
       if (e instanceof AdminInvariantError) {
         return err("Cannot deactivate the last active admin");
       }
+      if (isSerializationConflict(e)) return err(CONFLICT_MESSAGE);
       throw e;
     }
     return ok(undefined);
@@ -80,11 +94,12 @@ export async function setMemberRole(
         });
         const remaining = await tx.user.count({ where: { role: "ADMIN", active: true } });
         if (remaining < 1) throw new AdminInvariantError();
-      });
+      }, SERIALIZABLE);
     } catch (e) {
       if (e instanceof AdminInvariantError) {
         return err("Cannot demote the last active admin");
       }
+      if (isSerializationConflict(e)) return err(CONFLICT_MESSAGE);
       throw e;
     }
     return ok(undefined);
