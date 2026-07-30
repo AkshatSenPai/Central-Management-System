@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
-import { generateInviteToken, inviteExpiry } from "@/lib/invites";
+import { generateInviteToken, inviteExpiry, inviteStatus } from "@/lib/invites";
 import { ActionResult, ok, err } from "@/lib/action-result";
+import { hashPassword } from "@/lib/password";
 
 export async function createInviteRecord(
   db: PrismaClient,
@@ -26,4 +27,35 @@ export async function createInviteRecord(
     },
   });
   return ok({ token });
+}
+
+export async function redeemInvite(
+  db: PrismaClient,
+  input: { token: string; name: string; password: string }
+): Promise<ActionResult> {
+  const invite = await db.invite.findUnique({ where: { token: input.token } });
+  if (!invite) return err("Invalid invite link");
+
+  const status = inviteStatus(invite);
+  if (status === "used") return err("This invite has already been used");
+  if (status === "expired") return err("This invite has expired");
+
+  const name = input.name.trim();
+  if (!name) return err("Name is required");
+  if (input.password.length < 8) return err("Password must be at least 8 characters");
+
+  const existing = await db.user.findUnique({ where: { email: invite.email } });
+  if (existing) return err("A member with this email already exists");
+
+  const passwordHash = await hashPassword(input.password);
+  await db.$transaction([
+    db.user.create({
+      data: { email: invite.email, name, passwordHash, role: invite.role },
+    }),
+    db.invite.update({
+      where: { id: invite.id },
+      data: { acceptedAt: new Date() },
+    }),
+  ]);
+  return ok(undefined);
 }
