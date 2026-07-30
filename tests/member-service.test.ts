@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { setMemberActive, setMemberRole } from "@/lib/member-service";
 
 type FakeParts = {
@@ -10,10 +10,14 @@ type FakeParts = {
    * count between the pre-check and the transactional write. Defaults to
    * activeAdminCount when unset. */
   postUpdateActiveAdminCount?: number;
+  /** Error thrown by $transaction — lets a test simulate a serialization
+   * conflict (P2034) or other transaction failure. */
+  transactionError?: unknown;
 };
 
 function fakeDb(parts: FakeParts) {
   const updates: Record<string, unknown>[] = [];
+  const transactionOptions: unknown[] = [];
   const findUnique = async () => parts.target ?? null;
   const update = async (args: { data: Record<string, unknown> }) => {
     updates.push(args.data);
@@ -25,7 +29,9 @@ function fakeDb(parts: FakeParts) {
       update,
       count: async () => parts.activeAdminCount ?? 1,
     },
-    $transaction: async (fn: (tx: unknown) => Promise<void>) => {
+    $transaction: async (fn: (tx: unknown) => Promise<void>, options?: unknown) => {
+      transactionOptions.push(options);
+      if (parts.transactionError) throw parts.transactionError;
       const tx = {
         user: {
           findUnique,
@@ -36,8 +42,14 @@ function fakeDb(parts: FakeParts) {
       return fn(tx);
     },
   } as unknown as PrismaClient;
-  return { db, updates };
+  return { db, updates, transactionOptions };
 }
+
+const serializationConflict = () =>
+  new Prisma.PrismaClientKnownRequestError("Write conflict or deadlock", {
+    code: "P2034",
+    clientVersion: "test",
+  });
 
 const member = { id: "m1", role: "MEMBER", active: true };
 const admin = { id: "a1", role: "ADMIN", active: true };
@@ -87,6 +99,33 @@ describe("setMemberActive", () => {
     expect(result.ok).toBe(true);
     expect(updates[0]).toEqual({ active: false });
   });
+
+  it("runs the backstop transaction at Serializable isolation", async () => {
+    const { db, transactionOptions } = fakeDb({ target: admin, activeAdminCount: 2 });
+    await setMemberActive(db, { targetId: "a1", active: false, actorId: "x" });
+    expect(transactionOptions).toEqual([{ isolationLevel: "Serializable" }]);
+  });
+
+  it("maps a serialization conflict to a friendly retry error", async () => {
+    const { db } = fakeDb({
+      target: admin,
+      activeAdminCount: 2,
+      transactionError: serializationConflict(),
+    });
+    const result = await setMemberActive(db, { targetId: "a1", active: false, actorId: "x" });
+    expect(result).toEqual({
+      ok: false,
+      error: "Another member change happened at the same time. Try again.",
+    });
+  });
+
+  it("rethrows a non-serialization transaction failure", async () => {
+    const otherError = new Error("connection lost");
+    const { db } = fakeDb({ target: admin, activeAdminCount: 2, transactionError: otherError });
+    await expect(
+      setMemberActive(db, { targetId: "a1", active: false, actorId: "x" })
+    ).rejects.toBe(otherError);
+  });
 });
 
 describe("setMemberRole", () => {
@@ -121,5 +160,24 @@ describe("setMemberRole", () => {
     const result = await setMemberRole(db, { targetId: "a1", role: "MEMBER" });
     expect(result.ok).toBe(true);
     expect(updates[0]).toEqual({ role: "MEMBER" });
+  });
+
+  it("runs the backstop transaction at Serializable isolation", async () => {
+    const { db, transactionOptions } = fakeDb({ target: admin, activeAdminCount: 2 });
+    await setMemberRole(db, { targetId: "a1", role: "MEMBER" });
+    expect(transactionOptions).toEqual([{ isolationLevel: "Serializable" }]);
+  });
+
+  it("maps a serialization conflict to a friendly retry error", async () => {
+    const { db } = fakeDb({
+      target: admin,
+      activeAdminCount: 2,
+      transactionError: serializationConflict(),
+    });
+    const result = await setMemberRole(db, { targetId: "a1", role: "MEMBER" });
+    expect(result).toEqual({
+      ok: false,
+      error: "Another member change happened at the same time. Try again.",
+    });
   });
 });

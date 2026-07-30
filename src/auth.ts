@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import type { Provider } from "next-auth/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { withNormalizedEmail } from "@/lib/auth-adapter";
 import { authorizeUser } from "@/lib/credentials";
 import { googleSignInAllowed } from "@/lib/google-gate";
 import { refreshTokenFromDb } from "@/lib/session-freshness";
@@ -33,7 +34,9 @@ if (googleEnabled) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PrismaAdapter(prisma),
+  // Normalized so allowDangerousEmailAccountLinking's getUserByEmail lookup
+  // matches stored lowercase emails even when Google reports mixed case.
+  adapter: withNormalizedEmail(PrismaAdapter(prisma)),
   providers,
   callbacks: {
     ...authConfig.callbacks,

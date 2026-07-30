@@ -4,6 +4,8 @@ import { auth, signIn, googleEnabled } from "@/auth";
 
 const ERRORS: Record<string, string> = {
   invalid: "Invalid email or password.",
+  config:
+    "Sign-in failed because of a server problem, not your credentials. Try again, and tell an admin if it keeps happening.",
   AccessDenied:
     "That Google account isn't a member of this workspace. Ask an admin for an invite.",
 };
@@ -26,7 +28,14 @@ export default async function LoginPage({
         redirectTo: "/dashboard",
       });
     } catch (e) {
-      if (e instanceof AuthError) redirect("/login?error=invalid");
+      if (e instanceof AuthError) {
+        // Only a genuine credentials mismatch is the user's fault; everything
+        // else (CallbackRouteError from a down DB, misconfigured secrets, …)
+        // used to masquerade as "Invalid email or password".
+        if (e.type === "CredentialsSignin") redirect("/login?error=invalid");
+        console.error("Auth error during credentials sign-in:", e.type, e.cause ?? e);
+        redirect("/login?error=config");
+      }
       throw e; // NEXT_REDIRECT must propagate
     }
   }

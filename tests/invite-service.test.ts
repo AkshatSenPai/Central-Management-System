@@ -25,6 +25,16 @@ function fakeDb(parts: FakeParts) {
 describe("createInviteRecord", () => {
   const input = { email: "New@Example.com ", role: "MEMBER" as const, createdById: "admin1" };
 
+  it.each(["not-an-email", "missing-tld@host", "two@@example.com", "   "])(
+    "rejects the invalid email %j server-side",
+    async (email) => {
+      const { db, created } = fakeDb({});
+      const result = await createInviteRecord(db, { ...input, email });
+      expect(result).toEqual({ ok: false, error: "Enter a valid email address" });
+      expect(created).toHaveLength(0);
+    }
+  );
+
   it("rejects when a member with that email already exists", async () => {
     const { db } = fakeDb({ existingUser: { id: "u1" } });
     const result = await createInviteRecord(db, input);

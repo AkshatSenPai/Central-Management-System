@@ -1,10 +1,23 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { createInviteAction } from "@/server/actions/invites";
 
 export function InviteForm() {
   const [state, formAction, pending] = useActionState(createInviteAction, null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyResetTimer = useRef<number | undefined>(undefined);
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+    window.clearTimeout(copyResetTimer.current);
+    copyResetTimer.current = window.setTimeout(() => setCopyState("idle"), 2000);
+  }
 
   return (
     <div className="max-w-md space-y-3">
@@ -40,11 +53,16 @@ export function InviteForm() {
           </code>
           <button
             type="button"
-            onClick={() => navigator.clipboard.writeText(state.data.inviteUrl)}
+            onClick={() => copyLink(state.data.inviteUrl)}
             className="mt-2 rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-2)] hover:bg-[var(--surface-2)]"
           >
-            Copy link
+            {copyState === "copied" ? "Copied" : "Copy link"}
           </button>
+          {copyState === "failed" && (
+            <p className="mt-2 text-xs text-[var(--bad)]">
+              Couldn&apos;t copy — select the link above and copy it manually.
+            </p>
+          )}
         </div>
       )}
     </div>
