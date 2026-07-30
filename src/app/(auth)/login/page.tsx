@@ -37,41 +37,41 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--bg)] p-4">
       <div className="w-full max-w-sm space-y-6">
-        <h1 className="text-2xl font-semibold">Sign in</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text)]">Sign in</h1>
         {params.welcome && (
-          <p className="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
+          <p className="rounded-md bg-[var(--ok-bg)] p-3 text-sm text-[var(--ok)]">
             Account created — sign in to get started.
           </p>
         )}
         {error && (
-          <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+          <p className="rounded-md bg-[var(--bad-bg)] p-3 text-sm text-[var(--bad)]">
             {error}
           </p>
         )}
         <form action={loginAction} className="space-y-4">
-          <label className="block text-sm">
+          <label className="block text-sm text-[var(--text)]">
             Email
             <input
               name="email"
               type="email"
               required
-              className="mt-1 w-full rounded-md border px-3 py-2"
+              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
             />
           </label>
-          <label className="block text-sm">
+          <label className="block text-sm text-[var(--text)]">
             Password
             <input
               name="password"
               type="password"
               required
-              className="mt-1 w-full rounded-md border px-3 py-2"
+              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
             />
           </label>
           <button
             type="submit"
-            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+            className="w-full rounded-md bg-[var(--btn)] px-4 py-2 text-[var(--on-btn)] hover:bg-[var(--btn-h)]"
           >
             Sign in
           </button>
@@ -80,7 +80,7 @@ export default async function LoginPage({
           <form action={googleAction}>
             <button
               type="submit"
-              className="w-full rounded-md border px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900"
+              className="w-full rounded-md border border-[var(--border)] px-4 py-2 text-[var(--text)] hover:bg-[var(--surface-2)]"
             >
               Continue with Google
             </button>
