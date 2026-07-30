@@ -3,6 +3,7 @@ import {
   generateInviteToken,
   inviteStatus,
   inviteExpiry,
+  inviteLinkBase,
   INVITE_TTL_DAYS,
 } from "@/lib/invites";
 
@@ -40,5 +41,29 @@ describe("inviteExpiry", () => {
   it(`is ${INVITE_TTL_DAYS} days out`, () => {
     const from = new Date("2026-07-29T00:00:00Z");
     expect(inviteExpiry(from).toISOString()).toBe("2026-08-05T00:00:00.000Z");
+  });
+});
+
+describe("inviteLinkBase", () => {
+  it("uses NEXT_PUBLIC_APP_URL when set", () => {
+    expect(inviteLinkBase({ appUrl: "https://cms.example.com", nodeEnv: "production" })).toBe(
+      "https://cms.example.com"
+    );
+  });
+
+  it("strips trailing slashes so links don't double up", () => {
+    expect(inviteLinkBase({ appUrl: "https://cms.example.com/", nodeEnv: "production" })).toBe(
+      "https://cms.example.com"
+    );
+  });
+
+  it("falls back to localhost outside production", () => {
+    expect(inviteLinkBase({ appUrl: undefined, nodeEnv: "development" })).toBe(
+      "http://localhost:3000"
+    );
+  });
+
+  it("returns null in production when NEXT_PUBLIC_APP_URL is unset", () => {
+    expect(inviteLinkBase({ appUrl: undefined, nodeEnv: "production" })).toBeNull();
   });
 });

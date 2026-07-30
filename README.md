@@ -20,6 +20,19 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment & deploy
+
+Copy `.env.example` to `.env` for local development. Required in production:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string (the app fails fast at startup without it) |
+| `AUTH_SECRET` | NextAuth JWT/session secret |
+| `NEXT_PUBLIC_APP_URL` | Public origin used to build invite links, e.g. `https://cms.example.com`. Without it, invite creation fails in production (dev falls back to `http://localhost:3000`) |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Optional — enables "Continue with Google" (update the Google redirect URI to the production domain) |
+
+Run migrations in the deploy pipeline with `prisma migrate deploy` (not `migrate dev`).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
