@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { inviteStatus } from "@/lib/invites";
+import { knownRedeemError } from "@/lib/invite-errors";
 import { acceptInviteAction } from "@/server/actions/accept-invite";
 
 export default async function InvitePage({
@@ -11,6 +12,10 @@ export default async function InvitePage({
 }) {
   const { token } = await params;
   const { error } = await searchParams;
+  // Allowlist: ?error= is attacker-writable on this public page — only render
+  // messages our own redeem flow produces, with a generic fallback otherwise.
+  const errorMessage =
+    knownRedeemError(error) ?? (error ? "Something went wrong. Please try again." : null);
 
   const invite = await prisma.invite.findUnique({ where: { token } });
   const status = invite ? inviteStatus(invite) : null;
@@ -43,9 +48,9 @@ export default async function InvitePage({
             Creating an account for <strong>{invite.email}</strong>
           </p>
         </div>
-        {error && (
+        {errorMessage && (
           <p className="rounded-md bg-[var(--bad-bg)] p-3 text-sm text-[var(--bad)]">
-            {error}
+            {errorMessage}
           </p>
         )}
         <form action={action} className="space-y-4">

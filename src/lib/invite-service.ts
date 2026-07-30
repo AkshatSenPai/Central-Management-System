@@ -3,6 +3,7 @@ import { generateInviteToken, inviteExpiry, inviteStatus } from "@/lib/invites";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { hashPassword } from "@/lib/password";
 import { normalizeEmail } from "@/lib/email";
+import { REDEEM_ERRORS } from "@/lib/invite-errors";
 
 export async function createInviteRecord(
   db: PrismaClient,
@@ -35,18 +36,18 @@ export async function redeemInvite(
   input: { token: string; name: string; password: string }
 ): Promise<ActionResult> {
   const invite = await db.invite.findUnique({ where: { token: input.token } });
-  if (!invite) return err("Invalid invite link");
+  if (!invite) return err(REDEEM_ERRORS.invalidLink);
 
   const status = inviteStatus(invite);
-  if (status === "used") return err("This invite has already been used");
-  if (status === "expired") return err("This invite has expired");
+  if (status === "used") return err(REDEEM_ERRORS.used);
+  if (status === "expired") return err(REDEEM_ERRORS.expired);
 
   const name = input.name.trim();
-  if (!name) return err("Name is required");
-  if (input.password.length < 8) return err("Password must be at least 8 characters");
+  if (!name) return err(REDEEM_ERRORS.nameRequired);
+  if (input.password.length < 8) return err(REDEEM_ERRORS.passwordTooShort);
 
   const existing = await db.user.findUnique({ where: { email: invite.email } });
-  if (existing) return err("A member with this email already exists");
+  if (existing) return err(REDEEM_ERRORS.emailTaken);
 
   const passwordHash = await hashPassword(input.password);
   try {
@@ -61,7 +62,7 @@ export async function redeemInvite(
     ]);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return err("A member with this email already exists");
+      return err(REDEEM_ERRORS.emailTaken);
     }
     throw e;
   }
