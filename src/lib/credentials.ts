@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { verifyPassword } from "@/lib/password";
+import { normalizeEmail } from "@/lib/email";
 
 export type AuthorizedUser = {
   id: string;
@@ -14,7 +15,7 @@ export async function authorizeUser(
   password: string
 ): Promise<AuthorizedUser | null> {
   const user = await db.user.findUnique({
-    where: { email: email.toLowerCase().trim() },
+    where: { email: normalizeEmail(email) },
   });
   if (!user || !user.active || !user.passwordHash) return null;
   const valid = await verifyPassword(user.passwordHash, password);

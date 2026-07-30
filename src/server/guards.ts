@@ -1,15 +1,14 @@
 import { auth } from "@/auth";
+import { AuthError, assertUser, assertAdmin } from "@/lib/auth-guards";
 
-export class AuthError extends Error {}
+export { AuthError };
 
 export async function requireUser() {
   const session = await auth();
-  if (!session?.user?.id) throw new AuthError("Not signed in");
-  return session.user;
+  return assertUser(session);
 }
 
 export async function requireAdmin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new AuthError("Admin access required");
-  return user;
+  const session = await auth();
+  return assertAdmin(session);
 }

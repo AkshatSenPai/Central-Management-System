@@ -5,6 +5,8 @@ import type { Provider } from "next-auth/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { authorizeUser } from "@/lib/credentials";
+import { googleSignInAllowed } from "@/lib/google-gate";
+import { refreshTokenFromDb } from "@/lib/session-freshness";
 import { authConfig } from "@/auth.config";
 
 const providers: Provider[] = [
@@ -38,10 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account }) {
       // Invite-only: Google may only sign in emails that already exist as active members.
       if (account?.provider === "google") {
-        const existing = await prisma.user.findUnique({
-          where: { email: user.email?.toLowerCase() ?? "" },
-        });
-        return !!existing && existing.active;
+        return googleSignInAllowed(prisma, user.email);
       }
       return true;
     },
@@ -50,7 +49,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = (user as { role?: "ADMIN" | "MEMBER" }).role ?? "MEMBER";
       }
-      return token;
+      // Re-verify role/active against the DB on every invocation (not just
+      // first sign-in) so revocation (deactivation/demotion/promotion)
+      // takes effect on the next request instead of lagging up to the
+      // session's 7-day maxAge. Returning null here invalidates the
+      // session — see src/lib/session-freshness.ts for the evidence.
+      return refreshTokenFromDb(prisma, token);
     },
     async session({ session, token }) {
       session.user.id = token.id as string;

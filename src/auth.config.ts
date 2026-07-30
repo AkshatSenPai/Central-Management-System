@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { isPublicPath } from "@/lib/public-paths";
 
 export const authConfig = {
   pages: { signIn: "/login" },
@@ -6,9 +7,7 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
-      const isPublic =
-        pathname.startsWith("/login") || pathname.startsWith("/invite");
-      if (isPublic) return true;
+      if (isPublicPath(pathname)) return true;
       return !!auth?.user;
     },
   },

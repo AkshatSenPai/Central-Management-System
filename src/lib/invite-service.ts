@@ -2,12 +2,13 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { generateInviteToken, inviteExpiry, inviteStatus } from "@/lib/invites";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { hashPassword } from "@/lib/password";
+import { normalizeEmail } from "@/lib/email";
 
 export async function createInviteRecord(
   db: PrismaClient,
   input: { email: string; role: "ADMIN" | "MEMBER"; createdById: string }
 ): Promise<ActionResult<{ token: string }>> {
-  const email = input.email.toLowerCase().trim();
+  const email = normalizeEmail(input.email);
   const existingUser = await db.user.findUnique({ where: { email } });
   if (existingUser) return err("A member with this email already exists");
 
