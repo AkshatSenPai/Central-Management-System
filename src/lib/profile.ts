@@ -8,6 +8,7 @@ export const profileSchema = z.object({
     .string()
     .trim()
     .url("Avatar must be a valid URL")
+    .refine((v) => /^https?:\/\//i.test(v), "Avatar must be an http(s) URL")
     .optional()
     .or(z.literal("")),
 });

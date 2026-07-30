@@ -32,4 +32,20 @@ describe("profileSchema", () => {
       profileSchema.safeParse({ name: "Jo", avatarUrl: "not-a-url" }).success
     ).toBe(false);
   });
+
+  it("rejects a javascript: URL avatar", () => {
+    expect(
+      profileSchema.safeParse({ name: "Jo", avatarUrl: "javascript:alert(1)" })
+        .success
+    ).toBe(false);
+  });
+
+  it("accepts an https avatar URL", () => {
+    expect(
+      profileSchema.safeParse({
+        name: "Jo",
+        avatarUrl: "https://example.com/a.png",
+      }).success
+    ).toBe(true);
+  });
 });
