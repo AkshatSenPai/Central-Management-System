@@ -35,6 +35,15 @@ export const clientSchema = z.object({
 
 export type ClientInput = z.infer<typeof clientSchema>;
 
+export const contactSchema = z.object({
+  name: z.string().trim().min(1, "Contact name is required").max(120),
+  email: z.string().trim().email("Enter a valid email address").optional().or(z.literal("")),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  role: z.string().trim().max(120).optional().or(z.literal("")),
+});
+
+export type ContactInput = z.infer<typeof contactSchema>;
+
 /** First letter of the first two words, ignoring punctuation-only words like
  * the "&" in "Harlow & Fitch"; a single word falls back to its first two. */
 export function clientInitials(name: string): string {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clientSchema, clientInitials, clientListSummary } from "@/lib/client";
+import { clientSchema, contactSchema, clientInitials, clientListSummary } from "@/lib/client";
 
 const valid = {
   name: "Harlow & Fitch",
@@ -50,6 +50,30 @@ describe("clientSchema", () => {
 
   it("rejects an unknown status", () => {
     expect(clientSchema.safeParse({ ...valid, status: "ARCHIVED" }).success).toBe(false);
+  });
+});
+
+describe("contactSchema", () => {
+  it("requires a contact name", () => {
+    const parsed = contactSchema.safeParse({ name: "  ", email: "", phone: "", role: "" });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toBe("Contact name is required");
+  });
+
+  it("rejects a malformed email", () => {
+    const parsed = contactSchema.safeParse({ name: "Dana Reeve", email: "not-an-email" });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toBe("Enter a valid email address");
+  });
+
+  it("accepts an empty email, phone and role", () => {
+    expect(contactSchema.safeParse({ name: "Dana Reeve", email: "", phone: "", role: "" }).success).toBe(true);
+  });
+
+  it("trims the name", () => {
+    const parsed = contactSchema.safeParse({ name: "  Dana Reeve  " });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.name).toBe("Dana Reeve");
   });
 });
 
