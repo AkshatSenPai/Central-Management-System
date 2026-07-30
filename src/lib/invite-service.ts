@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { generateInviteToken, inviteExpiry, inviteStatus } from "@/lib/invites";
 import { ActionResult, ok, err } from "@/lib/action-result";
@@ -10,6 +11,8 @@ export async function createInviteRecord(
   input: { email: string; role: "ADMIN" | "MEMBER"; createdById: string }
 ): Promise<ActionResult<{ token: string }>> {
   const email = normalizeEmail(input.email);
+  // Server-side check — the invite form's type="email" is client-only.
+  if (!z.email().safeParse(email).success) return err("Enter a valid email address");
   const existingUser = await db.user.findUnique({ where: { email } });
   if (existingUser) return err("A member with this email already exists");
 
