@@ -15,6 +15,7 @@ import { ClientDeleteButton } from "@/components/clients/client-delete-button";
 import { ContactList } from "@/components/clients/contact-list";
 import { ContactForm } from "@/components/clients/contact-form";
 import { ProjectRow } from "@/components/projects/project-row";
+import { ProjectForm } from "@/components/projects/project-form";
 
 const CHIP = "text-xs text-[var(--text-3)]";
 const CARD = "rounded-lg border border-[var(--border)] bg-[var(--surface)]";
@@ -104,8 +105,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div className="space-y-6">
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-medium text-[var(--text)]">Projects</h2>
-              <span className="text-xs text-[var(--text-3)]">{client.projects.length} active</span>
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-lg font-medium text-[var(--text)]">Projects</h2>
+                <span className="text-xs text-[var(--text-3)]">{client.projects.length} active</span>
+              </div>
+              <ProjectForm presetClientId={client.id} />
             </div>
             {client.projects.length === 0 ? (
               <EmptyState message="No projects for this client yet." />
