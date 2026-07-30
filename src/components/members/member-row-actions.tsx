@@ -21,8 +21,12 @@ export function MemberRowActions({
 
   async function run(action: (fd: FormData) => Promise<{ ok: boolean; error?: string }>, fd: FormData) {
     setError(null);
-    const result = await action(fd);
-    if (!result.ok && result.error) setError(result.error);
+    try {
+      const result = await action(fd);
+      if (!result.ok && result.error) setError(result.error);
+    } catch {
+      setError("Something went wrong — try again");
+    }
   }
 
   const btn = "rounded-md border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)]";
