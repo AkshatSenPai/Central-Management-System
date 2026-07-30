@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored design reference (static HTML/JSX mockups), not app source.
+    "docs/**",
+    // Nested git worktrees of other branches — lint them on their own branch.
+    ".claude/**",
   ]),
 ]);
 
