@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { InviteForm } from "@/components/members/invite-form";
+import { MemberRowActions } from "@/components/members/member-row-actions";
 
 export default async function MembersPage() {
   const session = await auth();
   if (session?.user.role !== "ADMIN") redirect("/settings");
+  const currentUserId = session.user.id;
 
   const [members, pendingInvites] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
@@ -38,6 +40,7 @@ export default async function MembersPage() {
               <th>Email</th>
               <th>Role</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -47,6 +50,14 @@ export default async function MembersPage() {
                 <td>{m.email}</td>
                 <td>{m.role}</td>
                 <td>{m.active ? "Active" : "Deactivated"}</td>
+                <td>
+                  <MemberRowActions
+                    userId={m.id}
+                    role={m.role}
+                    active={m.active}
+                    isSelf={m.id === currentUserId}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
