@@ -33,10 +33,13 @@ export default async function MyTasksPage(props: {
     }),
   ]);
 
-  // The default view is open-only, so the "N tasks · M done" summary
-  // describes it exactly. Once a status filter is on, that phrasing would
-  // lie, so taskListSummary drops to a plain count itself.
-  const subtitle = taskListSummary(rows, { filtered: status !== null });
+  // The default view is open-only — listMyTasks applies status: { not: "DONE" }
+  // exactly when there is no filter — so a "done" fraction of its rows is
+  // structurally always zero there; only the ALL view's rows can actually
+  // contain DONE work, so only ALL gets the "N tasks · M done" phrasing.
+  // Every other view (the default, and any single-status filter) is a bare
+  // count.
+  const subtitle = taskListSummary(rows, { filtered: status !== "ALL" });
 
   return (
     <div className="space-y-6 p-8">

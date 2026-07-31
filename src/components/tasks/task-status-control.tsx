@@ -37,6 +37,7 @@ export function TaskStatusControl({
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
         {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
         <select
+          key={status}
           name="status"
           defaultValue={status}
           onChange={(e) => e.currentTarget.form?.requestSubmit()}

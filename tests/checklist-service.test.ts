@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { addChecklistItem, setChecklistItemDone, removeChecklistItem } from "@/lib/checklist-service";
 
 type FakeParts = {
@@ -11,6 +11,10 @@ type FakeParts = {
   item?: unknown;
   /** Rows returned by checklistItem.findMany — the sibling order query. */
   siblings?: { order: number }[];
+  /** Thrown by checklistItem.delete when set — simulates a concurrent
+   * P2025 raised when the row was already gone by the time the transaction
+   * ran. */
+  deleteError?: unknown;
 };
 
 type Sink = {
@@ -61,6 +65,7 @@ function fakeDb(parts: FakeParts) {
         return a.data;
       },
       delete: async (a: unknown) => {
+        if (parts.deleteError) throw parts.deleteError;
         sink.deleted.push(a);
         return {};
       },
@@ -258,5 +263,15 @@ describe("removeChecklistItem", () => {
     const personalItem = fakeDb({ item: itemOnPersonalTask });
     await removeChecklistItem(personalItem.db, { itemId: "i2", actorId: "u1" });
     expect(personalItem.txW.activity[0].clientId).toBeNull();
+  });
+
+  it("maps a concurrently-deleted row to the not-found error rather than throwing", async () => {
+    const race = new Prisma.PrismaClientKnownRequestError("Record to delete does not exist.", {
+      code: "P2025",
+      clientVersion: "test",
+    });
+    const { db } = fakeDb({ item: itemOnProjectTask, deleteError: race });
+    const result = await removeChecklistItem(db, { itemId: "i1", actorId: "u1" });
+    expect(result).toEqual({ ok: false, error: "Checklist item not found" });
   });
 });

@@ -216,20 +216,25 @@ export async function updateTask(
   // that never moved.
   const data = pick(candidate, Object.keys(changes) as (keyof typeof candidate)[]);
 
-  await db.$transaction(async (tx) => {
-    await tx.task.update({ where: { id: input.taskId }, data });
-    await recordActivity(tx, {
-      actorId: input.actorId,
-      entityType: "TASK",
-      entityId: input.taskId,
-      action: "task.updated",
-      // The pre-move client (R13): a cross-client project move is narrated
-      // on the timeline it is leaving, since `scope` was loaded before this
-      // write.
-      clientId: scope.clientId,
-      meta: { name: title, changes },
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.task.update({ where: { id: input.taskId }, data });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.taskId,
+        action: "task.updated",
+        // The pre-move client (R13): a cross-client project move is narrated
+        // on the timeline it is leaving, since `scope` was loaded before this
+        // write.
+        clientId: scope.clientId,
+        meta: { name: title, changes },
+      });
     });
-  });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Task not found");
+    throw e;
+  }
   return ok(undefined);
 }
 
@@ -242,17 +247,22 @@ export async function setTaskStatus(
 
   if (scope.task.status === input.status) return ok(undefined);
 
-  await db.$transaction(async (tx) => {
-    await tx.task.update({ where: { id: input.taskId }, data: { status: input.status } });
-    await recordActivity(tx, {
-      actorId: input.actorId,
-      entityType: "TASK",
-      entityId: input.taskId,
-      action: "task.status_changed",
-      clientId: scope.clientId,
-      meta: { name: scope.task.title, from: scope.task.status, to: input.status },
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.task.update({ where: { id: input.taskId }, data: { status: input.status } });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.taskId,
+        action: "task.status_changed",
+        clientId: scope.clientId,
+        meta: { name: scope.task.title, from: scope.task.status, to: input.status },
+      });
     });
-  });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Task not found");
+    throw e;
+  }
   return ok(undefined);
 }
 
@@ -266,19 +276,24 @@ export async function removeTask(
   // Title captured before the delete — afterwards there is nothing to read.
   const title = scope.task.title;
 
-  await db.$transaction(async (tx) => {
-    // Assignees and checklist items are Cascade-deleted by the FK; no
-    // manual join-row or checklist cleanup belongs here.
-    await tx.task.delete({ where: { id: input.taskId } });
-    await recordActivity(tx, {
-      actorId: input.actorId,
-      entityType: "TASK",
-      entityId: input.taskId,
-      action: "task.removed",
-      clientId: scope.clientId,
-      meta: { name: title },
+  try {
+    await db.$transaction(async (tx) => {
+      // Assignees and checklist items are Cascade-deleted by the FK; no
+      // manual join-row or checklist cleanup belongs here.
+      await tx.task.delete({ where: { id: input.taskId } });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.taskId,
+        action: "task.removed",
+        clientId: scope.clientId,
+        meta: { name: title },
+      });
     });
-  });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Task not found");
+    throw e;
+  }
   return ok(undefined);
 }
 
@@ -286,6 +301,15 @@ export async function removeTask(
  * `createMany` can race into. */
 function isConcurrentInsertRace(e: unknown): boolean {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+}
+
+/** True when `e` is the row-vanished error a concurrent delete can race a
+ * later update or delete into — the read in `loadTaskScope` succeeded, but
+ * the row was gone by the time the transaction actually ran. Same shape as
+ * isConcurrentInsertRace, mapped to the caller's existing not-found result
+ * instead of a clean success. */
+function isRowGoneRace(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025";
 }
 
 /** The read-diff-write cycle for `setTaskAssignees`, factored out so it can

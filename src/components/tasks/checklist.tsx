@@ -31,6 +31,7 @@ export function Checklist({
   items: ChecklistItem[];
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const addFormRef = useRef<HTMLFormElement>(null);
 
   async function run(
@@ -39,12 +40,15 @@ export function Checklist({
     onSuccess?: () => void
   ) {
     setError(null);
+    setPending(true);
     try {
       const result = await action(fd);
       if (!result.ok && result.error) setError(result.error);
       else if (result.ok) onSuccess?.();
     } catch {
       setError("Something went wrong — try again");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -96,7 +100,7 @@ export function Checklist({
                 <input type="hidden" name="taskId" value={taskId} />
                 {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
                 {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-                <button type="submit" className={BTN}>
+                <button type="submit" className={BTN} disabled={pending}>
                   Remove
                 </button>
               </form>

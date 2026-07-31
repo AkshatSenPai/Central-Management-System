@@ -23,6 +23,9 @@ type FakeParts = {
   /** Thrown by taskAssignee.createMany on its FIRST invocation only, then
    * succeeds on every call after — simulates a race that clears on retry. */
   assigneeCreateErrorOnce?: unknown;
+  /** Thrown by task.delete when set — simulates a concurrent P2025 raised
+   * when the row was already gone by the time the transaction ran. */
+  taskDeleteError?: unknown;
 };
 
 type Sink = {
@@ -109,6 +112,7 @@ function fakeDb(parts: FakeParts) {
         return a.data;
       },
       delete: async (a: unknown) => {
+        if (parts.taskDeleteError) throw parts.taskDeleteError;
         sink.deleted.push(a);
         return {};
       },
@@ -528,6 +532,16 @@ describe("removeTask", () => {
     await removeTask(db, { taskId: "t1", actorId: "u1" });
     expect(txW.assigneesDeleted).toHaveLength(0);
   });
+
+  it("maps a concurrently-deleted row to the not-found error rather than throwing", async () => {
+    const race = new Prisma.PrismaClientKnownRequestError("Record to delete does not exist.", {
+      code: "P2025",
+      clientVersion: "test",
+    });
+    const { db } = fakeDb({ task: taskWithProject, taskDeleteError: race });
+    const result = await removeTask(db, { taskId: "t1", actorId: "u1" });
+    expect(result).toEqual({ ok: false, error: "Task not found" });
+  });
 });
 
 const taskForAssign = {
@@ -552,7 +566,7 @@ describe("setTaskAssignees", () => {
   });
 
   it("deletes only the departed and creates only the newcomers", async () => {
-    const { db, txW } = fakeDb({
+    const { db, txW, args } = fakeDb({
       task: taskForAssign,
       currentAssignees: [
         { userId: "u1", user: { name: "Alex Kim" } },
@@ -564,6 +578,10 @@ describe("setTaskAssignees", () => {
     expect(result).toEqual({ ok: true, data: undefined });
     expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1"] } });
     expect(txW.assigneesCreated[0].data).toEqual([{ taskId: "t1", userId: "u3" }]);
+    // Guards against dropping `where: { taskId }` from the taskAssignee.findMany
+    // call, which would make `current` every TaskAssignee row in the database
+    // rather than just this task's.
+    expect(args.taskAssigneeFindManyWhere).toEqual({ taskId: "t1" });
   });
 
   it("never issues a blanket delete of every assignee row", async () => {
@@ -686,6 +704,29 @@ describe("setTaskAssignees", () => {
     expect(calls.userFindMany).toBe(0);
   });
 
+  it("leaves a deactivated current assignee's row alone when new ids are also added alongside it", async () => {
+    // u1 stands in for a deactivated member: still assigned, re-submitted
+    // unchanged as part of the same set, while u3 is a genuinely new id. The
+    // obvious refactor to computing survivors from resolved-active ids
+    // (instead of a true current/requested diff) would pass every other
+    // test in this file while silently deleting u1's row here.
+    const { db, txW, args } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u2", user: { name: "Jordan Lee" } },
+      ],
+      activeUsers: [{ id: "u3", name: "Sam Ortiz" }],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u1", "u2", "u3"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesDeleted).toHaveLength(0);
+    expect(txW.assigneesCreated[0].data).toEqual([{ taskId: "t1", userId: "u3" }]);
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0]).toMatchObject({ action: "task.assigned" });
+    expect(args.userFindManyWhere).toEqual({ id: { in: ["u3"] }, active: true });
+  });
+
   it("rejects an unknown or deactivated NEW id", async () => {
     const { db, txW, dbW } = fakeDb({
       task: taskForAssign,
@@ -698,6 +739,8 @@ describe("setTaskAssignees", () => {
     expect(txW.assigneesCreated).toHaveLength(0);
     expect(dbW.assigneesDeleted).toHaveLength(0);
     expect(dbW.assigneesCreated).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+    expect(dbW.activity).toHaveLength(0);
   });
 
   it("asks only for active users when resolving additions", async () => {

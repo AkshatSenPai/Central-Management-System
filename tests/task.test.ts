@@ -195,6 +195,20 @@ describe("taskListSummary", () => {
     expect(taskListSummary([{ status: "TO_DO" }], { filtered: true })).toBe("1 task");
     expect(taskListSummary([], { filtered: true })).toBe("No tasks");
   });
+
+  // My Tasks calls this as taskListSummary(rows, { filtered: status !== "ALL" }).
+  // The default view (status === null) is open-only — listMyTasks applies
+  // status: { not: "DONE" } exactly when there is no filter — so its rows can
+  // never structurally contain a DONE task; only the ALL view's rows can.
+  it("renders a bare count for the default My Tasks view (status null, so filtered: true), even though its rows can never contain a DONE task", () => {
+    const rows = [{ status: "TO_DO" }, { status: "IN_PROGRESS" }];
+    expect(taskListSummary(rows, { filtered: true })).toBe("2 tasks");
+  });
+
+  it("renders the done clause for the ALL My Tasks view (status \"ALL\", so filtered: false), the only view whose rows can contain a DONE task", () => {
+    const rows = [{ status: "DONE" }, { status: "TO_DO" }];
+    expect(taskListSummary(rows, { filtered: false })).toBe("2 tasks · 1 done");
+  });
 });
 
 describe("taskRowSubtitle", () => {

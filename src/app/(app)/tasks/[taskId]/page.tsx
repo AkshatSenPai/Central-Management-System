@@ -10,6 +10,7 @@ import { TaskStatusControl } from "@/components/tasks/task-status-control";
 import { TaskForm } from "@/components/tasks/task-form";
 import { TaskAssigneesForm } from "@/components/tasks/task-assignees-form";
 import { Checklist } from "@/components/tasks/checklist";
+import { TaskRemoveControl } from "@/components/tasks/task-remove-control";
 
 const CHIP = "text-xs text-[var(--text-3)]";
 const CARD = "rounded-lg border border-[var(--border)] bg-[var(--surface)]";
@@ -20,8 +21,15 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
   if (!task) notFound();
 
   const [projects, activeMembers] = await Promise.all([
+    // The options list must still include the task's own project even when
+    // that project is DONE — otherwise React's <select> reconciliation
+    // (updateOptions) falls back to selecting the first non-disabled option
+    // ("No project (personal task)") when the current projectId matches
+    // nothing rendered, and the next save silently makes the task personal.
     prisma.project.findMany({
-      where: { status: { not: "DONE" } },
+      where: task.projectId
+        ? { OR: [{ status: { not: "DONE" } }, { id: task.projectId }] }
+        : { status: { not: "DONE" } },
       select: { id: true, name: true, clientId: true },
       orderBy: { name: "asc" },
     }),
@@ -95,7 +103,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
             {task.milestoneTitle ? <span className={CHIP}>Milestone {task.milestoneTitle}</span> : null}
           </div>
         </div>
-        <div className="flex-none">
+        <div className="flex flex-none items-start gap-2">
           <TaskForm
             task={{
               id: task.id,
@@ -109,6 +117,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
             projects={projects}
             milestones={milestones}
           />
+          <TaskRemoveControl taskId={task.id} projectId={task.projectId} clientId={task.clientId} />
         </div>
       </div>
 

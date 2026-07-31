@@ -1,7 +1,16 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity } from "@/lib/activity";
 import { nextTaskOrder } from "@/lib/task";
+
+/** True when `e` is the row-vanished error a concurrent delete can race a
+ * later update or delete into — the read in `loadChecklistScope` succeeded,
+ * but the row was gone by the time the transaction actually ran. Mirrors
+ * task-service.ts's isConcurrentInsertRace so both race classes share one
+ * idiom. */
+function isRowGoneRace(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025";
+}
 
 /** A checklist item knows only its own taskId, but every activity row is
  * scoped by *client* — an event logged with the wrong scope never reaches the
@@ -98,17 +107,22 @@ export async function setChecklistItemDone(
 
   if (scope.item.done === input.done) return ok(undefined);
 
-  await db.$transaction(async (tx) => {
-    await tx.checklistItem.update({ where: { id: input.itemId }, data: { done: input.done } });
-    await recordActivity(tx, {
-      actorId: input.actorId,
-      entityType: "CHECKLIST_ITEM",
-      entityId: input.itemId,
-      action: input.done ? "checklist.completed" : "checklist.reopened",
-      clientId: scope.clientId,
-      meta: { name: scope.item.title },
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.checklistItem.update({ where: { id: input.itemId }, data: { done: input.done } });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "CHECKLIST_ITEM",
+        entityId: input.itemId,
+        action: input.done ? "checklist.completed" : "checklist.reopened",
+        clientId: scope.clientId,
+        meta: { name: scope.item.title },
+      });
     });
-  });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Checklist item not found");
+    throw e;
+  }
   return ok(undefined);
 }
 
@@ -122,16 +136,21 @@ export async function removeChecklistItem(
   // Title captured before the delete — afterwards there is nothing to read.
   const title = scope.item.title;
 
-  await db.$transaction(async (tx) => {
-    await tx.checklistItem.delete({ where: { id: input.itemId } });
-    await recordActivity(tx, {
-      actorId: input.actorId,
-      entityType: "CHECKLIST_ITEM",
-      entityId: input.itemId,
-      action: "checklist.removed",
-      clientId: scope.clientId,
-      meta: { name: title },
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.checklistItem.delete({ where: { id: input.itemId } });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "CHECKLIST_ITEM",
+        entityId: input.itemId,
+        action: "checklist.removed",
+        clientId: scope.clientId,
+        meta: { name: title },
+      });
     });
-  });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Checklist item not found");
+    throw e;
+  }
   return ok(undefined);
 }
