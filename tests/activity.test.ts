@@ -4,6 +4,7 @@ import {
   recordActivity,
   fieldDiff,
   describeActivity,
+  formatNameList,
   listClientActivity,
   type ActivityDb,
 } from "@/lib/activity";
@@ -128,6 +129,26 @@ describe("fieldDiff", () => {
   });
 });
 
+describe("formatNameList", () => {
+  it("returns an empty string for nobody", () => {
+    expect(formatNameList([])).toBe("");
+  });
+
+  it("returns the single name for one", () => {
+    expect(formatNameList(["Tom Iversen"])).toBe("Tom Iversen");
+  });
+
+  it('joins two with " and "', () => {
+    expect(formatNameList(["Tom Iversen", "Dana Reeve"])).toBe("Tom Iversen and Dana Reeve");
+  });
+
+  it('joins three as "A, B and C"', () => {
+    expect(formatNameList(["Tom Iversen", "Dana Reeve", "Priya Malhotra"])).toBe(
+      "Tom Iversen, Dana Reeve and Priya Malhotra"
+    );
+  });
+});
+
 describe("describeActivity", () => {
   it("describes a created client", () => {
     expect(
@@ -159,14 +180,136 @@ describe("describeActivity", () => {
     ).toBe("Sarah Whitfield completed milestone Design system freeze");
   });
 
+  it("describes a created task", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.created",
+        meta: { name: "Ship the deck" },
+      })
+    ).toBe("Sarah Whitfield created task Ship the deck");
+  });
+
+  it("describes an updated task", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.updated",
+        meta: { name: "Ship the deck" },
+      })
+    ).toBe("Sarah Whitfield updated task Ship the deck");
+  });
+
+  it("describes a task status change using the locked labels", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.status_changed",
+        meta: { name: "Ship the deck", from: "TO_DO", to: "IN_PROGRESS" },
+      })
+    ).toBe("Sarah Whitfield moved Ship the deck to In Progress");
+  });
+
+  it("describes an assignment naming everyone affected", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.assigned",
+        meta: { name: "Ship the deck", people: ["Tom Iversen", "Dana Reeve"] },
+      })
+    ).toBe("Sarah Whitfield assigned Ship the deck to Tom Iversen and Dana Reeve");
+  });
+
+  it("describes an unassignment", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.unassigned",
+        meta: { name: "Ship the deck", people: ["Tom Iversen"] },
+      })
+    ).toBe("Sarah Whitfield unassigned Tom Iversen from Ship the deck");
+  });
+
+  it("falls back to a generic task sentence when the people list is missing or is not an array of strings", () => {
+    expect(() =>
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.assigned",
+        meta: { name: "Ship the deck" },
+      })
+    ).not.toThrow();
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.assigned",
+        meta: { name: "Ship the deck" },
+      })
+    ).toBe("Sarah Whitfield updated task Ship the deck");
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.unassigned",
+        meta: { name: "Ship the deck", people: "Tom Iversen" },
+      })
+    ).toBe("Sarah Whitfield updated task Ship the deck");
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.unassigned",
+        meta: { name: "Ship the deck", people: [1, 2] },
+      })
+    ).toBe("Sarah Whitfield updated task Ship the deck");
+  });
+
+  it("describes a removed task", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "task.removed",
+        meta: { name: "Ship the deck" },
+      })
+    ).toBe("Sarah Whitfield removed task Ship the deck");
+  });
+
+  it("describes an added, completed, reopened and removed checklist item", () => {
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "checklist.added",
+        meta: { name: "Send invoice" },
+      })
+    ).toBe("Sarah Whitfield added checklist item Send invoice");
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "checklist.completed",
+        meta: { name: "Send invoice" },
+      })
+    ).toBe("Sarah Whitfield completed checklist item Send invoice");
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "checklist.reopened",
+        meta: { name: "Send invoice" },
+      })
+    ).toBe("Sarah Whitfield reopened checklist item Send invoice");
+    expect(
+      describeActivity({
+        actorName: "Sarah Whitfield",
+        action: "checklist.removed",
+        meta: { name: "Send invoice" },
+      })
+    ).toBe("Sarah Whitfield removed checklist item Send invoice");
+  });
+
   it("falls back to a generic phrase for an unrecognised action", () => {
     // Phase 3 adds verbs without a migration; an old renderer must not throw
     // on a new action string. Do not delete this case.
     expect(() =>
-      describeActivity({ actorName: "Sarah Whitfield", action: "task.assigned", meta: { name: "Ship it" } })
+      describeActivity({ actorName: "Sarah Whitfield", action: "task.archived", meta: { name: "Ship it" } })
     ).not.toThrow();
     expect(
-      describeActivity({ actorName: "Sarah Whitfield", action: "task.assigned", meta: { name: "Ship it" } })
+      describeActivity({ actorName: "Sarah Whitfield", action: "task.archived", meta: { name: "Ship it" } })
     ).toBe("Sarah Whitfield updated this record");
   });
 });

@@ -1,6 +1,12 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
-export type ActivityEntityType = "CLIENT" | "CLIENT_CONTACT" | "PROJECT" | "MILESTONE";
+export type ActivityEntityType =
+  | "CLIENT"
+  | "CLIENT_CONTACT"
+  | "PROJECT"
+  | "MILESTONE"
+  | "TASK"
+  | "CHECKLIST_ITEM";
 
 /** Stored as a plain String column, never a Prisma enum, so later phases add
  * verbs without a migration. describeActivity must stay total. */
@@ -22,7 +28,17 @@ export type ActivityAction =
   | "milestone.updated"
   | "milestone.completed"
   | "milestone.reopened"
-  | "milestone.removed";
+  | "milestone.removed"
+  | "task.created"
+  | "task.updated"
+  | "task.status_changed"
+  | "task.assigned"
+  | "task.unassigned"
+  | "task.removed"
+  | "checklist.added"
+  | "checklist.completed"
+  | "checklist.reopened"
+  | "checklist.removed";
 
 export type ActivityMeta = Record<string, unknown> | null;
 
@@ -94,8 +110,24 @@ function metaString(meta: ActivityMeta, key: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
+/** Reads come back as Prisma.JsonValue, so an assignment's `people` list must
+ * be checked, not trusted: null unless it really is an array of strings. */
+function metaNames(meta: ActivityMeta, key: string): string[] | null {
+  const value = meta?.[key];
+  return Array.isArray(value) && value.every((v) => typeof v === "string") ? (value as string[]) : null;
+}
+
 function subject(meta: ActivityMeta): string {
   return metaString(meta, "name") ?? "this record";
+}
+
+/** "" | "A" | "A and B" | "A, B and C" — the shared join for every activity
+ * sentence that names more than one person. */
+export function formatNameList(names: string[]): string {
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
 /** "AT_RISK" -> "At Risk". Matches the vocabulary lock for every Phase 2 enum
@@ -154,6 +186,30 @@ export function describeActivity(entry: {
       return `${who} reopened milestone ${what}`;
     case "milestone.removed":
       return `${who} removed milestone ${what}`;
+    case "task.created":
+      return `${who} created task ${what}`;
+    case "task.updated":
+      return `${who} updated task ${what}`;
+    case "task.status_changed":
+      return `${who} moved ${what} to ${to}`;
+    case "task.assigned": {
+      const people = metaNames(entry.meta, "people");
+      return people ? `${who} assigned ${what} to ${formatNameList(people)}` : `${who} updated task ${what}`;
+    }
+    case "task.unassigned": {
+      const people = metaNames(entry.meta, "people");
+      return people ? `${who} unassigned ${formatNameList(people)} from ${what}` : `${who} updated task ${what}`;
+    }
+    case "task.removed":
+      return `${who} removed task ${what}`;
+    case "checklist.added":
+      return `${who} added checklist item ${what}`;
+    case "checklist.completed":
+      return `${who} completed checklist item ${what}`;
+    case "checklist.reopened":
+      return `${who} reopened checklist item ${what}`;
+    case "checklist.removed":
+      return `${who} removed checklist item ${what}`;
     default:
       // Forward compatibility: an unrecognised verb renders, never throws.
       return `${who} updated this record`;
