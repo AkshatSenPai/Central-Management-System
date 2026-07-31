@@ -94,6 +94,55 @@ async function seedDemo(prisma: PrismaClient, adminId: string) {
     },
   });
 
+  const launch = await prisma.project.upsert({
+    where: { clientId_name: { clientId: harlow.id, name: "Launch Toolkit" } },
+    update: {},
+    create: {
+      clientId: harlow.id,
+      name: "Launch Toolkit",
+      description: "Everything the team needs on launch day.",
+      status: "IN_PROGRESS",
+      health: "ON_TRACK",
+      dueDate: new Date("2026-09-12T00:00:00Z"),
+    },
+  });
+
+  // Task has no unique column and two tasks may legitimately share a title, so
+  // idempotency is a count guard rather than an upsert.
+  if ((await prisma.task.count({ where: { projectId: launch.id } })) === 0) {
+    const rows: { title: string; status: "TO_DO" | "IN_PROGRESS" | "REVIEW" | "DONE"; order: number }[] = [
+      { title: "Agree the launch checklist", status: "DONE", order: 0 },
+      { title: "Write the announcement post", status: "DONE", order: 1 },
+      { title: "Build the landing section", status: "IN_PROGRESS", order: 2 },
+      { title: "Proof the press kit", status: "REVIEW", order: 3 },
+      { title: "Schedule the social queue", status: "TO_DO", order: 4 },
+    ];
+    for (const row of rows) {
+      await prisma.task.create({
+        data: {
+          projectId: launch.id,
+          creatorId: adminId,
+          title: row.title,
+          status: row.status,
+          priority: "MEDIUM",
+          order: row.order,
+          assignees: { create: [{ userId: adminId }] },
+        },
+      });
+    }
+  }
+
+  if ((await prisma.task.count({ where: { projectId: null, creatorId: adminId } })) === 0) {
+    await prisma.task.create({
+      data: { creatorId: adminId, title: "Review the quarterly numbers", status: "IN_PROGRESS", priority: "HIGH", order: 0,
+              assignees: { create: [{ userId: adminId }] } },
+    });
+    await prisma.task.create({
+      data: { creatorId: adminId, title: "Book the team offsite", status: "TO_DO", priority: "LOW", order: 1,
+              assignees: { create: [{ userId: adminId }] } },
+    });
+  }
+
   console.log("Demo clients and projects ready");
 }
 

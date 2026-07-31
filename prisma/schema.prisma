@@ -28,6 +28,8 @@ model User {
   invitesCreated Invite[]  @relation("InviteCreator")
   activity       ActivityLog[] @relation("ActivityActor")
   clientsLed     Client[]      @relation("ClientAccountLead")
+  tasksCreated    Task[]         @relation("TaskCreator")
+  taskAssignments TaskAssignee[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -149,6 +151,7 @@ model Project {
   startDate      DateTime?
   dueDate        DateTime?
   milestones     Milestone[]
+  tasks          Task[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -164,6 +167,7 @@ model Milestone {
   dueDate     DateTime?
   completedAt DateTime?
   order       Int
+  tasks       Task[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -188,4 +192,65 @@ model ActivityLog {
 
   @@index([clientId, at])
   @@index([entityType, entityId, at])
+}
+
+enum TaskStatus {
+  TO_DO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  project     Project?        @relation(fields: [projectId], references: [id])
+  projectId   String?
+  milestone   Milestone?      @relation(fields: [milestoneId], references: [id])
+  milestoneId String?
+  creator     User            @relation("TaskCreator", fields: [creatorId], references: [id])
+  creatorId   String
+  status      TaskStatus      @default(TO_DO)
+  priority    TaskPriority    @default(MEDIUM)
+  dueDate     DateTime?
+  order       Int
+  assignees   TaskAssignee[]
+  checklist   ChecklistItem[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([projectId])
+  @@index([milestoneId])
+  @@index([status])
+}
+
+model TaskAssignee {
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model ChecklistItem {
+  id        String   @id @default(cuid())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  title     String
+  done      Boolean  @default(false)
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
 }
