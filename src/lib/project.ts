@@ -87,6 +87,18 @@ export function projectRowSubtitle(input: { milestoneCount: number; dueDate: Dat
   return input.dueDate ? `${count} · due ${shortDate(input.dueDate)}` : count;
 }
 
+/** The list default is "active only", so DONE is opt-in. `null` means that
+ * default; "ALL" is the explicit escape hatch that makes completed work
+ * reachable again. */
+export type StatusFilter = ProjectStatus | "ALL";
+
+export function parseStatusFilter(raw: string | string[] | undefined): StatusFilter | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  if (value === "ALL") return "ALL";
+  return (PROJECT_STATUSES as readonly string[]).includes(value) ? (value as ProjectStatus) : null;
+}
+
 export function parseHealthFilter(raw: string | string[] | undefined): ProjectHealth | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (!value) return null;

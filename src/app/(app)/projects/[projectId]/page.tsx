@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getProjectDetail } from "@/lib/project-queries";
-import { PROJECT_HEALTH_BADGE, PROJECT_HEALTH_LABEL, PROJECT_STATUS_LABEL } from "@/lib/project";
+import { PROJECT_HEALTH_BADGE, PROJECT_HEALTH_LABEL } from "@/lib/project";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectForm } from "@/components/projects/project-form";
 import { ProjectHealthControl } from "@/components/projects/project-health-control";
+import { ProjectStatusControl } from "@/components/projects/project-status-control";
 import { ProgressControl } from "@/components/projects/progress-control";
 import { MilestoneStrip } from "@/components/projects/milestone-strip";
 import { MilestoneForm } from "@/components/projects/milestone-form";
@@ -85,7 +86,11 @@ export default async function ProjectDetailPage(props: {
         <div>
           <p className={STAT_LABEL}>Status</p>
           <div className="mt-1.5">
-            <Badge kind="neutral">{PROJECT_STATUS_LABEL[project.status]}</Badge>
+            <ProjectStatusControl
+              projectId={project.id}
+              clientId={project.clientId}
+              status={project.status}
+            />
           </div>
         </div>
 

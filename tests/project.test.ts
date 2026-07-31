@@ -10,6 +10,7 @@ import {
   projectListSummary,
   projectRowSubtitle,
   parseHealthFilter,
+  parseStatusFilter,
 } from "@/lib/project";
 
 const validProject = {
@@ -155,6 +156,30 @@ describe("projectRowSubtitle", () => {
     expect(
       projectRowSubtitle({ milestoneCount: 0, dueDate: new Date("2026-08-14T12:00:00.000Z") })
     ).toBe("No milestones · due 14 Aug");
+  });
+});
+
+describe("parseStatusFilter", () => {
+  it("maps a known status through", () => {
+    expect(parseStatusFilter("DONE")).toBe("DONE");
+    expect(parseStatusFilter("ON_HOLD")).toBe("ON_HOLD");
+  });
+
+  it("maps the explicit ALL sentinel through", () => {
+    expect(parseStatusFilter("ALL")).toBe("ALL");
+  });
+
+  it("maps undefined to null, meaning the active-only default", () => {
+    expect(parseStatusFilter(undefined)).toBeNull();
+    expect(parseStatusFilter("")).toBeNull();
+  });
+
+  it("maps an unrecognised value to null rather than throwing", () => {
+    expect(parseStatusFilter("ARCHIVED")).toBeNull();
+  });
+
+  it("takes the first entry of an array-valued searchParam", () => {
+    expect(parseStatusFilter(["DONE", "PLANNING"])).toBe("DONE");
   });
 });
 

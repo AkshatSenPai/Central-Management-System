@@ -112,14 +112,22 @@ describe("listProjects", () => {
     expect(rows[1].progress).toEqual({ percent: 90, mode: "MANUAL", hasUnits: true, label: "90%" });
   });
 
-  it("excludes DONE by default and includes it when includeDone is true", async () => {
+  it("excludes DONE by default", async () => {
     const { db, findManyArgs } = fakeDb({ projects: [projectRow()] });
     await listProjects(db);
     expect((findManyArgs[0] as { where: { status?: unknown } }).where.status).toEqual({ not: "DONE" });
+  });
 
-    const second = fakeDb({ projects: [projectRow()] });
-    await listProjects(second.db, { includeDone: true });
-    expect((second.findManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty("status");
+  it("drops the status constraint entirely when asked for ALL", async () => {
+    const { db, findManyArgs } = fakeDb({ projects: [projectRow()] });
+    await listProjects(db, { status: "ALL" });
+    expect((findManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty("status");
+  });
+
+  it("filters to a single status when given one — including DONE", async () => {
+    const { db, findManyArgs } = fakeDb({ projects: [projectRow({ status: "DONE" })] });
+    await listProjects(db, { status: "DONE" });
+    expect((findManyArgs[0] as { where: { status?: unknown } }).where.status).toBe("DONE");
   });
 
   it("passes a health filter through to the where clause and omits the key when null", async () => {

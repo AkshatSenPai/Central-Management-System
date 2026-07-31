@@ -91,8 +91,10 @@ export async function getClientDetail(
   });
 
   // Reuses the list read model so a project's progress is computed the same
-  // way here as it is on /projects.
-  const projects = await listProjects(db, { clientId });
+  // way here as it is on /projects. Every status is included: a client's page
+  // is the one place their completed work must stay visible, and it is what
+  // makes the "remove this client's projects first" delete guard actionable.
+  const projects = await listProjects(db, { clientId, status: "ALL" });
 
   return {
     id: client.id,

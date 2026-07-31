@@ -11,6 +11,7 @@ import {
   projectRowSubtitle,
   type ProjectHealth,
   type ProjectStatus,
+  type StatusFilter,
 } from "@/lib/project";
 
 /**
@@ -66,12 +67,15 @@ export type ProjectListRow = {
  * batched call for their progress units. */
 export async function listProjects(
   db: PrismaClient,
-  input?: { clientId?: string; health?: ProjectHealth | null; includeDone?: boolean }
+  input?: { clientId?: string; health?: ProjectHealth | null; status?: StatusFilter | null }
 ): Promise<ProjectListRow[]> {
   const where: Prisma.ProjectWhereInput = {};
   if (input?.clientId) where.clientId = input.clientId;
   if (input?.health) where.health = input.health;
-  if (!input?.includeDone) where.status = { not: "DONE" };
+  // No status given means the active-only default; "ALL" drops the constraint
+  // so DONE projects stay reachable; anything else filters to that one status.
+  if (!input?.status) where.status = { not: "DONE" };
+  else if (input.status !== "ALL") where.status = input.status;
 
   const projects = await db.project.findMany({
     where,

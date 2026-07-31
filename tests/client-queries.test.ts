@@ -32,13 +32,17 @@ function fakeDb(parts: {
   milestones?: { projectId: string; completedAt: Date | null }[];
 }) {
   let milestoneCalls = 0;
+  const projectFindManyArgs: unknown[] = [];
   const db = {
     client: {
       findMany: async () => parts.clients ?? [],
       findUnique: async () => parts.detail ?? null,
     },
     project: {
-      findMany: async () => parts.projects ?? [],
+      findMany: async (args: unknown) => {
+        projectFindManyArgs.push(args);
+        return parts.projects ?? [];
+      },
     },
     milestone: {
       findMany: async () => {
@@ -47,7 +51,7 @@ function fakeDb(parts: {
       },
     },
   } as unknown as PrismaClient;
-  return { db, milestoneCalls: () => milestoneCalls };
+  return { db, milestoneCalls: () => milestoneCalls, projectFindManyArgs };
 }
 
 describe("listClients", () => {
@@ -131,6 +135,27 @@ const detailRow = {
 };
 
 describe("getClientDetail", () => {
+  it("lists every project including DONE, so completed work stays reachable", async () => {
+    const { db, projectFindManyArgs } = fakeDb({
+      detail: {
+        id: "c1",
+        name: "Harlow & Fitch",
+        status: "ACTIVE",
+        sector: null,
+        website: null,
+        notes: null,
+        engagementType: null,
+        clientSince: null,
+        accountLead: null,
+        contacts: [],
+      },
+    });
+    await getClientDetail(db, "c1");
+    expect((projectFindManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty(
+      "status"
+    );
+  });
+
   it("returns null for an unknown id", async () => {
     const { db } = fakeDb({});
     expect(await getClientDetail(db, "ghost")).toBeNull();

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getClientDetail } from "@/lib/client-queries";
 import { listClientActivity } from "@/lib/activity";
 import { CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from "@/lib/client";
+import { isProjectActive } from "@/lib/project";
 import { monthYear } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -107,7 +108,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-baseline gap-2">
                 <h2 className="text-lg font-medium text-[var(--text)]">Projects</h2>
-                <span className="text-xs text-[var(--text-3)]">{client.projects.length} active</span>
+                <span className="text-xs text-[var(--text-3)]">
+                  {client.projects.filter((p) => isProjectActive(p.status)).length} active
+                </span>
               </div>
               <ProjectForm presetClientId={client.id} />
             </div>

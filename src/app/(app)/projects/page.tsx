@@ -1,40 +1,45 @@
 import { prisma } from "@/lib/prisma";
 import { listProjects } from "@/lib/project-queries";
-import { parseHealthFilter, projectListSummary } from "@/lib/project";
+import { parseHealthFilter, parseStatusFilter, projectListSummary } from "@/lib/project";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectRow } from "@/components/projects/project-row";
 import { ProjectForm } from "@/components/projects/project-form";
-import { HealthFilter } from "@/components/projects/health-filter";
+import { ProjectFilters } from "@/components/projects/project-filters";
 
 const COLUMNS = "grid-cols-[2fr_1fr_1.4fr_auto_auto]";
 
 export default async function ProjectsPage(props: {
-  searchParams: Promise<{ health?: string | string[] }>;
+  searchParams: Promise<{ health?: string | string[]; status?: string | string[] }>;
 }) {
   const raw = await props.searchParams;
   const health = parseHealthFilter(raw.health);
+  const status = parseStatusFilter(raw.status);
 
   const [rows, clients] = await Promise.all([
-    listProjects(prisma, { health }),
+    listProjects(prisma, { health, status }),
     prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
+  // The default view is active-only, so the "N active" summary describes it
+  // exactly. Once a status filter is on, that phrasing would lie — a Done-only
+  // view is not "0 active projects".
+  const subtitle =
+    status === null
+      ? projectListSummary(rows)
+      : `${rows.length} ${rows.length === 1 ? "project" : "projects"}`;
+
   return (
     <div className="space-y-6 p-8">
-      <PageHeader
-        title="Projects"
-        subtitle={projectListSummary(rows)}
-        action={<ProjectForm clients={clients} />}
-      />
+      <PageHeader title="Projects" subtitle={subtitle} action={<ProjectForm clients={clients} />} />
 
-      <HealthFilter value={health} />
+      <ProjectFilters health={health} status={status} />
 
       {rows.length === 0 ? (
         <EmptyState
           message={
-            health
-              ? "No projects match this health filter."
+            health || status
+              ? "No projects match these filters."
               : "No projects yet. Create one from a client's page."
           }
         />
