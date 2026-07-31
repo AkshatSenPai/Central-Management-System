@@ -44,8 +44,12 @@ export const TASK_PRIORITY_RANK: Record<TaskPriority, number> = {
   LOW: 3,
 };
 
-/** No `status` field on purpose (R15) — a task is always created TO_DO;
- * status only ever changes through `setTaskStatus`. */
+/** No `status` field on purpose (R15) — this schema backs both create and
+ * edit, and `updateTask` never writes status: once a task exists, its status
+ * moves only through `setTaskStatus`. Creation is the exception, so
+ * `createTaskAction` parses status off FormData separately against
+ * `TASK_STATUSES` and `<TaskForm>` renders a status select in create mode
+ * only. */
 export const taskSchema = z.object({
   title: z.string().trim().min(1, "Task title is required").max(200),
   description: z.string().trim().max(4000).optional().or(z.literal("")),

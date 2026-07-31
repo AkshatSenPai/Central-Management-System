@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { listProjects } from "@/lib/project-queries";
-import { parseHealthFilter, parseStatusFilter, projectListSummary } from "@/lib/project";
+import {
+  parseHealthFilter,
+  parseStatusFilter,
+  projectCountLabel,
+  projectListSummary,
+} from "@/lib/project";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectRow } from "@/components/projects/project-row";
@@ -24,10 +29,7 @@ export default async function ProjectsPage(props: {
   // The default view is active-only, so the "N active" summary describes it
   // exactly. Once a status filter is on, that phrasing would lie — a Done-only
   // view is not "0 active projects".
-  const subtitle =
-    status === null
-      ? projectListSummary(rows)
-      : `${rows.length} ${rows.length === 1 ? "project" : "projects"}`;
+  const subtitle = status === null ? projectListSummary(rows) : projectCountLabel(rows.length);
 
   return (
     <div className="space-y-6 p-8">

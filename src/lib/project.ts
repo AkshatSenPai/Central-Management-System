@@ -77,6 +77,16 @@ export function projectListSummary(rows: { status: string; clientId: string }[])
   return `${active.length} active ${projectWord} across ${clients} ${clientWord}`;
 }
 
+/** The filtered-view counterpart to `projectListSummary`. Once a status
+ * filter is on, the "N active projects across M clients" phrasing would lie —
+ * a Done-only view is not "0 active projects" — so the header falls back to a
+ * bare count. Extracted rather than inlined at the call site so the
+ * pluralisation is tested in one place, the way every other summary string
+ * in this module is. */
+export function projectCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "project" : "projects"}`;
+}
+
 /** In Phase 2 the trackable unit is the milestone, so the row says
  * "milestones" — the basis change is visible in the release that makes it. */
 export function projectRowSubtitle(input: { milestoneCount: number; dueDate: Date | null }): string {

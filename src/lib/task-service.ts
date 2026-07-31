@@ -189,12 +189,14 @@ export async function updateTask(
   // an exceptional one, so it must surface as an ActionResult, not a thrown
   // foreign-key error from tx.task.update. Unchanged and cleared-to-null
   // projects issue no lookup.
+  let destinationClientId: string | null = null;
   if (input.projectId && input.projectId !== scope.task.projectId) {
     const project = await db.project.findUnique({
       where: { id: input.projectId },
-      select: { id: true },
+      select: { id: true, clientId: true },
     });
     if (!project) return err("Project not found");
+    destinationClientId = project.clientId;
   }
 
   // order, creatorId, status and the assignee set are owned by other
@@ -226,8 +228,13 @@ export async function updateTask(
         action: "task.updated",
         // The pre-move client (R13): a cross-client project move is narrated
         // on the timeline it is leaving, since `scope` was loaded before this
-        // write.
-        clientId: scope.clientId,
+        // write. The rule is deliberately asymmetric — a personal task has no
+        // timeline to leave, so falling back to the destination is the only
+        // way the move is narrated anywhere at all. Without this, adopting a
+        // personal task into a project wrote clientId: null and the row
+        // surfaced on no timeline. Clearing a project still logs under the
+        // pre-move client, because `destinationClientId` stays null there.
+        clientId: scope.clientId ?? destinationClientId,
         meta: { name: title, changes },
       });
     });
@@ -297,28 +304,16 @@ export async function removeTask(
   return ok(undefined);
 }
 
-/** True when `e` is the unique-constraint violation a concurrent
- * `createMany` can race into. */
-function isConcurrentInsertRace(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
-}
-
 /** True when `e` is the row-vanished error a concurrent delete can race a
  * later update or delete into — the read in `loadTaskScope` succeeded, but
- * the row was gone by the time the transaction actually ran. Same shape as
- * isConcurrentInsertRace, mapped to the caller's existing not-found result
- * instead of a clean success. */
+ * the row was gone by the time the transaction actually ran. */
 function isRowGoneRace(e: unknown): boolean {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025";
 }
 
-/** The read-diff-write cycle for `setTaskAssignees`, factored out so it can
- * be retried wholesale: a P2002 on the `createMany` aborts the *entire*
- * transaction on Postgres, including a `deleteMany` that had already applied
- * inside it, so the retry must re-read `current` and recompute the diff —
- * not just re-issue the insert — or a pending removal caught in the same
- * rollback would be lost. Left uncaught here on purpose; the caller decides
- * whether to retry or surrender. */
+/** The read-diff-write cycle for `setTaskAssignees`. Kept as its own function
+ * because the read of `current` and the writes that depend on it belong
+ * together: the diff is only valid for the snapshot it was computed from. */
 async function attemptTaskAssigneeDiff(
   db: PrismaClient,
   scope: { task: { title: string }; clientId: string | null },
@@ -405,20 +400,18 @@ export async function setTaskAssignees(
   const scope = await loadTaskScope(db, input.taskId);
   if (!scope.ok) return err("Task not found");
 
-  try {
-    return await attemptTaskAssigneeDiff(db, scope, input);
-  } catch (e) {
-    if (!isConcurrentInsertRace(e)) throw e;
-  }
-
-  // Retry once, from scratch: re-reading `current` means the id that just
-  // raced its way in is no longer in `addedIds`, while a removal that rode
-  // down with the aborted transaction is recomputed and reapplied — never
-  // just silently dropped in favour of a reported success.
-  try {
-    return await attemptTaskAssigneeDiff(db, scope, input);
-  } catch (e) {
-    if (isConcurrentInsertRace(e)) return ok(undefined);
-    throw e;
-  }
+  // No P2002 retry, deliberately. `createMany({ skipDuplicates: true })`
+  // compiles to INSERT … ON CONFLICT DO NOTHING on Postgres, so a concurrent
+  // insert of the same (taskId, userId) is absorbed by the database and the
+  // transaction commits — verified against this install: the duplicate insert
+  // returned `{ count: 0 }` without throwing, while the same insert *without*
+  // skipDuplicates threw P2002, confirming the unique constraint is real.
+  // A retry here would have guarded an error that cannot reach it.
+  //
+  // The race that IS reachable needs no retry and cannot be fixed by one:
+  // two overlapping saves each diff against their own `current` snapshot, so
+  // the later one recomputes `removedIds` from stale data and can delete rows
+  // the earlier save just created. Last writer wins, which is the intended
+  // semantics of a set replacement.
+  return attemptTaskAssigneeDiff(db, scope, input);
 }

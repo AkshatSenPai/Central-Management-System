@@ -146,11 +146,22 @@ describe("listTeamCards", () => {
     expect(cards.find((c) => c.id === "u2")?.openTaskLabel).toBe("No open tasks");
   });
 
-  it("asks only for IN_PROGRESS tasks in the third query", async () => {
-    const { db, findManyArgs } = fakeDb({ users: [userRow()] });
+  // The whole where clause, not just its `task` fragment. Asserting the
+  // fragment alone would still pass with `userId: { in: ids }` dropped, and
+  // that omission has no visible symptom — the in-memory fold discards
+  // unknown members anyway, so every card would still render correctly while
+  // production hydrated every IN_PROGRESS assignment row in the database on
+  // each /team render.
+  it("asks only for IN_PROGRESS tasks belonging to the listed members in the third query", async () => {
+    const { db, findManyArgs } = fakeDb({
+      users: [userRow({ id: "u1" }), userRow({ id: "u2" })],
+    });
     await listTeamCards(db);
-    const where = (findManyArgs[0] as { where: { task?: unknown } }).where;
-    expect(where.task).toEqual({ status: "IN_PROGRESS" });
+    const where = (findManyArgs[0] as { where: unknown }).where;
+    expect(where).toEqual({
+      userId: { in: ["u1", "u2"] },
+      task: { status: "IN_PROGRESS" },
+    });
   });
 
   it("names the client and project on each In Progress task", async () => {

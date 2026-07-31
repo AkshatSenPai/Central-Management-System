@@ -59,8 +59,13 @@ export async function createTaskAction(
       return err(parsed.error.issues[0]?.message ?? "Invalid input");
     }
     const { title, description, projectId, milestoneId, priority, dueDate } = parsed.data;
+    // Rejected rather than defaulted, so this reads identically to
+    // setTaskStatusAction below. A silent fallback would let a tampered or
+    // stale request create a task under a status the sender did not choose,
+    // and report success.
     const statusParsed = z.enum(TASK_STATUSES).safeParse(formData.get("status"));
-    const status = statusParsed.success ? statusParsed.data : "TO_DO";
+    if (!statusParsed.success) return err("Invalid input");
+    const status = statusParsed.data;
     const assigneeIds = formData.getAll("userId").map(String);
     const result = await createTask(prisma, {
       title,

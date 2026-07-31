@@ -7,6 +7,7 @@ import {
   milestoneSchema,
   isProjectActive,
   projectColorIndex,
+  projectCountLabel,
   projectListSummary,
   projectRowSubtitle,
   parseHealthFilter,
@@ -138,6 +139,23 @@ describe("projectListSummary", () => {
 
   it('reads "No projects yet" for an empty list', () => {
     expect(projectListSummary([])).toBe("No projects yet");
+  });
+});
+
+describe("projectCountLabel", () => {
+  it("pluralises above one", () => {
+    expect(projectCountLabel(6)).toBe("6 projects");
+  });
+
+  it("uses the singular for exactly one", () => {
+    expect(projectCountLabel(1)).toBe("1 project");
+  });
+
+  // A filtered view legitimately reaches zero, and unlike projectListSummary
+  // it must stay a bare count — "No projects yet" would claim the project
+  // list is empty when it is only this filter that matches nothing.
+  it("reads a plural zero rather than an empty-state sentence", () => {
+    expect(projectCountLabel(0)).toBe("0 projects");
   });
 });
 

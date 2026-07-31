@@ -1,21 +1,20 @@
 # Phase 3a — Post-merge Follow-ups
 
-Carried out of the Phase 3a final whole-branch review (branch `phase-3a-tasks-team`, 4 review lenses, every finding refutation-tested). Five must-fix items were applied in a single fix wave before merge and are **not** listed here. Nothing below blocks merge.
+Carried out of the Phase 3a final whole-branch review (branch `phase-3a-tasks-team`, 4 review lenses, every finding refutation-tested). Five must-fix items were applied in a single fix wave before merge and are **not** listed here.
 
-## Fix soon
+**All nine items below were resolved on 2026-07-31.** The record of what each one was, and how it was settled, is kept here rather than deleted — several encode a decision a later phase could otherwise re-litigate.
 
-1. **The P2002 retry in `setTaskAssignees` guards an unreachable error.** `src/lib/task-service.ts` retries once on a unique-constraint violation from `taskAssignee.createMany`, but the datasource is Postgres and `skipDuplicates: true` compiles to `INSERT … ON CONFLICT DO NOTHING`, which absorbs the conflict rather than raising P2002. Its two tests only witness the fake throwing what the fixture told it to. This was plan-mandated and passed two review rounds, so it was deliberately left alone rather than overturned same-day. Either prove the premise with one integration check on this install, or drop the retry and replace both tests with the race that *is* reachable: two overlapping saves diffing against the same stale `current` snapshot, where the later save's `removedIds` re-deletes rows the first just created and still returns `ok`. **That untested race is the real gap.**
-2. **`TaskRowSource.status`/`priority` are typed as plain `string`**, forcing casts in `toTaskListRow` and `getTaskDetail` (`src/lib/task-queries.ts`). Phase 3b's kanban builds directly on these rows and inherits every cast. Highest-value of the deferred minors.
-3. **Checklist error state is list-scoped** (`src/components/tasks/checklist.tsx`): a failed toggle on item 7 renders the error above item 1. Cheap to make per-item now, before 3c adds more per-row controls.
-4. **`overdue` is computed and never rendered.** `task-queries.ts` derives it on every row and `TaskRow` shows an overdue task in the same muted colour as any other, while the milestone strip renders overdue milestones in `--bad` on the same screen. Either render it in the row subtitle or drop it from `TaskListRow`/`TaskDetail` and their mappers — carrying a computed-but-unread field into 3b is how it becomes load-bearing by accident.
-5. **A personal task moving *into* a project logs under no client.** R13 scopes `task.updated` to the pre-move client, which is right for project-to-project moves, but a personal task has no pre-move client, so the row is written with `clientId: null` and appears on no timeline at all. Fix in `updateTask`: when the pre-move scope has no client and the write sets a non-null `projectId`, log under the destination client resolved from the project lookup already issued. Add the mirror test beside the existing "clearing the project to personal" case and note the asymmetry in the R13 comment so 3b does not re-derive it.
-6. **`createTaskAction` silently falls back on a bad status** while `setTaskStatusAction` four lines later returns `err("Invalid input")` for the identical enum (`src/server/actions/tasks.ts`). Only reachable via a tampered or stale request. Make it return the error.
-7. **A stale doc comment.** `src/lib/task.ts`'s `taskSchema` comment claims "a task is always created TO_DO; status only ever changes through `setTaskStatus`", which is false — `createTaskAction` parses status off FormData and `TaskForm` renders a status select in create mode. R15 only ever constrained `updateTask`. Reword it.
-8. **A weak assertion in `tests/team-queries.test.ts`** asserts only the `where.task` fragment while its sibling asserts the whole `groupBy` object. Dropping `userId: { in: ids }` from `src/lib/team-queries.ts` would pass every test while making production hydrate every IN_PROGRESS assignment row on each `/team` render.
+## Resolved
 
-## On master, not this branch
-
-- **`src/app/(app)/projects/page.tsx` still carries the inline pluralisation ternary** this phase removed from My Tasks, introduced by the earlier Done-project fix. Extract a `projectCountLabel` helper in `src/lib/project.ts` with tests.
+1. **The P2002 retry in `setTaskAssignees` guarded an unreachable error.** *Premise proven false, retry removed.* A probe against this Postgres install showed `taskAssignee.createMany({ …, skipDuplicates: true })` returns `{ count: 0 }` on a duplicate without throwing, while the identical insert *without* `skipDuplicates` throws P2002 — confirming both that the conflict is absorbed and that the unique constraint is genuinely there. `setTaskAssignees` is now a single `attemptTaskAssigneeDiff` call, `isConcurrentInsertRace` is gone, and the two tests that only witnessed the fake throwing its own fixture were replaced by (a) an assertion that exactly one insert is ever issued and it carries `skipDuplicates`, and (b) the race that *is* reachable — two overlapping saves diffing against the same stale `current`, where the later save's `removedIds` deletes a row the earlier one just created and still returns `ok`. That is last-writer-wins, the intended semantics of a set replacement, and it is now pinned rather than accidental.
+2. **`TaskRowSource.status`/`priority` were typed as plain `string`.** Now the `TaskStatus`/`TaskPriority` unions. All six casts in `toTaskListRow` and `getTaskDetail` deleted; `tsc` is clean without them, because Prisma already returns the enum types. Phase 3b's kanban builds on these rows cast-free.
+3. **Checklist error state was list-scoped.** `error` is now `{ scope, message }`, where `scope` is the item id or `ADD_SCOPE`. A failed toggle renders under the row it happened on; an add failure still renders under the add form.
+4. **`overdue` was computed and never rendered.** Now rendered, on the grounds that the milestone strip already shows overdue milestones in `--bad` on the same screen. `<TaskRow>` recolours its subtitle and the task detail page recolours its due line — no new string, so the Vocabulary Lock is untouched.
+5. **A personal task moving *into* a project logged under no client.** Fixed in `updateTask`: the project lookup on the move path now also selects `clientId`, and the activity row is scoped `scope.clientId ?? destinationClientId`. Clearing a project still logs under the pre-move client, because `destinationClientId` stays null there. **Reproduced live in the browser before the fix** (`task.updated` written with `clientId: null`, visible on no timeline). Two tests: the mirror of the existing clear-to-personal case, plus a guard that a project-to-project move still leaves its old timeline, so the asymmetry cannot be "tidied" away.
+6. **`createTaskAction` silently fell back on a bad status.** Now returns `err("Invalid input")`, reading identically to `setTaskStatusAction` four lines below. Confirmed safe: `<TaskForm>` renders `name="status"` exactly when `!task`, and `createTaskAction` is only reached from that branch, so the field is always present on a legitimate submit.
+7. **A stale doc comment on `taskSchema`.** Reworded — R15 constrains `updateTask`, not creation; creation parses status separately and `<TaskForm>` renders a status select in create mode.
+8. **A weak assertion in `tests/team-queries.test.ts`.** Now asserts the whole `where` object, so dropping `userId: { in: ids }` fails. Noted in the test why that omission has no visible symptom: the in-memory fold discards unknown members anyway, so every card would still render correctly while production hydrated every IN_PROGRESS assignment row on each `/team` render.
+9. **The inline pluralisation ternary on `src/app/(app)/projects/page.tsx`** (was on master, not the branch). Extracted as `projectCountLabel` in `src/lib/project.ts` with three tests, including the zero case — a filtered view legitimately reaches zero and must stay a bare count, not `projectListSummary`'s "No projects yet".
 
 ## Accepted — no action planned
 
@@ -23,12 +22,29 @@ Carried out of the Phase 3a final whole-branch review (branch `phase-3a-tasks-te
 - `taskRowSubtitle`'s all-or-nothing client/project join: unreachable while `Project.clientId` is required.
 - `pick()`'s widened cast: Prisma's `data` argument is partial; no runtime effect.
 - The `not.toContain("assigneeIds")` assertion: tautological today, but a cheap guard against a future implementation that spreads `input` into the update payload.
-- Duplicate-ish assignment assertions ("never issues a blanket delete" duplicating the exact-`toEqual` before it): redundant, not wrong; both still fail against a no-delete implementation.
+- Duplicate-ish assignment assertions: redundant, not wrong; both still fail against a no-delete implementation.
 - `loadChecklistScope`'s redundant `taskId` and unused `task.id`/`title` select: literal parity with its declared signature.
 - Redundant `byMember.set` after in-place mutation in `team-queries.ts`.
-- `<TaskAssigneesForm>`'s "Save assignees" label instead of the locked "Save": justified, since two identical Save buttons on one screen is worse. **Record it as a third Vocabulary Lock exception in the plan so the lock stays audit-complete.**
-- The redundant both-field gate and missing `shrink-0` on the member-card header badge: matches an unguarded pattern already present elsewhere; not a regression.
+- `<TaskAssigneesForm>`'s "Save assignees" label instead of the locked "Save": justified, since two identical Save buttons on one screen is worse. **Still to be recorded as a Vocabulary Lock exception in the plan so the lock stays audit-complete.**
 
-## Still to verify
+## Browser QA — done 2026-07-31
 
-The browser QA checklists across Tasks 10, 11 and 12 are **pending the owner's click-through** — they require an authenticated session, which was deliberately not created. Every non-authenticated gate (tests, type-check, lint, production build, the no-hardcoded-colour grep) passed, and each pending line has a recorded code-level walkthrough, but the click-through is the honest remaining gap. See `docs/superpowers/plans/2026-07-31-phase-3a-tasks-team.md` Tasks 10–12 for the line-by-line lists.
+The Tasks 10–12 click-through was executed against a temporary QA account (since deleted, along with every task, activity row and account it created; the deactivated member was reactivated). Everything exercised passed. Highlights:
+
+- Progress flipped **50% (2/4 milestones) → 0% (0/1 task)** the moment a project got its first task, and to **100%** on completion — identically on the project page, `/projects` and the client page. A move to Review did not shift it.
+- Milestone fallback intact (a project with milestones and no tasks stayed milestone-derived); a project with neither read `—` plus "Add tasks or set progress manually", never `0%`.
+- One correctly client-scoped activity row per mutation, including checklist rows resolving the client through the two-level walk-up; personal-task rows written `clientId: null` and absent from the client timeline.
+- A save adding two people and removing one produced exactly two rows, each naming everyone affected.
+- A deactivated member stayed checked in the picker, survived an unrelated save, and produced no `task.unassigned` row.
+- A rejected submit preserved every field including three selects and both checkboxes.
+
+**Not exercised**, needing data or setup judged not worth building at the time: the five-assignee `+2` avatar cap (only three users exist), the sort ordering across dated/undated/priority, and the "under 15 seconds" timing claim.
+
+**Two observations from the click-through**, neither a defect, both unresolved:
+
+- The checklist affordance is a button labelled **"Add"**, while the Vocabulary Lock specifies "Add checklist item" (that string is the input's placeholder). Worth recording as a lock exception the way "Save assignees" was, or relabelling.
+- A project row still reads "4 milestones · due 14 Aug" while its progress is task-derived. Mildly self-contradictory once the basis flips; `projectRowSubtitle`'s own comment anticipates the basis change.
+
+## Still open
+
+- **QA finding 1**, carried from Phase 2: next-themes emits "Encountered a script tag while rendering React component" on the `notFound()` path. Re-confirmed on `/tasks/does-not-exist`. Pre-existing Phase 1 architecture — the theme script lives inside a client component, and next-themes 0.4.6 offers no way to suppress it. A real fix means replacing next-themes; only `theme-provider.tsx` and `topbar.tsx` use it.

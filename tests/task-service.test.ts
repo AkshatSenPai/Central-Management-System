@@ -17,12 +17,6 @@ type FakeParts = {
   /** Rows returned by taskAssignee.findMany — setTaskAssignees' current set,
    * carrying names so the remove side never needs an active-user lookup. */
   currentAssignees?: { userId: string; user: { name: string } }[];
-  /** Thrown by taskAssignee.createMany when set — simulates the concurrent
-   * P2002 race setTaskAssignees maps to a clean success. */
-  assigneeCreateError?: unknown;
-  /** Thrown by taskAssignee.createMany on its FIRST invocation only, then
-   * succeeds on every call after — simulates a race that clears on retry. */
-  assigneeCreateErrorOnce?: unknown;
   /** Thrown by task.delete when set — simulates a concurrent P2025 raised
    * when the row was already gone by the time the transaction ran. */
   taskDeleteError?: unknown;
@@ -58,7 +52,6 @@ function fakeDb(parts: FakeParts) {
   const dbW = emptySink();
   const txW = emptySink();
   const calls = { projectFindUnique: 0, milestoneFindUnique: 0, taskFindMany: 0, userFindMany: 0 };
-  let assigneeCreateCalls = 0;
   const args: {
     taskFindManyWhere?: unknown;
     userFindManyWhere?: unknown;
@@ -119,17 +112,9 @@ function fakeDb(parts: FakeParts) {
     },
     taskAssignee: {
       createMany: async (a: Record<string, unknown>) => {
-        assigneeCreateCalls++;
-        // Simulates a concurrent P2002 raised by the real driver on the
-        // insert itself, so setTaskAssignees' catch has something real to
-        // narrow on. assigneeCreateErrorOnce only fires the first time this
-        // is ever called across the whole test (including a retry's second
-        // attempt), so the retry's own insert goes through cleanly.
-        if (parts.assigneeCreateErrorOnce && assigneeCreateCalls === 1) {
-          throw parts.assigneeCreateErrorOnce;
-        }
-        if (parts.assigneeCreateError) throw parts.assigneeCreateError;
         sink.assigneesCreated.push(a);
+        // What real Postgres returns when ON CONFLICT DO NOTHING absorbs
+        // every row: a success carrying a zero count, never a throw.
         return { count: 0 };
       },
       deleteMany: async (a: Record<string, unknown>) => {
@@ -462,6 +447,32 @@ describe("updateTask", () => {
   it("clearing the project to personal logs task.updated under the old client's id", async () => {
     const { db, txW } = fakeDb({ task: taskWithProject });
     await updateTask(db, { ...baseUpdateInput, projectId: null, milestoneId: null });
+    expect(txW.activity[0]).toMatchObject({ action: "task.updated", clientId: "c1" });
+  });
+
+  // The mirror of the case above, and deliberately NOT symmetric with it. R13
+  // narrates a move on the timeline it is leaving, but a personal task has no
+  // timeline to leave — scoping to the pre-move client would write null and
+  // put the row on no timeline at all.
+  it("adopting a personal task into a project logs task.updated under the destination client", async () => {
+    const { db, txW } = fakeDb({ task: personalTask, project: project1 });
+    await updateTask(db, {
+      ...baseUpdateInput,
+      taskId: "t2",
+      title: personalTask.title,
+      description: null,
+      priority: "LOW",
+      projectId: "p1",
+      milestoneId: null,
+    });
+    expect(txW.activity[0]).toMatchObject({ action: "task.updated", clientId: "c1" });
+  });
+
+  // Guards the asymmetry from being "tidied" into always preferring the
+  // destination: a project-to-project move must still leave its old timeline.
+  it("moving between clients still logs under the pre-move client, not the destination", async () => {
+    const { db, txW } = fakeDb({ task: taskWithProject, project: project2 });
+    await updateTask(db, { ...baseUpdateInput, projectId: "p2", milestoneId: null });
     expect(txW.activity[0]).toMatchObject({ action: "task.updated", clientId: "c1" });
   });
 
@@ -818,40 +829,64 @@ describe("setTaskAssignees", () => {
     expect(txW.assigneesCreated[0].skipDuplicates).toBe(true);
   });
 
-  it("maps a concurrent P2002 on the insert to a clean success", async () => {
-    const race = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-      code: "P2002",
-      clientVersion: "test",
-    });
-    const { db } = fakeDb({
+  // These two replace a pair that asserted a P2002 retry. That retry was
+  // removed: `skipDuplicates: true` compiles to INSERT … ON CONFLICT DO
+  // NOTHING, so Postgres absorbs a concurrent duplicate rather than raising
+  // P2002 — verified against the real database, where the duplicate insert
+  // returned { count: 0 } and only the same insert WITHOUT skipDuplicates
+  // threw. The old tests could only ever witness the fake throwing what the
+  // fixture told it to.
+  it("relies on skipDuplicates rather than a retry — one insert attempt, ever", async () => {
+    const { db, txW } = fakeDb({
       task: taskForAssign,
       currentAssignees: [],
       activeUsers: [{ id: "u2", name: "Jordan Lee" }],
-      assigneeCreateError: race,
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
     expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesCreated).toHaveLength(1);
+    expect(txW.assigneesCreated[0].skipDuplicates).toBe(true);
   });
 
-  it("a P2002 on the first attempt retries and still applies the removal", async () => {
-    // current [u1], requested [u2]: a mixed add-and-remove, so the first
-    // attempt's deleteMany for u1 applies inside the same transaction whose
-    // createMany then races into P2002 and rolls the whole thing back — if
-    // setTaskAssignees didn't retry, that removal would be silently lost
-    // even though the call reports success.
-    const race = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-      code: "P2002",
-      clientVersion: "test",
-    });
-    const { db, txW } = fakeDb({
+  // The race that is actually reachable, and the one the retry never
+  // addressed. Two overlapping saves each diff against their own snapshot of
+  // `current`; the later one computes `removedIds` from stale data and
+  // deletes a row the earlier save just created. Last writer wins — the
+  // intended semantics of a set replacement, but it must be deliberate
+  // rather than accidental, so it is pinned here.
+  it("a save diffing against a stale snapshot removes what a concurrent save just added", async () => {
+    // This snapshot predates a concurrent save that added u3. u3 is therefore
+    // absent from `current`, absent from the submitted set, and so lands in
+    // neither list — the concurrent addition simply survives untouched.
+    const stale = fakeDb({
       task: taskForAssign,
       currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
       activeUsers: [{ id: "u2", name: "Jordan Lee" }],
-      assigneeCreateErrorOnce: race,
     });
-    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    await setTaskAssignees(stale.db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(stale.txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1"] } });
+
+    // But when the stale snapshot DOES contain the row a concurrent save
+    // meant to keep, the later save deletes it and still reports ok. No
+    // retry can detect this: nothing errors.
+    const clobber = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u3", user: { name: "Sam Ruiz" } },
+      ],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    const result = await setTaskAssignees(clobber.db, {
+      taskId: "t1",
+      userIds: ["u2"],
+      actorId: "u1",
+    });
     expect(result).toEqual({ ok: true, data: undefined });
-    expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1"] } });
+    expect(clobber.txW.assigneesDeleted[0].where).toEqual({
+      taskId: "t1",
+      userId: { in: ["u1", "u3"] },
+    });
   });
 
   it("writes both assignee changes and both activity rows inside the transaction", async () => {

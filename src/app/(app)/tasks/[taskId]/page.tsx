@@ -95,7 +95,14 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
             />
             <Badge kind={TASK_PRIORITY_BADGE[task.priority]}>{TASK_PRIORITY_LABEL[task.priority]}</Badge>
           </div>
-          <p className="mt-1 text-sm text-[var(--text-3)]">
+          {/* Same rule as <TaskRow>: `overdue` is carried on the detail
+              model, so the one line that states the due date is where it
+              has to show. */}
+          <p
+            className={`mt-1 text-sm ${
+              task.overdue ? "text-[var(--bad)]" : "text-[var(--text-3)]"
+            }`}
+          >
             {task.dueDate ? `Due ${shortDate(task.dueDate)}` : "No due date"}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">

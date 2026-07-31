@@ -39,11 +39,14 @@ const taskRowSelect = {
   assignees: { select: { user: { select: { id: true, name: true } } } },
 } as const;
 
+/** Status and priority are the enum unions, not plain strings — Prisma
+ * already returns them that way, and widening them here was what forced a
+ * cast at every read site. Phase 3b's kanban builds directly on these rows. */
 type TaskRowSource = {
   id: string;
   title: string;
-  status: string;
-  priority: string;
+  status: TaskStatus;
+  priority: TaskPriority;
   dueDate: Date | null;
   projectId: string | null;
   project: { name: string; clientId: string; client: { name: string } } | null;
@@ -58,10 +61,10 @@ function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
   return {
     id: t.id,
     title: t.title,
-    status: t.status as TaskStatus,
-    priority: t.priority as TaskPriority,
+    status: t.status,
+    priority: t.priority,
     dueDate: t.dueDate,
-    overdue: isTaskOverdue({ dueDate: t.dueDate, status: t.status as TaskStatus }),
+    overdue: isTaskOverdue({ dueDate: t.dueDate, status: t.status }),
     projectId: t.projectId,
     projectName: t.project?.name ?? null,
     clientId: t.project?.clientId ?? null,
@@ -175,10 +178,10 @@ export async function getTaskDetail(db: PrismaClient, taskId: string): Promise<T
     id: task.id,
     title: task.title,
     description: task.description,
-    status: task.status as TaskStatus,
-    priority: task.priority as TaskPriority,
+    status: task.status,
+    priority: task.priority,
     dueDate: task.dueDate,
-    overdue: isTaskOverdue({ dueDate: task.dueDate, status: task.status as TaskStatus }),
+    overdue: isTaskOverdue({ dueDate: task.dueDate, status: task.status }),
     projectId: task.projectId,
     projectName: task.project?.name ?? null,
     clientId: task.project?.clientId ?? null,
