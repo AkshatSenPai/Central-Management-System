@@ -282,6 +282,85 @@ export async function removeTask(
   return ok(undefined);
 }
 
+/** True when `e` is the unique-constraint violation a concurrent
+ * `createMany` can race into. */
+function isConcurrentInsertRace(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+}
+
+/** The read-diff-write cycle for `setTaskAssignees`, factored out so it can
+ * be retried wholesale: a P2002 on the `createMany` aborts the *entire*
+ * transaction on Postgres, including a `deleteMany` that had already applied
+ * inside it, so the retry must re-read `current` and recompute the diff —
+ * not just re-issue the insert — or a pending removal caught in the same
+ * rollback would be lost. Left uncaught here on purpose; the caller decides
+ * whether to retry or surrender. */
+async function attemptTaskAssigneeDiff(
+  db: PrismaClient,
+  scope: { task: { title: string }; clientId: string | null },
+  input: { taskId: string; userIds: string[]; actorId: string }
+): Promise<ActionResult> {
+  const current = await db.taskAssignee.findMany({
+    where: { taskId: input.taskId },
+    select: { userId: true, user: { select: { name: true } } },
+  });
+  const currentIds = current.map((row) => row.userId);
+  const requestedIds = Array.from(new Set(input.userIds));
+
+  const addedIds = requestedIds.filter((id) => !currentIds.includes(id));
+  const removedIds = currentIds.filter((id) => !requestedIds.includes(id));
+
+  // A true set diff, never a blanket delete: an unchanged submission
+  // (including one that re-submits a deactivated current assignee — see
+  // setTaskAssignees) writes nothing at all and logs nothing.
+  if (addedIds.length === 0 && removedIds.length === 0) return ok(undefined);
+
+  // Only the NEW ids are ever checked against the active-user list; a
+  // deactivated id already present in `current` never reaches this call.
+  const added = addedIds.length > 0 ? await resolveAssignees(db, addedIds) : [];
+  if (added === null) return err("Invalid input");
+
+  const removedNames = current.filter((row) => removedIds.includes(row.userId)).map((row) => row.user.name);
+
+  await db.$transaction(async (tx) => {
+    // Scoped to exactly the departed ids (R: a true diff) — wiping every
+    // row for the task and recreating the survivors would churn rows that
+    // never changed at all.
+    if (removedIds.length > 0) {
+      await tx.taskAssignee.deleteMany({ where: { taskId: input.taskId, userId: { in: removedIds } } });
+    }
+    if (addedIds.length > 0) {
+      await tx.taskAssignee.createMany({
+        data: addedIds.map((userId) => ({ taskId: input.taskId, userId })),
+        skipDuplicates: true,
+      });
+    }
+    // At most two rows per call, each naming people rather than ids so the
+    // timeline renders without a join and stays readable after a rename.
+    if (addedIds.length > 0) {
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.taskId,
+        action: "task.assigned",
+        clientId: scope.clientId,
+        meta: { name: scope.task.title, people: added.map((a) => a.name) },
+      });
+    }
+    if (removedIds.length > 0) {
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.taskId,
+        action: "task.unassigned",
+        clientId: scope.clientId,
+        meta: { name: scope.task.title, people: removedNames },
+      });
+    }
+  });
+  return ok(undefined);
+}
+
 /** The universal-assignment invariant: any member can assign work to any
  * other member, expressed here as a set replacement rather than an
  * add/remove pair, so a caller never has to compute its own diff.
@@ -302,73 +381,20 @@ export async function setTaskAssignees(
   const scope = await loadTaskScope(db, input.taskId);
   if (!scope.ok) return err("Task not found");
 
-  const current = await db.taskAssignee.findMany({
-    where: { taskId: input.taskId },
-    select: { userId: true, user: { select: { name: true } } },
-  });
-  const currentIds = current.map((row) => row.userId);
-  const requestedIds = Array.from(new Set(input.userIds));
-
-  const addedIds = requestedIds.filter((id) => !currentIds.includes(id));
-  const removedIds = currentIds.filter((id) => !requestedIds.includes(id));
-
-  // A true set diff, never a blanket delete: an unchanged submission
-  // (including one that re-submits a deactivated current assignee — see
-  // above) writes nothing at all and logs nothing.
-  if (addedIds.length === 0 && removedIds.length === 0) return ok(undefined);
-
-  // Only the NEW ids are ever checked against the active-user list; a
-  // deactivated id already present in `current` never reaches this call.
-  const added = addedIds.length > 0 ? await resolveAssignees(db, addedIds) : [];
-  if (added === null) return err("Invalid input");
-
-  const removedNames = current.filter((row) => removedIds.includes(row.userId)).map((row) => row.user.name);
-
   try {
-    await db.$transaction(async (tx) => {
-      // Scoped to exactly the departed ids (R: a true diff) — wiping every
-      // row for the task and recreating the survivors would churn rows that
-      // never changed at all.
-      if (removedIds.length > 0) {
-        await tx.taskAssignee.deleteMany({ where: { taskId: input.taskId, userId: { in: removedIds } } });
-      }
-      if (addedIds.length > 0) {
-        await tx.taskAssignee.createMany({
-          data: addedIds.map((userId) => ({ taskId: input.taskId, userId })),
-          skipDuplicates: true,
-        });
-      }
-      // At most two rows per call, each naming people rather than ids so the
-      // timeline renders without a join and stays readable after a rename.
-      if (addedIds.length > 0) {
-        await recordActivity(tx, {
-          actorId: input.actorId,
-          entityType: "TASK",
-          entityId: input.taskId,
-          action: "task.assigned",
-          clientId: scope.clientId,
-          meta: { name: scope.task.title, people: added.map((a) => a.name) },
-        });
-      }
-      if (removedIds.length > 0) {
-        await recordActivity(tx, {
-          actorId: input.actorId,
-          entityType: "TASK",
-          entityId: input.taskId,
-          action: "task.unassigned",
-          clientId: scope.clientId,
-          meta: { name: scope.task.title, people: removedNames },
-        });
-      }
-    });
+    return await attemptTaskAssigneeDiff(db, scope, input);
   } catch (e) {
-    // A concurrent identical assignment can still race skipDuplicates into a
-    // unique-constraint error on some drivers; that is functionally a
-    // success, not a failure the caller should see.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return ok(undefined);
-    }
+    if (!isConcurrentInsertRace(e)) throw e;
+  }
+
+  // Retry once, from scratch: re-reading `current` means the id that just
+  // raced its way in is no longer in `addedIds`, while a removal that rode
+  // down with the aborted transaction is recomputed and reapplied — never
+  // just silently dropped in favour of a reported success.
+  try {
+    return await attemptTaskAssigneeDiff(db, scope, input);
+  } catch (e) {
+    if (isConcurrentInsertRace(e)) return ok(undefined);
     throw e;
   }
-  return ok(undefined);
 }

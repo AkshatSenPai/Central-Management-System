@@ -20,6 +20,9 @@ type FakeParts = {
   /** Thrown by taskAssignee.createMany when set — simulates the concurrent
    * P2002 race setTaskAssignees maps to a clean success. */
   assigneeCreateError?: unknown;
+  /** Thrown by taskAssignee.createMany on its FIRST invocation only, then
+   * succeeds on every call after — simulates a race that clears on retry. */
+  assigneeCreateErrorOnce?: unknown;
 };
 
 type Sink = {
@@ -52,6 +55,7 @@ function fakeDb(parts: FakeParts) {
   const dbW = emptySink();
   const txW = emptySink();
   const calls = { projectFindUnique: 0, milestoneFindUnique: 0, taskFindMany: 0, userFindMany: 0 };
+  let assigneeCreateCalls = 0;
   const args: {
     taskFindManyWhere?: unknown;
     userFindManyWhere?: unknown;
@@ -111,9 +115,15 @@ function fakeDb(parts: FakeParts) {
     },
     taskAssignee: {
       createMany: async (a: Record<string, unknown>) => {
+        assigneeCreateCalls++;
         // Simulates a concurrent P2002 raised by the real driver on the
         // insert itself, so setTaskAssignees' catch has something real to
-        // narrow on.
+        // narrow on. assigneeCreateErrorOnce only fires the first time this
+        // is ever called across the whole test (including a retry's second
+        // attempt), so the retry's own insert goes through cleanly.
+        if (parts.assigneeCreateErrorOnce && assigneeCreateCalls === 1) {
+          throw parts.assigneeCreateErrorOnce;
+        }
         if (parts.assigneeCreateError) throw parts.assigneeCreateError;
         sink.assigneesCreated.push(a);
         return { count: 0 };
@@ -138,15 +148,39 @@ function fakeDb(parts: FakeParts) {
     user: reads.user,
     taskAssignee: { ...reads.taskAssignee, ...writers(dbW).taskAssignee },
     activityLog: writers(dbW).activityLog,
-    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
-      fn({
-        task: { ...reads.task, ...writers(txW).task },
-        project: reads.project,
-        milestone: reads.milestone,
-        user: reads.user,
-        taskAssignee: { ...reads.taskAssignee, ...writers(txW).taskAssignee },
-        activityLog: writers(txW).activityLog,
-      }),
+    // Mirrors real transactional rollback: a thrown error undoes everything
+    // this specific call pushed into txW before the error propagates, so a
+    // retry that starts a fresh $transaction never inherits a previous
+    // failed attempt's partial writes (the way a real rolled-back Postgres
+    // transaction never leaves them behind either).
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      const before = {
+        created: txW.created.length,
+        updated: txW.updated.length,
+        deleted: txW.deleted.length,
+        activity: txW.activity.length,
+        assigneesCreated: txW.assigneesCreated.length,
+        assigneesDeleted: txW.assigneesDeleted.length,
+      };
+      try {
+        return await fn({
+          task: { ...reads.task, ...writers(txW).task },
+          project: reads.project,
+          milestone: reads.milestone,
+          user: reads.user,
+          taskAssignee: { ...reads.taskAssignee, ...writers(txW).taskAssignee },
+          activityLog: writers(txW).activityLog,
+        });
+      } catch (e) {
+        txW.created.length = before.created;
+        txW.updated.length = before.updated;
+        txW.deleted.length = before.deleted;
+        txW.activity.length = before.activity;
+        txW.assigneesCreated.length = before.assigneesCreated;
+        txW.assigneesDeleted.length = before.assigneesDeleted;
+        throw e;
+      }
+    },
   } as unknown as PrismaClient;
 
   return { db, dbW, txW, calls, args };
@@ -754,6 +788,27 @@ describe("setTaskAssignees", () => {
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
     expect(result).toEqual({ ok: true, data: undefined });
+  });
+
+  it("a P2002 on the first attempt retries and still applies the removal", async () => {
+    // current [u1], requested [u2]: a mixed add-and-remove, so the first
+    // attempt's deleteMany for u1 applies inside the same transaction whose
+    // createMany then races into P2002 and rolls the whole thing back — if
+    // setTaskAssignees didn't retry, that removal would be silently lost
+    // even though the call reports success.
+    const race = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "test",
+    });
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+      assigneeCreateErrorOnce: race,
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1"] } });
   });
 
   it("writes both assignee changes and both activity rows inside the transaction", async () => {
