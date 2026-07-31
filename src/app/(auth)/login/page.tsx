@@ -15,7 +15,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string; welcome?: string }>;
 }) {
-  if (await auth()) redirect("/dashboard");
+  if (await auth()) redirect("/my-tasks");
   const params = await searchParams;
   const error = params.error ? (ERRORS[params.error] ?? "Sign-in failed.") : null;
 
@@ -25,7 +25,7 @@ export default async function LoginPage({
       await signIn("credentials", {
         email: formData.get("email"),
         password: formData.get("password"),
-        redirectTo: "/dashboard",
+        redirectTo: "/my-tasks",
       });
     } catch (e) {
       if (e instanceof AuthError) {
@@ -42,7 +42,7 @@ export default async function LoginPage({
 
   async function googleAction() {
     "use server";
-    await signIn("google", { redirectTo: "/dashboard" });
+    await signIn("google", { redirectTo: "/my-tasks" });
   }
 
   return (
