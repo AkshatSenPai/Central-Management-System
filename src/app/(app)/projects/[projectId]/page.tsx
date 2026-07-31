@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getProjectDetail } from "@/lib/project-queries";
+import { listProjectTasks } from "@/lib/task-queries";
+import { taskListSummary } from "@/lib/task";
 import { PROJECT_HEALTH_BADGE, PROJECT_HEALTH_LABEL } from "@/lib/project";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +15,8 @@ import { ProjectStatusControl } from "@/components/projects/project-status-contr
 import { ProgressControl } from "@/components/projects/progress-control";
 import { MilestoneStrip } from "@/components/projects/milestone-strip";
 import { MilestoneForm } from "@/components/projects/milestone-form";
+import { TaskForm } from "@/components/tasks/task-form";
+import { TaskRow } from "@/components/tasks/task-row";
 
 const STAT_LABEL = "text-[11px] font-semibold tracking-wide text-[var(--text-3)]";
 
@@ -22,6 +26,18 @@ export default async function ProjectDetailPage(props: {
   const { projectId } = await props.params;
   const project = await getProjectDetail(prisma, projectId);
   if (!project) notFound();
+
+  const [tasks, members] = await Promise.all([
+    listProjectTasks(prisma, projectId),
+    prisma.user.findMany({
+      where: { active: true },
+      select: { id: true, name: true, active: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  // Already loaded by getProjectDetail — no second milestone query.
+  const milestoneOptions = project.milestones.map((m) => ({ id: m.id, title: m.title }));
 
   return (
     <div className="space-y-6 p-8">
@@ -117,6 +133,31 @@ export default async function ProjectDetailPage(props: {
           </div>
         </div>
       </div>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-lg font-medium text-[var(--text)]">Tasks</h2>
+            <span className="text-xs text-[var(--text-3)]">{taskListSummary(tasks)}</span>
+          </div>
+          <TaskForm
+            projectId={project.id}
+            clientId={project.clientId}
+            projects={[]}
+            milestones={{ projectId: project.id, options: milestoneOptions }}
+            members={members}
+          />
+        </div>
+        {tasks.length === 0 ? (
+          <EmptyState message="No tasks yet." />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+            {tasks.map((row) => (
+              <TaskRow key={row.id} row={row} />
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2">

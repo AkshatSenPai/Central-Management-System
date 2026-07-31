@@ -1,0 +1,182 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { getTaskDetail } from "@/lib/task-queries";
+import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL } from "@/lib/task";
+import { shortDate } from "@/lib/dates";
+import { Badge } from "@/components/ui/badge";
+import { InitialsAvatar } from "@/components/ui/initials-avatar";
+import { TaskStatusControl } from "@/components/tasks/task-status-control";
+import { TaskForm } from "@/components/tasks/task-form";
+import { TaskAssigneesForm } from "@/components/tasks/task-assignees-form";
+import { Checklist } from "@/components/tasks/checklist";
+
+const CHIP = "text-xs text-[var(--text-3)]";
+const CARD = "rounded-lg border border-[var(--border)] bg-[var(--surface)]";
+
+/** members for both the embedded (inert, updateTaskAction-driven) picker in
+ * <TaskForm> and the functional <TaskAssigneesForm> below: the union of
+ * active members and the task's current assignees, so a deactivated current
+ * assignee's checkbox still renders checked and is never silently dropped by
+ * a save that never meant to touch assignees at all. */
+function mergeAssigneeMembers(
+  activeMembers: Array<{ id: string; name: string; active: boolean }>,
+  assignees: Array<{ id: string; name: string }>
+): Array<{ id: string; name: string; active: boolean }> {
+  const activeIds = new Set(activeMembers.map((m) => m.id));
+  const deactivated = assignees
+    .filter((a) => !activeIds.has(a.id))
+    .map((a) => ({ id: a.id, name: a.name, active: false }));
+  return [...activeMembers, ...deactivated];
+}
+
+export default async function TaskDetailPage(props: { params: Promise<{ taskId: string }> }) {
+  const { taskId } = await props.params;
+  const task = await getTaskDetail(prisma, taskId);
+  if (!task) notFound();
+
+  const [projects, activeMembers] = await Promise.all([
+    prisma.project.findMany({
+      where: { status: { not: "DONE" } },
+      select: { id: true, name: true, clientId: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { active: true },
+      select: { id: true, name: true, active: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  // Only a project task has milestones to offer, and only that project's own.
+  const milestoneRows = task.projectId
+    ? await prisma.milestone.findMany({
+        where: { projectId: task.projectId },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: { id: true, title: true },
+      })
+    : null;
+  const milestones = task.projectId ? { projectId: task.projectId, options: milestoneRows ?? [] } : null;
+
+  const members = mergeAssigneeMembers(activeMembers, task.assignees);
+  const selectedAssigneeIds = task.assignees.map((a) => a.id);
+
+  return (
+    <div className="space-y-6 p-8">
+      <nav className="text-xs text-[var(--text-3)]">
+        {task.projectId ? (
+          <>
+            <Link href="/clients" className="hover:text-[var(--text-2)]">
+              Clients
+            </Link>
+            <span> / </span>
+            <Link href={`/clients/${task.clientId}`} className="hover:text-[var(--text-2)]">
+              {task.clientName}
+            </Link>
+            <span> / </span>
+            <Link href={`/projects/${task.projectId}`} className="hover:text-[var(--text-2)]">
+              {task.projectName}
+            </Link>
+            <span> / </span>
+            <span className="text-[var(--text-2)]">Task</span>
+          </>
+        ) : (
+          <>
+            <Link href="/my-tasks" className="hover:text-[var(--text-2)]">
+              My Tasks
+            </Link>
+            <span> / </span>
+            <span className="text-[var(--text-2)]">Task</span>
+          </>
+        )}
+      </nav>
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold text-[var(--text)]">{task.title}</h1>
+            <TaskStatusControl
+              taskId={task.id}
+              projectId={task.projectId}
+              clientId={task.clientId}
+              status={task.status}
+            />
+            <Badge kind={TASK_PRIORITY_BADGE[task.priority]}>{TASK_PRIORITY_LABEL[task.priority]}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-[var(--text-3)]">
+            {task.dueDate ? `Due ${shortDate(task.dueDate)}` : "No due date"}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className={CHIP}>Created by {task.creator.name}</span>
+            {task.milestoneTitle ? <span className={CHIP}>Milestone {task.milestoneTitle}</span> : null}
+          </div>
+        </div>
+        <div className="flex-none">
+          <TaskForm
+            task={{
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              projectId: task.projectId,
+              milestoneId: task.milestoneId,
+              priority: task.priority,
+              dueDate: task.dueDate,
+            }}
+            projects={projects}
+            milestones={milestones}
+            members={members}
+            selectedAssigneeIds={selectedAssigneeIds}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+        <div className="space-y-6">
+          {task.description ? (
+            <p className="max-w-2xl whitespace-pre-wrap text-sm text-[var(--text-2)]">{task.description}</p>
+          ) : null}
+
+          <section className="space-y-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-medium text-[var(--text)]">Checklist</h2>
+              {task.checklistTotal > 0 ? (
+                <span className="text-xs text-[var(--text-3)]">
+                  {task.checklistDone}/{task.checklistTotal} done
+                </span>
+              ) : null}
+            </div>
+            <Checklist
+              taskId={task.id}
+              projectId={task.projectId}
+              clientId={task.clientId}
+              items={task.checklist}
+            />
+          </section>
+        </div>
+
+        <aside className={`h-fit space-y-3 p-4 ${CARD}`}>
+          <h2 className="text-sm font-semibold text-[var(--text)]">Assignees</h2>
+          {task.assignees.length === 0 ? (
+            <p className="text-xs text-[var(--text-3)]">Unassigned</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+              {task.assignees.map((a) => (
+                <span key={a.id} className="flex items-center gap-1.5">
+                  <InitialsAvatar initials={a.initials} shape="circle" size={22} />
+                  <span className="text-xs text-[var(--text-2)]">{a.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <TaskAssigneesForm
+            taskId={task.id}
+            projectId={task.projectId}
+            clientId={task.clientId}
+            members={members}
+            selectedIds={selectedAssigneeIds}
+          />
+        </aside>
+      </div>
+    </div>
+  );
+}
