@@ -18,10 +18,24 @@ export function ProgressControl({
   manualProgress: number | null;
 }) {
   const [mode, setMode] = useState<ProgressMode>(progressMode);
-  const [state, formAction, pending] = useActionState(setProjectProgressAction, null);
+  // Controlled for the same reason as the other forms: React 19 resets an
+  // uncontrolled form once the action resolves, so a rejected value would
+  // vanish before the user could correct it.
+  const [percent, setPercent] = useState<string>(manualProgress?.toString() ?? "");
+  // React 19 resets the form after the action resolves, and a <select> is not
+  // re-synced from React state by that reset. Remount on a rejected submit.
+  const [attempt, setAttempt] = useState(0);
+  const [state, formAction, pending] = useActionState(
+    async (prev: Awaited<ReturnType<typeof setProjectProgressAction>> | null, formData: FormData) => {
+      const result = await setProjectProgressAction(prev, formData);
+      if (!result.ok) setAttempt((a) => a + 1);
+      return result;
+    },
+    null
+  );
 
   return (
-    <form action={formAction} className="flex flex-col gap-1">
+    <form key={attempt} action={formAction} className="flex flex-col gap-1">
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="clientId" value={clientId} />
       <div className="flex items-center gap-2">
@@ -40,7 +54,8 @@ export function ProgressControl({
           min={0}
           max={100}
           disabled={mode !== "MANUAL"}
-          defaultValue={manualProgress ?? ""}
+          value={percent}
+          onChange={(e) => setPercent(e.target.value)}
           className="w-20 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)] disabled:opacity-50"
         />
         <button
