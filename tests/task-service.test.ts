@@ -133,6 +133,7 @@ function fakeDb(parts: FakeParts) {
 }
 
 const project1 = { id: "p1", clientId: "c1" };
+const project2 = { id: "p2", clientId: "c2" };
 
 const taskWithProject = {
   id: "t1",
@@ -375,10 +376,29 @@ describe("updateTask", () => {
   it("a cross-client project move logs task.updated under the OLD client's id", async () => {
     // taskWithProject's pre-move project (p1) belongs to client c1; whatever
     // client the new project (p2) belongs to is irrelevant — the row must
-    // carry the client whose timeline the task is leaving.
-    const { db, txW } = fakeDb({ task: taskWithProject });
+    // carry the client whose timeline the task is leaving. project2 must
+    // exist so the target-project guard lets the move through.
+    const { db, txW } = fakeDb({ task: taskWithProject, project: project2 });
     await updateTask(db, { ...baseUpdateInput, projectId: "p2", milestoneId: null });
     expect(txW.activity[0]).toMatchObject({ action: "task.updated", clientId: "c1" });
+  });
+
+  it("errors when moved to a project that does not exist", async () => {
+    const { db, txW, dbW } = fakeDb({ task: taskWithProject });
+    // milestoneId is cleared so the pair rule doesn't intercept this first —
+    // the point here is the target project itself is missing.
+    const result = await updateTask(db, { ...baseUpdateInput, projectId: "ghost", milestoneId: null });
+    expect(result).toEqual({ ok: false, error: "Project not found" });
+    expect(txW.updated).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+    expect(dbW.updated).toHaveLength(0);
+    expect(dbW.activity).toHaveLength(0);
+  });
+
+  it("issues no project lookup when the project is unchanged", async () => {
+    const { db, calls } = fakeDb({ task: taskWithProject, milestone: { id: "m1", projectId: "p1" } });
+    await updateTask(db, { ...baseUpdateInput });
+    expect(calls.projectFindUnique).toBe(0);
   });
 
   it("clearing the project to personal logs task.updated under the old client's id", async () => {

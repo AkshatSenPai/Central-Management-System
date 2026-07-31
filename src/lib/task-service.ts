@@ -184,6 +184,19 @@ export async function updateTask(
   const milestoneError = await validateMilestonePair(db, input.projectId, input.milestoneId);
   if (milestoneError) return err(milestoneError);
 
+  // Only a genuine move needs this: a stale dropdown or a project deleted
+  // by someone else between page render and save is an expected path, not
+  // an exceptional one, so it must surface as an ActionResult, not a thrown
+  // foreign-key error from tx.task.update. Unchanged and cleared-to-null
+  // projects issue no lookup.
+  if (input.projectId && input.projectId !== scope.task.projectId) {
+    const project = await db.project.findUnique({
+      where: { id: input.projectId },
+      select: { id: true },
+    });
+    if (!project) return err("Project not found");
+  }
+
   // order, creatorId, status and the assignee set are owned by other
   // operations (nextTaskOrder, createTask, setTaskStatus and Task 5's
   // setTaskAssignees respectively) and never touched here.
