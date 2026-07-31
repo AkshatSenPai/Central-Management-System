@@ -20,7 +20,7 @@ export function ProgressBar({
       <div className="flex flex-col gap-0.5">
         <span className="text-[11.5px] font-semibold text-[var(--text-2)]">{view.label}</span>
         <span className="text-[11px] text-[var(--text-3)]">
-          Add milestones or set progress manually
+          Add tasks or set progress manually
         </span>
       </div>
     );

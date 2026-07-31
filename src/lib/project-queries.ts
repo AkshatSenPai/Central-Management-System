@@ -18,9 +18,10 @@ import {
  * THE Phase 3 swap point.
  *
  * A "unit" of progress is the finest-grained trackable work item a project
- * has. In Phase 2 that is the milestone; in Phase 3 it becomes the task, and
- * only this function's body changes — its signature, its batching contract
- * and every caller stay exactly as they are.
+ * has. Through Phase 2 that was the milestone; as of Phase 3 it is the task
+ * when a project has any, falling back to milestones when it doesn't — the
+ * signature, its batching contract and every caller stay exactly as they
+ * were.
  *
  * Takes an array of ids and returns a Map, so callers never issue one query
  * per row. Every requested id is present in the result, including projects
@@ -33,19 +34,54 @@ export async function getProjectProgressCounts(
   const counts = new Map<string, ProgressCounts>();
   if (projectIds.length === 0) return counts;
 
+  // Invariant 1: every requested id is present, so no caller null-checks.
   for (const id of projectIds) counts.set(id, { completed: 0, total: 0 });
 
+  // D1: tasks are the finest-grained unit when a project has any. One grouped
+  // count, constant regardless of row count.
+  const taskGroups = await db.task.groupBy({
+    by: ["projectId", "status"],
+    where: { projectId: { in: projectIds } },
+    _count: { _all: true },
+  });
+
+  const taskCounts = new Map<string, ProgressCounts>();
+  for (const g of taskGroups) {
+    // Prisma types a nullable grouping key as string | null. The where clause
+    // excludes personal tasks, but a stray null must never land in a project's
+    // bucket — a mis-bucketed row is a wrong percentage with no error anywhere.
+    if (g.projectId === null) continue;
+    const entry = taskCounts.get(g.projectId) ?? { completed: 0, total: 0 };
+    entry.total += g._count._all;
+    if (g.status === "DONE") entry.completed += g._count._all; // D7: REVIEW is in flight
+    taskCounts.set(g.projectId, entry);
+  }
+
+  // Unchanged from Phase 2, byte for byte.
   const milestones = await db.milestone.findMany({
     where: { projectId: { in: projectIds } },
     select: { projectId: true, completedAt: true },
   });
 
+  const milestoneCounts = new Map<string, ProgressCounts>();
   for (const m of milestones) {
-    const entry = counts.get(m.projectId);
-    if (!entry) continue;
+    const entry = milestoneCounts.get(m.projectId) ?? { completed: 0, total: 0 };
     entry.total += 1;
     if (m.completedAt !== null) entry.completed += 1;
+    milestoneCounts.set(m.projectId, entry);
   }
+
+  for (const id of projectIds) {
+    const tasks = taskCounts.get(id);
+    if (tasks && tasks.total > 0) {
+      counts.set(id, tasks);
+      continue;
+    }
+    const ms = milestoneCounts.get(id);
+    if (ms) counts.set(id, ms);
+    // else: the seeded { completed: 0, total: 0 } stands — invariant 2.
+  }
+
   return counts;
 }
 
@@ -63,8 +99,9 @@ export type ProjectListRow = {
   subtitle: string;
 };
 
-/** Exactly two queries, whatever the row count: one for the projects, one
- * batched call for their progress units. */
+/** Exactly three queries, whatever the row count: one for the projects, two
+ * batched calls (tasks, then milestones as fallback) for their progress
+ * units. */
 export async function listProjects(
   db: PrismaClient,
   input?: { clientId?: string; health?: ProjectHealth | null; status?: StatusFilter | null }

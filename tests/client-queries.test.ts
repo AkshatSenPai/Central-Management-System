@@ -44,6 +44,9 @@ function fakeDb(parts: {
         return parts.projects ?? [];
       },
     },
+    task: {
+      groupBy: async () => [],
+    },
     milestone: {
       findMany: async () => {
         milestoneCalls++;
