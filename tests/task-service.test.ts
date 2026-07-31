@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { TaskPriority, TaskStatus } from "@/lib/task";
-import { createTask, updateTask, setTaskStatus, removeTask } from "@/lib/task-service";
+import { createTask, updateTask, setTaskStatus, removeTask, setTaskAssignees } from "@/lib/task-service";
 
 type FakeParts = {
   /** Row returned by task.findUnique — loadTaskScope's walk-up target. */
@@ -14,6 +14,12 @@ type FakeParts = {
   milestone?: unknown;
   /** Rows returned by user.findMany — resolveAssignees. */
   activeUsers?: { id: string; name: string }[];
+  /** Rows returned by taskAssignee.findMany — setTaskAssignees' current set,
+   * carrying names so the remove side never needs an active-user lookup. */
+  currentAssignees?: { userId: string; user: { name: string } }[];
+  /** Thrown by taskAssignee.createMany when set — simulates the concurrent
+   * P2002 race setTaskAssignees maps to a clean success. */
+  assigneeCreateError?: unknown;
 };
 
 type Sink = {
@@ -46,7 +52,11 @@ function fakeDb(parts: FakeParts) {
   const dbW = emptySink();
   const txW = emptySink();
   const calls = { projectFindUnique: 0, milestoneFindUnique: 0, taskFindMany: 0, userFindMany: 0 };
-  const args: { taskFindManyWhere?: unknown; userFindManyWhere?: unknown } = {};
+  const args: {
+    taskFindManyWhere?: unknown;
+    userFindManyWhere?: unknown;
+    taskAssigneeFindManyWhere?: unknown;
+  } = {};
 
   const reads = {
     task: {
@@ -76,6 +86,12 @@ function fakeDb(parts: FakeParts) {
         return parts.activeUsers ?? [];
       },
     },
+    taskAssignee: {
+      findMany: async (a: { where: unknown }) => {
+        args.taskAssigneeFindManyWhere = a.where;
+        return parts.currentAssignees ?? [];
+      },
+    },
   };
 
   const writers = (sink: Sink) => ({
@@ -95,6 +111,10 @@ function fakeDb(parts: FakeParts) {
     },
     taskAssignee: {
       createMany: async (a: Record<string, unknown>) => {
+        // Simulates a concurrent P2002 raised by the real driver on the
+        // insert itself, so setTaskAssignees' catch has something real to
+        // narrow on.
+        if (parts.assigneeCreateError) throw parts.assigneeCreateError;
         sink.assigneesCreated.push(a);
         return { count: 0 };
       },
@@ -116,7 +136,7 @@ function fakeDb(parts: FakeParts) {
     project: reads.project,
     milestone: reads.milestone,
     user: reads.user,
-    taskAssignee: writers(dbW).taskAssignee,
+    taskAssignee: { ...reads.taskAssignee, ...writers(dbW).taskAssignee },
     activityLog: writers(dbW).activityLog,
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -124,7 +144,7 @@ function fakeDb(parts: FakeParts) {
         project: reads.project,
         milestone: reads.milestone,
         user: reads.user,
-        taskAssignee: writers(txW).taskAssignee,
+        taskAssignee: { ...reads.taskAssignee, ...writers(txW).taskAssignee },
         activityLog: writers(txW).activityLog,
       }),
   } as unknown as PrismaClient;
@@ -473,5 +493,281 @@ describe("removeTask", () => {
     const { db, txW } = fakeDb({ task: taskWithProject });
     await removeTask(db, { taskId: "t1", actorId: "u1" });
     expect(txW.assigneesDeleted).toHaveLength(0);
+  });
+});
+
+const taskForAssign = {
+  id: "t1",
+  title: "Ship the deck",
+  description: null,
+  projectId: "p1",
+  milestoneId: null,
+  status: "TO_DO",
+  priority: "MEDIUM",
+  dueDate: null,
+  project: { clientId: "c1" },
+};
+
+describe("setTaskAssignees", () => {
+  it("errors on an unknown task", async () => {
+    const { db } = fakeDb({});
+    expect(await setTaskAssignees(db, { taskId: "ghost", userIds: [], actorId: "u1" })).toEqual({
+      ok: false,
+      error: "Task not found",
+    });
+  });
+
+  it("deletes only the departed and creates only the newcomers", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u2", user: { name: "Jordan Lee" } },
+      ],
+      activeUsers: [{ id: "u3", name: "Sam Ortiz" }],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u3"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1"] } });
+    expect(txW.assigneesCreated[0].data).toEqual([{ taskId: "t1", userId: "u3" }]);
+  });
+
+  it("never issues a blanket delete of every assignee row", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u2", user: { name: "Jordan Lee" } },
+      ],
+      activeUsers: [{ id: "u3", name: "Sam Ortiz" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u3"], actorId: "u1" });
+    expect(txW.assigneesDeleted[0].where).not.toEqual({ taskId: "t1" });
+  });
+
+  it("writes nothing at all when the requested set matches the current one", async () => {
+    const { db, txW, dbW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u2", user: { name: "Jordan Lee" } },
+      ],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u1"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesDeleted).toHaveLength(0);
+    expect(txW.assigneesCreated).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+    expect(dbW.assigneesDeleted).toHaveLength(0);
+    expect(dbW.assigneesCreated).toHaveLength(0);
+  });
+
+  it("de-duplicates repeated ids in the input", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u2", "u2"], actorId: "u1" });
+    expect(txW.assigneesCreated[0].data).toEqual([{ taskId: "t1", userId: "u2" }]);
+  });
+
+  it("logs exactly one task.assigned row naming everyone added", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Dana Reeve" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0]).toMatchObject({ action: "task.assigned" });
+    expect(txW.activity[0].meta).toEqual({ name: "Ship the deck", people: ["Dana Reeve"] });
+  });
+
+  it("logs exactly one task.unassigned row naming everyone removed", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: [], actorId: "u1" });
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0]).toMatchObject({ action: "task.unassigned" });
+    expect(txW.activity[0].meta).toEqual({ name: "Ship the deck", people: ["Alex Kim"] });
+  });
+
+  it("a mixed add-and-remove produces exactly two activity rows", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(txW.activity).toHaveLength(2);
+    expect(txW.activity[0].action).toBe("task.assigned");
+    expect(txW.activity[1].action).toBe("task.unassigned");
+  });
+
+  it("stores names rather than ids in meta", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    const people = txW.activity.flatMap((row) => (row.meta as { people: string[] }).people);
+    expect(people).toEqual(["Jordan Lee", "Alex Kim"]);
+    expect(people).not.toContain("u1");
+    expect(people).not.toContain("u2");
+  });
+
+  it("resolves removed names from the current rows, not from an active-user lookup", async () => {
+    const { db, args } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(args.userFindManyWhere).toEqual({ id: { in: ["u2"] }, active: true });
+  });
+
+  it("leaves a deactivated current assignee alone when re-submitted unchanged", async () => {
+    // u1 stands in for a deactivated member: still assigned, re-submitted
+    // as part of the same set, and never active in this fixture at all.
+    const { db, txW, dbW, calls } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u2", user: { name: "Jordan Lee" } },
+      ],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u1", "u2"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesDeleted).toHaveLength(0);
+    expect(txW.assigneesCreated).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+    expect(dbW.assigneesDeleted).toHaveLength(0);
+    expect(dbW.assigneesCreated).toHaveLength(0);
+    // No addedIds at all means resolveAssignees (and its user.findMany) is
+    // never called — u1 never reaches the active-user check.
+    expect(calls.userFindMany).toBe(0);
+  });
+
+  it("rejects an unknown or deactivated NEW id", async () => {
+    const { db, txW, dbW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u2", user: { name: "Jordan Lee" } }],
+      activeUsers: [],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["ghost"], actorId: "u1" });
+    expect(result).toEqual({ ok: false, error: "Invalid input" });
+    expect(txW.assigneesDeleted).toHaveLength(0);
+    expect(txW.assigneesCreated).toHaveLength(0);
+    expect(dbW.assigneesDeleted).toHaveLength(0);
+    expect(dbW.assigneesCreated).toHaveLength(0);
+  });
+
+  it("asks only for active users when resolving additions", async () => {
+    const { db, args } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(args.userFindManyWhere).toEqual({ id: { in: ["u2"] }, active: true });
+  });
+
+  it("assigning everybody to an unassigned task creates every join row and logs one task.assigned", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [
+        { id: "u2", name: "Jordan Lee" },
+        { id: "u3", name: "Sam Ortiz" },
+      ],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u3"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesCreated[0].data).toEqual([
+      { taskId: "t1", userId: "u2" },
+      { taskId: "t1", userId: "u3" },
+    ]);
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0]).toMatchObject({ action: "task.assigned" });
+  });
+
+  it("clearing every assignee is legitimate", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [
+        { userId: "u1", user: { name: "Alex Kim" } },
+        { userId: "u2", user: { name: "Jordan Lee" } },
+      ],
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: [], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1", "u2"] } });
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0]).toMatchObject({ action: "task.unassigned" });
+    expect(txW.activity[0].meta).toEqual({ name: "Ship the deck", people: ["Alex Kim", "Jordan Lee"] });
+  });
+
+  it("logs the grandparent clientId for a project task", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(txW.activity[0].clientId).toBe("c1");
+  });
+
+  it("logs a null client scope for a personal task", async () => {
+    const { db, txW } = fakeDb({
+      task: personalTask,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t2", userIds: ["u2"], actorId: "u1" });
+    expect(txW.activity[0].clientId).toBeNull();
+  });
+
+  it("passes skipDuplicates on the insert", async () => {
+    const { db, txW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(txW.assigneesCreated[0].skipDuplicates).toBe(true);
+  });
+
+  it("maps a concurrent P2002 on the insert to a clean success", async () => {
+    const race = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "test",
+    });
+    const { db } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+      assigneeCreateError: race,
+    });
+    const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(result).toEqual({ ok: true, data: undefined });
+  });
+
+  it("writes both assignee changes and both activity rows inside the transaction", async () => {
+    const { db, txW, dbW } = fakeDb({
+      task: taskForAssign,
+      currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
+      activeUsers: [{ id: "u2", name: "Jordan Lee" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
+    expect(txW.assigneesDeleted).toHaveLength(1);
+    expect(txW.assigneesCreated).toHaveLength(1);
+    expect(txW.activity).toHaveLength(2);
+    expect(dbW.assigneesDeleted).toHaveLength(0);
+    expect(dbW.assigneesCreated).toHaveLength(0);
+    expect(dbW.activity).toHaveLength(0);
   });
 });
