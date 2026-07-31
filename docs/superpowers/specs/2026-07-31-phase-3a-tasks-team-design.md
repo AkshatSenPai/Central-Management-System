@@ -2,7 +2,7 @@
 
 **Goal:** Ship task records with universal assignment, checklists, a My Tasks view and a Team grid — so any member can assign work to anyone and the team can see who is doing what, without asking.
 
-**Status:** design approved 2026-07-31; implementation plan not yet written.
+**Status: complete (2026-07-31).** Design approved, planned as `docs/superpowers/plans/2026-07-31-phase-3a-tasks-team.md`, implemented across twelve tasks and merged to master. Every done criterion in §8 is met, the Tasks 10–12 browser QA click-through has been executed, and all nine post-merge follow-ups are cleared — see `docs/superpowers/plans/phase-3a-followups.md`, which also records what that QA did *not* cover and the two Vocabulary Lock exceptions still to be reconciled. One issue remains open and is tracked there: next-themes emits a console error on the `notFound()` path, carried from Phase 1.
 
 **Inputs:** spec `docs/superpowers/specs/2026-07-29-internal-cms-design.md` (§5.3, §5.4, §7, §10, §11) · Phase 2 plan `docs/superpowers/plans/2026-07-30-phase-2-clients-projects.md` (architecture, conventions, D1–D9).
 
