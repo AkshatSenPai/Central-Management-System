@@ -120,6 +120,25 @@ export function capAssignees<T>(list: T[], max = 3): { shown: T[]; extra: number
   return { shown: list.slice(0, max), extra: list.length - max };
 }
 
+/** The members an assignee picker may check: every active member, in the
+ * order given, followed by any of the task's current assignees who are not
+ * active — appended, never merged into the active ordering, each flagged
+ * `active: false`. That appended remainder is what keeps a deactivated
+ * current assignee's box rendered and checked, so a save that only touches
+ * unrelated fields (which never resubmits the picker's own set — see
+ * setTaskAssignees) can never be read as having dropped them. A current
+ * assignee who is also active is never duplicated. */
+export function mergeAssigneeMembers(
+  activeMembers: Array<{ id: string; name: string; active: boolean }>,
+  assignees: Array<{ id: string; name: string }>
+): Array<{ id: string; name: string; active: boolean }> {
+  const activeIds = new Set(activeMembers.map((m) => m.id));
+  const deactivated = assignees
+    .filter((a) => !activeIds.has(a.id))
+    .map((a) => ({ id: a.id, name: a.name, active: false }));
+  return [...activeMembers, ...deactivated];
+}
+
 export type TaskSortable = { dueDate: Date | null; priority: TaskPriority };
 
 /** My Tasks order: a dated task always precedes an undated one; two dated

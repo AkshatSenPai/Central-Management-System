@@ -17,6 +17,7 @@ import {
   compareMyTasks,
   sortMyTasks,
   parseTaskStatusFilter,
+  mergeAssigneeMembers,
   type TaskSortable,
 } from "@/lib/task";
 
@@ -340,6 +341,47 @@ describe("capAssignees", () => {
 
   it("returns an empty list and no overflow for nobody", () => {
     expect(capAssignees([])).toEqual({ shown: [], extra: 0 });
+  });
+});
+
+describe("mergeAssigneeMembers", () => {
+  const active = [
+    { id: "u1", name: "Alice", active: true },
+    { id: "u2", name: "Bob", active: true },
+  ];
+
+  it("keeps an inactive current assignee in the list, flagged not active so their box still renders checked", () => {
+    const result = mergeAssigneeMembers(active, [{ id: "u3", name: "Cara" }]);
+    expect(result).toEqual([
+      { id: "u1", name: "Alice", active: true },
+      { id: "u2", name: "Bob", active: true },
+      { id: "u3", name: "Cara", active: false },
+    ]);
+  });
+
+  it("does not duplicate a member who is both active and currently assigned", () => {
+    const result = mergeAssigneeMembers(active, [{ id: "u1", name: "Alice" }]);
+    expect(result).toEqual(active);
+  });
+
+  it("returns the active list unchanged when no assignee is inactive", () => {
+    const result = mergeAssigneeMembers(active, [
+      { id: "u1", name: "Alice" },
+      { id: "u2", name: "Bob" },
+    ]);
+    expect(result).toEqual(active);
+  });
+
+  it("preserves the active order first, then appends deactivated assignees in their given order", () => {
+    const result = mergeAssigneeMembers(active, [
+      { id: "u4", name: "Dana" },
+      { id: "u3", name: "Cara" },
+    ]);
+    expect(result.map((m) => m.id)).toEqual(["u1", "u2", "u4", "u3"]);
+  });
+
+  it("returns an empty list for no active members and no assignees", () => {
+    expect(mergeAssigneeMembers([], [])).toEqual([]);
   });
 });
 

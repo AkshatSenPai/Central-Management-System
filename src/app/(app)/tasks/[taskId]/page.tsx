@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getTaskDetail } from "@/lib/task-queries";
-import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL } from "@/lib/task";
+import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, mergeAssigneeMembers } from "@/lib/task";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
@@ -13,22 +13,6 @@ import { Checklist } from "@/components/tasks/checklist";
 
 const CHIP = "text-xs text-[var(--text-3)]";
 const CARD = "rounded-lg border border-[var(--border)] bg-[var(--surface)]";
-
-/** members for both the embedded (inert, updateTaskAction-driven) picker in
- * <TaskForm> and the functional <TaskAssigneesForm> below: the union of
- * active members and the task's current assignees, so a deactivated current
- * assignee's checkbox still renders checked and is never silently dropped by
- * a save that never meant to touch assignees at all. */
-function mergeAssigneeMembers(
-  activeMembers: Array<{ id: string; name: string; active: boolean }>,
-  assignees: Array<{ id: string; name: string }>
-): Array<{ id: string; name: string; active: boolean }> {
-  const activeIds = new Set(activeMembers.map((m) => m.id));
-  const deactivated = assignees
-    .filter((a) => !activeIds.has(a.id))
-    .map((a) => ({ id: a.id, name: a.name, active: false }));
-  return [...activeMembers, ...deactivated];
-}
 
 export default async function TaskDetailPage(props: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await props.params;
@@ -124,8 +108,6 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
             }}
             projects={projects}
             milestones={milestones}
-            members={members}
-            selectedAssigneeIds={selectedAssigneeIds}
           />
         </div>
       </div>

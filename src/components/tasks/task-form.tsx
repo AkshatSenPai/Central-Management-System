@@ -67,7 +67,7 @@ export function TaskForm({
   clientId,
   projects,
   milestones,
-  members,
+  members = [],
   selectedAssigneeIds,
 }: {
   task?: TaskDefaults;
@@ -78,7 +78,9 @@ export function TaskForm({
   clientId?: string | null;
   projects: ProjectOption[];
   milestones: MilestoneOptions | null;
-  members: MemberOption[];
+  /** Only read in create mode (see the Assignees block below) — an edit-mode
+   * caller has no functional use for this, so it's optional there. */
+  members?: MemberOption[];
   selectedAssigneeIds?: string[];
 }) {
   const [open, setOpen] = useState(false);
@@ -290,12 +292,20 @@ export function TaskForm({
         </label>
       </div>
 
-      <div>
-        <p className={LABEL}>Assignees</p>
-        <div className="mt-1">
-          <AssigneePicker members={members} selectedIds={values.assigneeIds} />
+      {/* Create-only: createTaskAction reads `userId` and seeds the new
+          task's assignees, but updateTaskAction never does — the assignee
+          set is owned solely by setTaskAssignees (task-service.ts), reached
+          through its own dedicated form wherever a task can be edited.
+          Rendering this picker in edit mode would be a second, identical-
+          looking control whose changes silently do nothing on save. */}
+      {!task ? (
+        <div>
+          <p className={LABEL}>Assignees</p>
+          <div className="mt-1">
+            <AssigneePicker members={members} selectedIds={values.assigneeIds} />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="flex items-center gap-2">
         <button
