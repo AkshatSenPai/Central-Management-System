@@ -79,10 +79,18 @@ export function nextTaskOrder(existing: { order: number }[]): number {
   return Math.max(...existing.map((t) => t.order)) + 1;
 }
 
-export function taskListSummary(rows: { status: string }[]): string {
+/** Default phrasing ("5 tasks · 2 done") describes an unfiltered list, where
+ * "done" is a meaningful fraction of the whole. Once a status filter is on,
+ * every row already matches that status, so a "done" count would either be
+ * redundant (viewing Done) or a lie (viewing anything else) — `filtered: true`
+ * drops to a bare count instead. */
+export function taskListSummary(rows: { status: string }[], options?: { filtered?: boolean }): string {
+  const taskWord = rows.length === 1 ? "task" : "tasks";
+  if (options?.filtered) {
+    return rows.length === 0 ? "No tasks" : `${rows.length} ${taskWord}`;
+  }
   if (rows.length === 0) return "No tasks yet";
   const done = rows.filter((r) => r.status === "DONE").length;
-  const taskWord = rows.length === 1 ? "task" : "tasks";
   return `${rows.length} ${taskWord} · ${done} done`;
 }
 

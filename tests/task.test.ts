@@ -169,6 +169,31 @@ describe("taskListSummary", () => {
   it('reads "No tasks yet" for an empty list', () => {
     expect(taskListSummary([])).toBe("No tasks yet");
   });
+
+  it("is unchanged when not filtered", () => {
+    const rows = [
+      { status: "DONE" },
+      { status: "DONE" },
+      { status: "TO_DO" },
+      { status: "IN_PROGRESS" },
+      { status: "REVIEW" },
+    ];
+    expect(taskListSummary(rows)).toBe("5 tasks · 2 done");
+    expect(taskListSummary(rows, { filtered: false })).toBe("5 tasks · 2 done");
+  });
+
+  it('reads a bare count when filtered: "5 tasks", "1 task" and "No tasks"', () => {
+    const rows = [
+      { status: "DONE" },
+      { status: "DONE" },
+      { status: "TO_DO" },
+      { status: "IN_PROGRESS" },
+      { status: "REVIEW" },
+    ];
+    expect(taskListSummary(rows, { filtered: true })).toBe("5 tasks");
+    expect(taskListSummary([{ status: "TO_DO" }], { filtered: true })).toBe("1 task");
+    expect(taskListSummary([], { filtered: true })).toBe("No tasks");
+  });
 });
 
 describe("taskRowSubtitle", () => {

@@ -28,22 +28,15 @@ export default async function MyTasksPage(props: {
     }),
     prisma.user.findMany({
       where: { active: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, active: true },
       orderBy: { name: "asc" },
     }),
   ]);
 
-  // Same rule as ProjectsPage: the default view is open-only, so the
-  // "N tasks · M done" summary describes it exactly. Once a status filter is
-  // on, that phrasing would lie, so it drops to a plain count.
-  const subtitle =
-    status === null ? taskListSummary(rows) : `${rows.length} ${rows.length === 1 ? "task" : "tasks"}`;
-
-  // The query already filters to active users, so `active` is always true
-  // here — it is still part of AssigneePicker's contract because a future
-  // caller (editing a task) unions in the task's current assignees, who may
-  // not be.
-  const pickerMembers = members.map((m) => ({ id: m.id, name: m.name, active: true }));
+  // The default view is open-only, so the "N tasks · M done" summary
+  // describes it exactly. Once a status filter is on, that phrasing would
+  // lie, so taskListSummary drops to a plain count itself.
+  const subtitle = taskListSummary(rows, { filtered: status !== null });
 
   return (
     <div className="space-y-6 p-8">
@@ -54,7 +47,7 @@ export default async function MyTasksPage(props: {
           <TaskForm
             projects={projects}
             milestones={null}
-            members={pickerMembers}
+            members={members}
             selectedAssigneeIds={[userId]}
           />
         }
