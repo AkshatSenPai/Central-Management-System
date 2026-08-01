@@ -16,13 +16,15 @@ export function MemberCard({ card }: { card: TeamCard }) {
   return (
     <div className={CARD}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+        <Link href={`/team/${card.id}`} className="flex min-w-0 items-center gap-3">
           <InitialsAvatar initials={card.initials} shape="circle" size={40} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-[var(--text)]">{card.name}</p>
+            <p className="truncate text-sm font-medium text-[var(--text)] hover:underline">
+              {card.name}
+            </p>
             {card.title ? <p className="truncate text-xs text-[var(--text-3)]">{card.title}</p> : null}
           </div>
-        </div>
+        </Link>
         <Badge kind="neutral">{card.openTaskLabel}</Badge>
       </div>
 
