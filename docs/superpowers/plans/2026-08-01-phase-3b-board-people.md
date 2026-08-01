@@ -1223,7 +1223,7 @@ Per spec §2, this is the phase's **primary** verification, not a formality. Not
 8. Every card still shows its status select, and changing status that way moves the card identically.
 9. Each move writes exactly one `task.status_changed` row on the client timeline — not two, and not one per re-render.
 10. Moving a card to Done raises the project's AUTO progress; the same value appears on the project page, `/projects` and the client page. Moving one to Review does not change it.
-11. **Rollback:** with the board open in two tabs, delete the task in tab A, then drag that same card in tab B. The card returns to its original column and shows "Task not found" **on that card**, not as a board-wide banner.
+11. **Rollback:** with the board open in two tabs, delete the task in tab A, then drag that same card in tab B. The card **disappears cleanly**, with no board-wide error banner. (This item originally asserted a per-card "Task not found". That cannot happen: `setTaskStatusAction` revalidates unconditionally, so the row is revalidated away before an error could render. Corrected and re-run 2026-08-01 — see `phase-3b-followups.md`, ruling 1.)
 12. Both themes render via the topbar toggle; the grid reflows sensibly at a narrow width.
 
 - [ ] **Step 2: Member profile QA**
@@ -1255,8 +1255,8 @@ Run: `npx tsc --noEmit` → exits 0.
 Run: `npm run lint` → clean.
 Run: `npm run build` → succeeds.
 
-Run: `git grep -nE "dark:|#[0-9a-fA-F]{3,6}" -- src/app src/components src/lib`
-Expected: no output.
+Run: `git grep -nE "dark:|#[0-9a-fA-F]{3,6}" -- 'src/**/*.tsx' 'src/**/*.ts'`
+Expected: no output. (Scoped to TS/TSX deliberately. The unscoped form over `src/app src/components src/lib` always matches `src/app/globals.css`, where the tokens are *defined*, so it reports failure on a clean tree every time — see `phase-3b-followups.md`, ruling 2.)
 
 - [ ] **Step 5: Tear down the QA data and record the results**
 
