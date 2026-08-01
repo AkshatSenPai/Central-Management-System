@@ -63,6 +63,27 @@ body {
   font-family: var(--font-public-sans), -apple-system, "Helvetica Neue", Helvetica, sans-serif;
 }
 
+/* The status filters on My Tasks and the member profile are native
+   <form method="get"> submits, so changing one replaces the document rather
+   than routing client-side — verified: a marker set on window is gone
+   afterwards. React's <ViewTransition> only covers same-document updates, so
+   the plan's approach for these would have added a wrapper that never fired.
+   This at-rule is the cross-document equivalent, and is what would give those
+   filter changes a crossfade: same place, different content.
+
+   UNVERIFIED. In the embedded browser used for QA the navigation fires
+   `pageswap` — so it is genuinely cross-document — but the event carries no
+   `viewTransition`, meaning the transition never activates. Cause not
+   established; cross-document view transitions shipped later than
+   same-document ones, so it is most likely this browser. The at-rule is
+   standards-correct and degrades to nothing where unsupported, so it stays,
+   but nobody should record the crossfade as working until it is seen in a
+   real browser. The same-document route transitions are unaffected and are
+   verified. */
+@view-transition {
+  navigation: auto;
+}
+
 /* Directional route transitions. Forward slides content left-to-right, back
    reverses it. Exit is fast (150ms) so old content stops competing for
    attention; enter is slower and delayed until the exit finishes, so the new
