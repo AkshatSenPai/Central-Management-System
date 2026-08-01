@@ -351,6 +351,53 @@ describe("getMemberProfile", () => {
     });
   });
 
+  // Nothing else in this suite notices if the filter is dropped on the way to
+  // listAssignedTasks — every other assertion reads the project query or the
+  // member, and both ignore it. The profile page's whole filter is this one
+  // argument, so it gets its own test rather than riding on another's.
+  it("forwards the status filter to the task query and asks for open work without one", async () => {
+    const filtered = fakeProfileDb({ member: MEMBER });
+    await getMemberProfile(filtered.db, "u1", { status: "DONE" });
+    expect(filtered.taskFindManyArgs[0]).toMatchObject({
+      where: { assignees: { some: { userId: "u1" } }, status: "DONE" },
+    });
+
+    const unfiltered = fakeProfileDb({ member: MEMBER });
+    await getMemberProfile(unfiltered.db, "u1");
+    expect(unfiltered.taskFindManyArgs[0]).toMatchObject({
+      where: { assignees: { some: { userId: "u1" } }, status: { not: "DONE" } },
+    });
+  });
+
+  // Both task queries come off the same delegate and return different shapes.
+  // Reading them the wrong way round would put project rows on `tasks` and
+  // still satisfy every assertion above.
+  it("returns the assigned task rows rather than the project query's rows", async () => {
+    const { db } = fakeProfileDb({
+      member: MEMBER,
+      tasks: [
+        {
+          id: "t1",
+          title: "Draft the brief",
+          status: "IN_PROGRESS",
+          priority: "HIGH",
+          dueDate: DUE,
+          projectId: "p1",
+          project: { name: "Brand Guidelines v3", clientId: "c1", client: { name: "Harlow & Fitch" } },
+          assignees: [{ user: { id: "u1", name: "Dana Reeve" } }],
+        },
+      ],
+      projectRows: [projectRow("p1", "Brand Guidelines v3")],
+    });
+    const profile = await getMemberProfile(db, "u1");
+    expect(profile?.tasks.map((t) => t.id)).toEqual(["t1"]);
+    expect(profile?.tasks[0]).toMatchObject({
+      title: "Draft the brief",
+      projectName: "Brand Guidelines v3",
+      clientName: "Harlow & Fitch",
+    });
+  });
+
   it("carries the member's own fields and derived initials", async () => {
     const { db } = fakeProfileDb({ member: { ...MEMBER, active: false } });
     const profile = await getMemberProfile(db, "u1");
