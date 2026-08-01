@@ -1,4 +1,21 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
+/** A hidden input is frequently written across several lines, so the
+ * `type="hidden"` sits below the `<input`. Line-based filtering misses those
+ * and reports them as violations — milestone-strip.tsx has one. Read forward
+ * from the match to the end of the opening tag and judge the whole tag. */
+function tagIsHidden(match) {
+  const m = match.match(/^([^:]*):(\d+):/);
+  if (!m) return false;
+  try {
+    const lines = readFileSync(m[1], "utf8").split("\n");
+    const tag = lines.slice(Number(m[2]) - 1, Number(m[2]) + 8).join("\n");
+    return tag.slice(0, tag.indexOf(">") + 1).includes('type="hidden"');
+  } catch {
+    return false;
+  }
+}
 
 /** Node rather than shell because the team is on Windows; `npm run` hands
  * scripts to cmd.exe, where a .sh file needs a POSIX shell that may not be
@@ -47,7 +64,7 @@ const gates = [
     run: () =>
       stripComments(grep(["<(input|select|textarea)", "--", TSX, `:!${UI}/*`]))
         .split("\n")
-        .filter((l) => l && !l.includes('type="hidden"'))
+        .filter((l) => l && !tagIsHidden(l))
         .join("\n"),
   },
   {

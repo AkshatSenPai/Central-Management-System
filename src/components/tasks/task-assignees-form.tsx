@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { ActionResult } from "@/lib/action-result";
 import { setTaskAssigneesAction } from "@/server/actions/tasks";
 import { AssigneePicker } from "@/components/tasks/assignee-picker";
+import { Button } from "@/components/ui/button";
 
 /** The assignee set has exactly one owner on this page: this form, via
  * setTaskAssigneesAction directly — never <TaskForm>'s own embedded
@@ -47,13 +48,9 @@ export function TaskAssigneesForm({
       {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
       <AssigneePicker key={selectedIds.join(",")} members={members} selectedIds={selectedIds} />
       {state && !state.ok ? <p className="text-xs text-[var(--bad)]">{state.error}</p> : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md bg-[var(--btn)] px-3 py-1.5 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-      >
+      <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Saving…" : "Save assignees"}
-      </button>
+      </Button>
     </form>
   );
 }

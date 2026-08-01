@@ -8,9 +8,8 @@ import {
   type ProjectHealth,
   type StatusFilter,
 } from "@/lib/project";
-
-const SELECT =
-  "rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]";
+import { Button } from "@/components/ui/button";
+import { SelectField } from "@/components/ui/field";
 
 /**
  * One GET form for both filters, so changing either keeps the other — two
@@ -25,11 +24,11 @@ export function ProjectFilters({
 }) {
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
-      <select
+      <SelectField
+        size="sm"
         name="status"
         defaultValue={status ?? ""}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className={SELECT}
       >
         <option value="">Active projects</option>
         <option value="ALL">All statuses</option>
@@ -38,13 +37,13 @@ export function ProjectFilters({
             {PROJECT_STATUS_LABEL[s]}
           </option>
         ))}
-      </select>
+      </SelectField>
 
-      <select
+      <SelectField
+        size="sm"
         name="health"
         defaultValue={health ?? ""}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className={SELECT}
       >
         <option value="">All health</option>
         {PROJECT_HEALTHS.map((h) => (
@@ -52,15 +51,10 @@ export function ProjectFilters({
             {PROJECT_HEALTH_LABEL[h]}
           </option>
         ))}
-      </select>
+      </SelectField>
 
       <noscript>
-        <button
-          type="submit"
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)]"
-        >
-          Filter
-        </button>
+        <Button type="submit">Filter</Button>
       </noscript>
     </form>
   );

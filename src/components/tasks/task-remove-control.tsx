@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { removeTaskAction } from "@/server/actions/tasks";
+import { Button } from "@/components/ui/button";
 
 /** Same fire-and-forget shape as Checklist's `run` — a plain async call with
  * its own try/catch, never a useActionState reducer. Deletion has no form
@@ -42,13 +43,9 @@ export function TaskRemoveControl({
         <input type="hidden" name="taskId" value={taskId} />
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
         {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
-        >
+        <Button type="submit" disabled={pending}>
           Remove
-        </button>
+        </Button>
       </form>
       {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
     </div>

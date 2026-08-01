@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { Badge } from "@/components/ui/badge";
+import { cardClass } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { TeamCard } from "@/lib/team-queries";
-
-const CARD = "flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4";
 
 /** One member, one glance — the whole of D5. `listTeamCards` already seeded
  * every active member, folded the open-task count through `openTaskSummary`
@@ -14,7 +13,7 @@ const CARD = "flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[v
  * flight is just an empty list, never absent). */
 export function MemberCard({ card }: { card: TeamCard }) {
   return (
-    <div className={CARD}>
+    <div className={cardClass({ className: "flex flex-col gap-4 p-4" })}>
       <div className="flex items-start justify-between gap-3">
         <Link href={`/team/${card.id}`} className="flex min-w-0 items-center gap-3">
           <InitialsAvatar initials={card.initials} shape="circle" size={40} />

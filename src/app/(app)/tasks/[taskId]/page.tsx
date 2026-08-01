@@ -5,6 +5,7 @@ import { getTaskDetail } from "@/lib/task-queries";
 import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, mergeAssigneeMembers } from "@/lib/task";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
+import { cardClass } from "@/components/ui/card";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
 import { TaskForm } from "@/components/tasks/task-form";
@@ -13,7 +14,6 @@ import { Checklist } from "@/components/tasks/checklist";
 import { TaskRemoveControl } from "@/components/tasks/task-remove-control";
 
 const CHIP = "text-xs text-[var(--text-3)]";
-const CARD = "rounded-lg border border-[var(--border)] bg-[var(--surface)]";
 
 export default async function TaskDetailPage(props: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await props.params;
@@ -152,7 +152,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
           </section>
         </div>
 
-        <aside className={`h-fit space-y-3 p-4 ${CARD}`}>
+        <aside className={cardClass({ className: "h-fit space-y-3 p-4" })}>
           <h2 className="text-sm font-semibold text-[var(--text)]">Assignees</h2>
           {task.assignees.length === 0 ? (
             <p className="text-xs text-[var(--text-3)]">Unassigned</p>

@@ -8,6 +8,8 @@
  *
  * `active: false` renders identically to `active: true` — the vocabulary
  * lock has no string for "inactive", so this list never says it. */
+import { Checkbox } from "@/components/ui/checkbox";
+
 export function AssigneePicker({
   members,
   selectedIds,
@@ -18,19 +20,17 @@ export function AssigneePicker({
   return (
     <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-[var(--border)] p-2">
       {members.map((m) => (
-        <label
+        <div
           key={m.id}
-          className="flex items-center gap-2 rounded px-2 py-1 text-sm text-[var(--text)] hover:bg-[var(--surface-2)]"
+          className="rounded px-2 py-1 hover:bg-[var(--surface-2)]"
         >
-          <input
-            type="checkbox"
+          <Checkbox
+            label={m.name}
             name="userId"
             value={m.id}
             defaultChecked={selectedIds.includes(m.id)}
-            className="h-4 w-4 rounded border-[var(--border)]"
           />
-          {m.name}
-        </label>
+        </div>
       ))}
     </div>
   );
