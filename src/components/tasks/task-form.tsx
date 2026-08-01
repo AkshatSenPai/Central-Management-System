@@ -8,6 +8,9 @@ import {
   TASK_STATUS_LABEL,
   type TaskPriority,
 } from "@/lib/task";
+import { Button } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
+import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { toDateInputValue } from "@/lib/dates";
 import { createTaskAction, updateTaskAction } from "@/server/actions/tasks";
 import { AssigneePicker } from "@/components/tasks/assignee-picker";
@@ -28,10 +31,6 @@ type MemberOption = { id: string; name: string; active: boolean };
 
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
-
-const FIELD =
-  "mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
-const LABEL = "block text-sm text-[var(--text-2)]";
 
 type Values = {
   title: string;
@@ -144,17 +143,13 @@ export function TaskForm({
 
   if (!open) {
     return (
-      <button
-        type="button"
+      <Button
         onClick={() => setOpen(true)}
-        className={
-          task
-            ? "rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-            : "rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)]"
-        }
+        variant={task ? "secondary" : "primary"}
+        size={task ? "sm" : "md"}
       >
         {task ? "Edit" : "New task"}
-      </button>
+      </Button>
     );
   }
 
@@ -163,7 +158,7 @@ export function TaskForm({
       key={attempt}
       action={formAction}
       onChange={handleFormChange}
-      className="w-full max-w-xl space-y-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4"
+      className={cardClass({ className: "w-full max-w-xl space-y-4 p-4" })}
     >
       {task ? <input type="hidden" name="taskId" value={task.id} /> : null}
       <input type="hidden" name="clientId" value={derivedClientId} />
@@ -175,47 +170,41 @@ export function TaskForm({
       ) : null}
       {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
 
-      <label className={LABEL}>
-        Title
-        <input
-          name="title"
-          required
-          value={values.title}
-          onChange={(e) => set("title", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <Field
+        label="Title"
+        className="w-full"
+        name="title"
+        required
+        value={values.title}
+        onChange={(e) => set("title", e.target.value)}
+      />
 
-      <label className={LABEL}>
-        Description
-        <textarea
-          name="description"
-          rows={3}
-          value={values.description}
-          onChange={(e) => set("description", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <TextareaField
+        label="Description"
+        className="w-full"
+        name="description"
+        rows={3}
+        value={values.description}
+        onChange={(e) => set("description", e.target.value)}
+      />
 
       {isProjectFixed ? (
         <input type="hidden" name="projectId" value={projectId ?? ""} />
       ) : (
-        <label className={LABEL}>
-          Project
-          <select
-            name="projectId"
-            value={values.projectId}
-            onChange={(e) => setValues((v) => ({ ...v, projectId: e.target.value, milestoneId: "" }))}
-            className={FIELD}
-          >
+        <SelectField
+          label="Project"
+          className="w-full"
+          name="projectId"
+          value={values.projectId}
+          onChange={(e) => setValues((v) => ({ ...v, projectId: e.target.value, milestoneId: "" }))}
+        >
             <option value="">No project (personal task)</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
-        </label>
+        </SelectField>
       )}
 
       {/* Pairing milestone options with the project id they were loaded for
@@ -225,71 +214,63 @@ export function TaskForm({
           swapped away from the one they were loaded for — hides the select
           and forces milestoneId to submit empty. */}
       {milestones !== null && values.projectId === milestones.projectId ? (
-        <label className={LABEL}>
-          Milestone
-          <select
-            name="milestoneId"
-            value={values.milestoneId}
-            onChange={(e) => set("milestoneId", e.target.value)}
-            className={FIELD}
-          >
+        <SelectField
+          label="Milestone"
+          className="w-full"
+          name="milestoneId"
+          value={values.milestoneId}
+          onChange={(e) => set("milestoneId", e.target.value)}
+        >
             <option value="">No milestone</option>
             {milestones.options.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.title}
               </option>
             ))}
-          </select>
-        </label>
+        </SelectField>
       ) : (
         <input type="hidden" name="milestoneId" value="" />
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className={LABEL}>
-          Priority
-          <select
-            name="priority"
-            value={values.priority}
-            onChange={(e) => set("priority", e.target.value as TaskPriority)}
-            className={FIELD}
-          >
+        <SelectField
+          label="Priority"
+          className="w-full"
+          name="priority"
+          value={values.priority}
+          onChange={(e) => set("priority", e.target.value as TaskPriority)}
+        >
             {TASK_PRIORITIES.map((priority) => (
               <option key={priority} value={priority}>
                 {TASK_PRIORITY_LABEL[priority]}
               </option>
             ))}
-          </select>
-        </label>
+        </SelectField>
 
         {!task ? (
-          <label className={LABEL}>
-            Status
-            <select
-              name="status"
-              value={values.status}
-              onChange={(e) => set("status", e.target.value as Values["status"])}
-              className={FIELD}
-            >
+          <SelectField
+            label="Status"
+            className="w-full"
+            name="status"
+            value={values.status}
+            onChange={(e) => set("status", e.target.value as Values["status"])}
+          >
               {TASK_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {TASK_STATUS_LABEL[status]}
                 </option>
               ))}
-            </select>
-          </label>
+          </SelectField>
         ) : null}
 
-        <label className={LABEL}>
-          Due date
-          <input
-            type="date"
-            name="dueDate"
-            value={values.dueDate}
-            onChange={(e) => set("dueDate", e.target.value)}
-            className={FIELD}
-          />
-        </label>
+        <Field
+          label="Due date"
+          className="w-full"
+          type="date"
+          name="dueDate"
+          value={values.dueDate}
+          onChange={(e) => set("dueDate", e.target.value)}
+        />
       </div>
 
       {/* Create-only: createTaskAction reads `userId` and seeds the new
@@ -300,7 +281,7 @@ export function TaskForm({
           looking control whose changes silently do nothing on save. */}
       {!task ? (
         <div>
-          <p className={LABEL}>Assignees</p>
+          <p className="block text-sm text-[var(--text-2)]">Assignees</p>
           <div className="mt-1">
             <AssigneePicker members={members} selectedIds={values.assigneeIds} />
           </div>
@@ -308,20 +289,10 @@ export function TaskForm({
       ) : null}
 
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" size="md" disabled={pending}>
           {pending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={cancel}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button onClick={cancel}>Cancel</Button>
       </div>
     </form>
   );

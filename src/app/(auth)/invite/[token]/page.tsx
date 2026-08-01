@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { inviteStatus } from "@/lib/invites";
 import { knownRedeemError } from "@/lib/invite-errors";
 import { acceptInviteAction } from "@/server/actions/accept-invite";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 
 export default async function InvitePage({
   params,
@@ -54,30 +56,18 @@ export default async function InvitePage({
           </p>
         )}
         <form action={action} className="space-y-4">
-          <label className="block text-sm text-[var(--text)]">
-            Your name
-            <input
-              name="name"
-              required
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
-            />
-          </label>
-          <label className="block text-sm text-[var(--text)]">
-            Password (min 8 characters)
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
-            />
-          </label>
-          <button
-            type="submit"
-            className="w-full rounded-md bg-[var(--btn)] px-4 py-2 text-[var(--on-btn)] hover:bg-[var(--btn-h)]"
-          >
+          <Field label="Your name" className="w-full" name="name" required />
+          <Field
+            label="Password (min 8 characters)"
+            className="w-full"
+            name="password"
+            type="password"
+            required
+            minLength={8}
+          />
+          <Button type="submit" variant="primary" size="md" className="w-full">
             Create account
-          </button>
+          </Button>
         </form>
       </div>
     </main>

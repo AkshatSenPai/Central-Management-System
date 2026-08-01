@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, signIn, googleEnabled } from "@/auth";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 
 const ERRORS: Record<string, string> = {
   invalid: "Invalid email or password.",
@@ -60,39 +62,17 @@ export default async function LoginPage({
           </p>
         )}
         <form action={loginAction} className="space-y-4">
-          <label className="block text-sm text-[var(--text)]">
-            Email
-            <input
-              name="email"
-              type="email"
-              required
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
-            />
-          </label>
-          <label className="block text-sm text-[var(--text)]">
-            Password
-            <input
-              name="password"
-              type="password"
-              required
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
-            />
-          </label>
-          <button
-            type="submit"
-            className="w-full rounded-md bg-[var(--btn)] px-4 py-2 text-[var(--on-btn)] hover:bg-[var(--btn-h)]"
-          >
+          <Field label="Email" className="w-full" name="email" type="email" required />
+          <Field label="Password" className="w-full" name="password" type="password" required />
+          <Button type="submit" variant="primary" size="md" className="w-full">
             Sign in
-          </button>
+          </Button>
         </form>
         {googleEnabled && (
           <form action={googleAction}>
-            <button
-              type="submit"
-              className="w-full rounded-md border border-[var(--border)] px-4 py-2 text-[var(--text)] hover:bg-[var(--surface-2)]"
-            >
+            <Button type="submit" size="md" className="w-full">
               Continue with Google
-            </button>
+            </Button>
           </form>
         )}
       </div>

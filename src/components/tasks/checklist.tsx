@@ -6,13 +6,11 @@ import {
   setChecklistItemDoneAction,
   removeChecklistItemAction,
 } from "@/server/actions/tasks";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field } from "@/components/ui/field";
 
 type ChecklistItem = { id: string; title: string; done: boolean; order: number };
-
-const FIELD =
-  "w-full max-w-xs rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]";
-const BTN =
-  "flex-none rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]";
 
 /** Not a possible item id (cuid), so it can never collide with one. */
 const ADD_SCOPE = "add";
@@ -86,12 +84,11 @@ export function Checklist({
                 <input type="hidden" name="taskId" value={taskId} />
                 {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
                 {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="done"
                   value="true"
                   defaultChecked={item.done}
-                  className="h-4 w-4 flex-none rounded border-[var(--border)]"
+                  className="flex-none"
                 />
                 <span
                   className={`truncate text-sm ${
@@ -106,9 +103,9 @@ export function Checklist({
                 <input type="hidden" name="taskId" value={taskId} />
                 {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
                 {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-                <button type="submit" className={BTN} disabled={pending}>
+                <Button type="submit" className="flex-none" disabled={pending}>
                   Remove
-                </button>
+                </Button>
               </form>
               </div>
               {error?.scope === item.id ? (
@@ -131,10 +128,10 @@ export function Checklist({
         <input type="hidden" name="taskId" value={taskId} />
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
         {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-        <input name="title" placeholder="Add checklist item" required className={FIELD} />
-        <button type="submit" className={BTN}>
+        <Field size="sm" className="w-full max-w-xs" name="title" placeholder="Add checklist item" required />
+        <Button type="submit" className="flex-none">
           Add
-        </button>
+        </Button>
       </form>
 
       {error?.scope === ADD_SCOPE ? (

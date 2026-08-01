@@ -3,6 +3,9 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createTaskAction } from "@/server/actions/tasks";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field } from "@/components/ui/field";
 
 /** A popover, not a modal: no backdrop, no focus trap, no scroll lock. That
  * boundary is what keeps 3a's D6 ("no overlay primitive") from quietly
@@ -54,16 +57,14 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
+      <Button
         onClick={() => {
           setOpen((o) => !o);
           setCreatedId(null);
         }}
-        className="rounded-md border border-[var(--border)] px-2 py-1 text-sm text-[var(--text-2)] hover:bg-[var(--surface-3)]"
       >
         Quick add
-      </button>
+      </Button>
 
       {open ? (
         <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
@@ -84,28 +85,26 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
             <input type="hidden" name="milestoneId" value="" />
             <input type="hidden" name="dueDate" value="" />
 
-            <input
+            <Field
+              size="sm"
+              className="w-full"
               name="title"
               required
               placeholder="Task title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]"
             />
 
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {members.map((m) => (
-                <label key={m.id} className="flex items-center gap-2 text-sm text-[var(--text)]">
-                  <input
-                    type="checkbox"
-                    name="userId"
-                    value={m.id}
-                    checked={assigneeIds.includes(m.id)}
-                    onChange={() => toggle(m.id)}
-                    className="h-4 w-4 rounded border-[var(--border)]"
-                  />
-                  {m.name}
-                </label>
+                <Checkbox
+                  key={m.id}
+                  label={m.name}
+                  name="userId"
+                  value={m.id}
+                  checked={assigneeIds.includes(m.id)}
+                  onChange={() => toggle(m.id)}
+                />
               ))}
             </div>
 
@@ -121,13 +120,9 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
               </Link>
             ) : null}
 
-            <button
-              type="submit"
-              disabled={pending}
-              className="w-full rounded-md bg-[var(--btn)] px-3 py-1.5 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-            >
+            <Button type="submit" variant="primary" className="w-full" disabled={pending}>
               {pending ? "Saving…" : "Save"}
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}

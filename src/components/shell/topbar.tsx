@@ -2,6 +2,8 @@
 
 import { useTheme } from "next-themes";
 import { QuickAdd } from "@/components/tasks/quick-add";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 
 export function Topbar({
   userName,
@@ -22,20 +24,17 @@ export function Topbar({
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4">
-      <input
+      <Field
+        size="sm"
+        className="w-64 bg-[var(--surface-2)]"
         placeholder="Search (coming soon)"
         disabled
-        className="w-64 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm text-[var(--text)] placeholder:text-[var(--text-3)]"
       />
       <div className="flex items-center gap-3">
         <QuickAdd members={members} />
-        <button
-          type="button"
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-          className="rounded-md border border-[var(--border)] px-2 py-1 text-sm text-[var(--text-2)] hover:bg-[var(--surface-3)]"
-        >
+        <Button onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
           {resolvedTheme === "dark" ? "Light" : "Dark"}
-        </button>
+        </Button>
         <span
           title={userName}
           className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--avatar)] text-xs font-medium text-[var(--avatar-t)]"
@@ -43,12 +42,9 @@ export function Topbar({
           {initials}
         </span>
         <form action={signOutAction}>
-          <button
-            type="submit"
-            className="text-sm text-[var(--text-2)] hover:underline"
-          >
+          <Button type="submit" variant="ghost">
             Sign out
-          </button>
+          </Button>
         </form>
       </div>
     </header>
