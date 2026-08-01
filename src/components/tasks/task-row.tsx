@@ -16,7 +16,7 @@ export function TaskRow({ row }: { row: TaskListRow }) {
 
   return (
     <div className="grid grid-cols-[2fr_auto_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)]">
-      <Link href={`/tasks/${row.id}`} className="min-w-0">
+      <Link href={`/tasks/${row.id}`} transitionTypes={["nav-forward"]} className="min-w-0">
         <p className="truncate text-sm font-medium text-[var(--text)]">{row.title}</p>
         {/* Overdue is carried on the row, so it has to be visible: the
             milestone strip on the same screen already renders an overdue

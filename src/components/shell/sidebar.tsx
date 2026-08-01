@@ -19,7 +19,10 @@ export const NAV_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
+    <aside
+      style={{ viewTransitionName: "app-sidebar" }}
+      className="flex w-56 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]"
+    >
       <div className="px-4 py-5 text-lg font-semibold text-[var(--text)]">
         Meridian Ops
       </div>

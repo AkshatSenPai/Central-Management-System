@@ -20,6 +20,7 @@ export function ProjectRow({ row, showClient = false }: { row: ProjectListRow; s
   return (
     <Link
       href={`/projects/${row.id}`}
+      transitionTypes={["nav-forward"]}
       className={`grid items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)] ${
         showClient
           ? "grid-cols-[2fr_1fr_1.4fr_auto_auto]"
@@ -29,7 +30,12 @@ export function ProjectRow({ row, showClient = false }: { row: ProjectListRow; s
       <div className="flex min-w-0 items-center gap-2.5">
         <span className={`h-8 w-[3px] flex-none rounded-full ${SWATCH[row.colorIndex] ?? SWATCH[1]}`} />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[var(--text)]">{row.name}</p>
+          <p
+            style={{ viewTransitionName: `project-${row.id}` }}
+            className="truncate text-sm font-medium text-[var(--text)]"
+          >
+            {row.name}
+          </p>
           <p className="truncate text-xs text-[var(--text-3)]">{row.subtitle}</p>
         </div>
       </div>

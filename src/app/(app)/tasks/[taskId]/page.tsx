@@ -58,15 +58,18 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
       <nav className="text-xs text-[var(--text-3)]">
         {task.projectId ? (
           <>
-            <Link href="/clients" className="hover:text-[var(--text-2)]">
+            <Link href="/clients" transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
               Clients
             </Link>
             <span> / </span>
-            <Link href={`/clients/${task.clientId}`} className="hover:text-[var(--text-2)]">
+            <Link href={`/clients/${task.clientId}`} transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
               {task.clientName}
             </Link>
             <span> / </span>
-            <Link href={`/projects/${task.projectId}`} className="hover:text-[var(--text-2)]">
+            <Link href={`/projects/${task.projectId}`} transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
               {task.projectName}
             </Link>
             <span> / </span>
@@ -74,7 +77,8 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
           </>
         ) : (
           <>
-            <Link href="/my-tasks" className="hover:text-[var(--text-2)]">
+            <Link href="/my-tasks" transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
               My Tasks
             </Link>
             <span> / </span>
@@ -86,7 +90,12 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold text-[var(--text)]">{task.title}</h1>
+            <h1
+              style={{ viewTransitionName: `task-${task.id}` }}
+              className="text-2xl font-semibold text-[var(--text)]"
+            >
+              {task.title}
+            </h1>
             <TaskStatusControl
               taskId={task.id}
               projectId={task.projectId}

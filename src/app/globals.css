@@ -63,6 +63,67 @@ body {
   font-family: var(--font-public-sans), -apple-system, "Helvetica Neue", Helvetica, sans-serif;
 }
 
+/* Directional route transitions. Forward slides content left-to-right, back
+   reverses it. Exit is fast (150ms) so old content stops competing for
+   attention; enter is slower and delayed until the exit finishes, so the new
+   screen has room to register. Both from the Next.js view-transitions guide. */
+::view-transition-old(.nav-forward) {
+  --slide-offset: -60px;
+  animation: var(--dur-exit) ease-in both fade reverse, 400ms ease-in-out both slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 60px;
+  animation: var(--dur-enter) ease-out var(--dur-exit) both fade, 400ms ease-in-out both slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 60px;
+  animation: var(--dur-exit) ease-in both fade reverse, 400ms ease-in-out both slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -60px;
+  animation: var(--dur-enter) ease-out var(--dur-exit) both fade, 400ms ease-in-out both slide;
+}
+
+/* The shell must not move. It is present on every screen, and sliding it
+   away removes the user's only fixed spatial anchor — the content moved,
+   not the viewport. display:none on the old snapshot prevents a one-frame
+   flash of two overlapping shells. */
+::view-transition-group(app-sidebar),
+::view-transition-group(app-topbar) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-sidebar),
+::view-transition-old(app-topbar) {
+  display: none;
+}
+::view-transition-new(app-sidebar),
+::view-transition-new(app-topbar) {
+  animation: none;
+}
+
+/* Suspense reveal: the skeleton yields downward, the real content arrives
+   upward. Vertical direction encodes hierarchy — arriving vs departing. */
+::view-transition-old(.slide-down) {
+  animation: var(--dur-exit) ease-out both fade reverse, var(--dur-exit) ease-out both slide-y reverse;
+}
+::view-transition-new(.slide-up) {
+  animation: var(--dur-enter) ease-in var(--dur-exit) both fade, 400ms ease-in both slide-y;
+}
+
+@keyframes fade {
+  from { filter: blur(3px); opacity: 0; }
+  to { filter: blur(0); opacity: 1; }
+}
+@keyframes slide {
+  from { translate: var(--slide-offset); }
+  to { translate: 0; }
+}
+@keyframes slide-y {
+  from { transform: translateY(10px); }
+  to { transform: translateY(0); }
+}
+
 /* Links are keyboard-focusable but pass through no primitive, so the sweep
    left every breadcrumb and task-row title with no focus indicator — found
    by browser QA, invisible to gate 5, which only inspects button/field/

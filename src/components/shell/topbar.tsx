@@ -23,7 +23,10 @@ export function Topbar({
     .toUpperCase();
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4">
+    <header
+      style={{ viewTransitionName: "app-topbar" }}
+      className="flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4"
+    >
       <Field
         size="sm"
         className="w-64 bg-[var(--surface-2)]"

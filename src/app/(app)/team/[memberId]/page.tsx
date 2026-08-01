@@ -23,7 +23,8 @@ export default async function MemberProfilePage(props: {
   return (
     <div className="space-y-6 p-8">
       <nav className="text-xs text-[var(--text-3)]">
-        <Link href="/team" className="hover:text-[var(--text-2)]">
+        <Link href="/team" transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           Team
         </Link>
         <span> / </span>
@@ -34,7 +35,12 @@ export default async function MemberProfilePage(props: {
         <InitialsAvatar initials={profile.initials} shape="circle" size={48} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold text-[var(--text)]">{profile.name}</h1>
+            <h1
+              style={{ viewTransitionName: `member-${profile.id}` }}
+              className="text-2xl font-semibold text-[var(--text)]"
+            >
+              {profile.name}
+            </h1>
             {profile.active ? null : <Badge kind="neutral">Deactivated</Badge>}
           </div>
           {profile.title ? <p className="text-sm text-[var(--text-3)]">{profile.title}</p> : null}

@@ -44,11 +44,13 @@ export default async function ProjectDetailPage(props: {
   return (
     <div className="space-y-6 p-8">
       <nav className="text-xs text-[var(--text-3)]">
-        <Link href="/clients" className="hover:text-[var(--text-2)]">
+        <Link href="/clients" transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           Clients
         </Link>
         <span> / </span>
-        <Link href={`/clients/${project.clientId}`} className="hover:text-[var(--text-2)]">
+        <Link href={`/clients/${project.clientId}`} transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           {project.clientName}
         </Link>
         <span> / </span>
@@ -58,7 +60,12 @@ export default async function ProjectDetailPage(props: {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold text-[var(--text)]">{project.name}</h1>
+            <h1
+              style={{ viewTransitionName: `project-${project.id}` }}
+              className="text-2xl font-semibold text-[var(--text)]"
+            >
+              {project.name}
+            </h1>
             <Badge kind={PROJECT_HEALTH_BADGE[project.health]} dot>
               {PROJECT_HEALTH_LABEL[project.health]}
             </Badge>
@@ -145,6 +152,7 @@ export default async function ProjectDetailPage(props: {
           <div className="flex items-center gap-2">
             <Link
               href={`/projects/${project.id}/board`}
+              transitionTypes={["nav-forward"]}
               className={buttonClass()}
             >
               Board

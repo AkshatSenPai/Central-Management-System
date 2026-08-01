@@ -32,8 +32,13 @@ export function BoardCard({
         draggable ? "cursor-grab active:cursor-grabbing" : ""
       }`}
     >
-      <Link href={`/tasks/${row.id}`} className="block min-w-0">
-        <p className="truncate text-sm font-medium text-[var(--text)]">{row.title}</p>
+      <Link href={`/tasks/${row.id}`} transitionTypes={["nav-forward"]} className="block min-w-0">
+        <p
+          style={{ viewTransitionName: `task-${row.id}` }}
+          className="truncate text-sm font-medium text-[var(--text)]"
+        >
+          {row.title}
+        </p>
         {row.subtitle ? (
           <p className={`truncate text-xs ${row.overdue ? "text-[var(--bad)]" : "text-[var(--text-3)]"}`}>
             {row.subtitle}

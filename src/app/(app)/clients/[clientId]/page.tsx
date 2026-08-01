@@ -41,7 +41,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   return (
     <div className="space-y-6 p-8">
       <nav className="text-xs text-[var(--text-3)]">
-        <Link href="/clients" className="hover:text-[var(--text-2)]">
+        <Link href="/clients" transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           Clients
         </Link>
         <span> / </span>

@@ -18,15 +18,18 @@ export default async function ProjectBoardPage(props: {
   return (
     <div className="space-y-6 p-8">
       <nav className="text-xs text-[var(--text-3)]">
-        <Link href="/clients" className="hover:text-[var(--text-2)]">
+        <Link href="/clients" transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           Clients
         </Link>
         <span> / </span>
-        <Link href={`/clients/${project.clientId}`} className="hover:text-[var(--text-2)]">
+        <Link href={`/clients/${project.clientId}`} transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           {project.clientName}
         </Link>
         <span> / </span>
-        <Link href={`/projects/${project.id}`} className="hover:text-[var(--text-2)]">
+        <Link href={`/projects/${project.id}`} transitionTypes={["nav-back"]}
+          className="hover:text-[var(--text-2)]">
           {project.name}
         </Link>
         <span> / </span>
