@@ -81,9 +81,13 @@ Defined since Phase 1, used zero times. Its intended home is visible in `board-c
 
 ### The typing gotcha, first
 
-`ViewTransition` is declared in `@types/react/canary.d.ts` as a `declare module "."` augmentation. It is **not** in `index.d.ts`. A naive `import { ViewTransition } from "react"` fails `npx tsc --noEmit`, which is a gate on this project.
+> **Corrected 2026-08-01 during the spike.** This section originally claimed a naive `import { ViewTransition } from "react"` fails `tsc`, and prescribed a `src/types/react-canary.d.ts` carrying `/// <reference types="react/canary" />`. **The claim was false** and the file was not built. What follows is what is actually true.
 
-Fix: a one-line `src/types/react-canary.d.ts` containing `/// <reference types="react/canary" />`. Deliberately *not* `compilerOptions.types`, because setting that key at all disables automatic `@types` inclusion and would have knock-on effects. **The spike proves this before anything else.**
+`ViewTransition` is declared in `@types/react/canary.d.ts` as a `declare module "."` augmentation, and is **not** in `index.d.ts`. It nonetheless resolves with no extra file, because `tsconfig.json` sets no `compilerOptions.types` — so TypeScript auto-includes every `@types` package and `canary.d.ts` lands in the program. Verified three ways: `tsc` exits 0 with no such file; a control probe importing a genuinely absent React export still errors `TS2305`, so the pass is not a false negative; and `tsc --listFiles` shows `canary.d.ts` in the program.
+
+The original reasoning contradicted itself — it correctly warned that setting `compilerOptions.types` disables automatic `@types` inclusion, without noticing that automatic inclusion was precisely what made the manual reference redundant.
+
+**The hazard is real even though the fix was not:** adding `compilerOptions.types` later would break every `ViewTransition` import in the app. That is recorded as a comment above the flag in `next.config.ts`, where someone editing tsconfig has a chance of meeting it.
 
 ### Route transitions
 

@@ -26,8 +26,7 @@
 | File | Responsibility |
 |---|---|
 | `src/app/globals.css` (modify) | `--ico`, `--ico-s`, `--dur-exit`, `--dur-enter`, view-transition keyframes, reduced-motion reset |
-| `next.config.ts` (modify) | `experimental.viewTransition` |
-| `src/types/react-canary.d.ts` (create) | `/// <reference types="react/canary" />` — without it `tsc` fails on `ViewTransition` |
+| `next.config.ts` (modify) | `experimental.viewTransition`, plus the comment recording why `ViewTransition` types resolve |
 | `src/components/ui/button.tsx` (create) | `buttonClass`, `<Button>` |
 | `src/components/ui/field.tsx` (create) | `fieldClass`, `<Field>`, `<SelectField>`, `<TextareaField>` |
 | `src/components/ui/checkbox.tsx` (create) | `<Checkbox>` |
@@ -49,7 +48,6 @@ Throwaway proof. Its only deliverable is knowledge plus two permanent files (`ne
 
 **Files:**
 - Modify: `next.config.ts`
-- Create: `src/types/react-canary.d.ts`
 - Test: none (spike)
 
 **Interfaces:**
@@ -75,17 +73,32 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Step 3: Add the canary type reference**
+- [ ] **Step 3: Establish why the types resolve, and record it**
 
-Create `src/types/react-canary.d.ts`:
+**Corrected during execution.** This plan and the spec both originally called for a `src/types/react-canary.d.ts` carrying `/// <reference types="react/canary" />`, on the stated grounds that `tsc` fails without it. **That is false, and was verified false three ways:**
+
+1. `npx tsc --noEmit` exits 0 with the file deleted.
+2. A control probe importing a genuinely non-existent React export still errors (`TS2305`), proving react's types are strict and the pass is not a false negative.
+3. `npx tsc --noEmit --listFiles` shows `@types/react/canary.d.ts` and `experimental.d.ts` already in the program.
+
+The cause is that `tsconfig.json` sets no `compilerOptions.types`, so TypeScript auto-includes every `@types` package — canary included. The original reasoning contradicted itself: it correctly warned that setting `compilerOptions.types` would disable automatic inclusion, without noticing that automatic inclusion was what made the manual reference unnecessary.
+
+So **create no file.** Instead record the real constraint where it can do some good — as a comment above the flag in `next.config.ts`:
 
 ```ts
-/// <reference types="react/canary" />
+  /**
+   * Enables React's <ViewTransition>. The component itself is typed in
+   * @types/react/canary.d.ts, not index.d.ts — it resolves only because
+   * tsconfig.json sets no `compilerOptions.types`, so TypeScript auto-includes
+   * every @types package and canary.d.ts lands in the program.
+   *
+   * Setting `compilerOptions.types` would therefore break every
+   * `import { ViewTransition } from "react"` in the app. If you ever need that
+   * key, add "react/canary" to the array.
+   */
 ```
 
-`ViewTransition` is declared in `node_modules/@types/react/canary.d.ts` inside a `declare module "."` augmentation, not in `index.d.ts`. Without this file `tsc` reports `ViewTransition` is not exported from `react`.
-
-**Do NOT use `compilerOptions.types` in `tsconfig.json` instead.** Setting that key disables automatic inclusion of all other `@types` packages.
+The hazard is real; the file was the wrong mitigation for it.
 
 - [ ] **Step 4: Verify the type resolves**
 
@@ -121,12 +134,12 @@ Record the answer to each:
 
 **This is the one combination no documentation covers.** If drag is visibly broken, board reorder animation is dropped from Task 12 and everything else in the plan stands. Write the answer into the task report either way.
 
-- [ ] **Step 7: Revert the spike edits, keep the two permanent files**
+- [ ] **Step 7: Revert the spike edits, keep the one permanent file**
 
-Revert the `team/page.tsx` and `board-card.tsx` edits. Keep `next.config.ts` and `src/types/react-canary.d.ts`.
+Revert the `team/page.tsx` and `board-card.tsx` edits. Keep `next.config.ts`.
 
 Run: `git diff --stat`
-Expected: only `next.config.ts` and the new `src/types/react-canary.d.ts`.
+Expected: `next.config.ts` only.
 
 - [ ] **Step 8: Gates and commit**
 
@@ -135,7 +148,7 @@ Run: `npx tsc --noEmit` → exits 0.
 Run: `npm run lint` → clean.
 
 ```bash
-git add next.config.ts src/types/react-canary.d.ts
+git add next.config.ts
 git commit -m "build: enable React view transitions behind the experimental flag"
 ```
 
@@ -1063,7 +1076,7 @@ git commit -m "feat: adopt the design system across shell, auth and placeholder 
 - Test: none (browser QA)
 
 **Interfaces:**
-- Consumes: `experimental.viewTransition` and `src/types/react-canary.d.ts` from Task 1.
+- Consumes: `experimental.viewTransition` from Task 1.
 
 - [ ] **Step 1: Add the transition CSS**
 
