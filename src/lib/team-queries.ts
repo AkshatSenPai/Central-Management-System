@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { clientInitials } from "@/lib/client";
-import { openTaskSummary, sortMyTasks, type TaskPriority } from "@/lib/task";
+import { openTaskSummary, sortMyTasks, type TaskPriority, type TaskStatusFilter } from "@/lib/task";
+import { listAssignedTasks, type TaskListRow } from "@/lib/task-queries";
 
 export type TeamCardTask = {
   id: string;
@@ -111,4 +112,73 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
   }
 
   return members.map((m) => cards.get(m.id)!);
+}
+
+export type MemberProfileProject = {
+  id: string;
+  name: string;
+  clientId: string;
+  clientName: string;
+};
+
+export type MemberProfile = {
+  id: string;
+  name: string;
+  initials: string;
+  title: string | null;
+  active: boolean;
+  tasks: TaskListRow[];
+  projects: MemberProfileProject[];
+};
+
+/** One member's page: their assigned tasks under whatever filter the URL
+ * carries, plus the projects they are active on.
+ *
+ * Three queries, constant regardless of row count. The project list is its
+ * own query deliberately — folding it out of the filtered task rows would be
+ * two, but then filtering the page to Done would empty it and the member
+ * would appear active on nothing. "Projects they are active on" is a fact
+ * about the member, not about the current view. */
+export async function getMemberProfile(
+  db: PrismaClient,
+  userId: string,
+  input: { status?: TaskStatusFilter | null } = {}
+): Promise<MemberProfile | null> {
+  const member = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, title: true, active: true },
+  });
+  if (!member) return null;
+
+  const tasks = await listAssignedTasks(db, { userId, status: input.status });
+
+  const projectRows = await db.task.findMany({
+    where: { assignees: { some: { userId } }, status: { not: "DONE" } },
+    select: {
+      project: { select: { id: true, name: true, clientId: true, client: { select: { name: true } } } },
+    },
+  });
+
+  const projects = new Map<string, MemberProfileProject>();
+  for (const row of projectRows) {
+    // A personal task has no project to contribute.
+    if (!row.project) continue;
+    if (projects.has(row.project.id)) continue;
+    projects.set(row.project.id, {
+      id: row.project.id,
+      name: row.project.name,
+      clientId: row.project.clientId,
+      clientName: row.project.client.name,
+    });
+  }
+
+  return {
+    id: member.id,
+    name: member.name,
+    initials: clientInitials(member.name),
+    title: member.title,
+    active: member.active,
+    tasks,
+    projects: [...projects.values()],
+  };
 }

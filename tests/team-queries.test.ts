@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { listTeamCards } from "@/lib/team-queries";
+import { getMemberProfile, listTeamCards } from "@/lib/team-queries";
 
 type UserRow = { id: string; name: string; title: string | null };
 type GroupRow = { userId: string; _count: { _all: number } };
@@ -252,5 +252,114 @@ describe("listTeamCards", () => {
     const cards = await listTeamCards(db);
     expect(cards).toHaveLength(1);
     expect(cards.find((c) => c.id === "ghost")).toBeUndefined();
+  });
+});
+
+type ProfileParts = {
+  member?: { id: string; name: string; title: string | null; active: boolean } | null;
+  tasks?: unknown[];
+  projectRows?: { project: { id: string; name: string; clientId: string; client: { name: string } } | null }[];
+};
+
+function fakeProfileDb(parts: ProfileParts) {
+  const calls = { userFindUnique: 0, taskFindMany: 0 };
+  const taskFindManyArgs: unknown[] = [];
+
+  const db = {
+    user: {
+      findUnique: async () => {
+        calls.userFindUnique++;
+        return parts.member ?? null;
+      },
+    },
+    task: {
+      findMany: async (args: unknown) => {
+        calls.taskFindMany++;
+        taskFindManyArgs.push(args);
+        // First call is listAssignedTasks; second is the project query.
+        return calls.taskFindMany === 1 ? (parts.tasks ?? []) : (parts.projectRows ?? []);
+      },
+    },
+  } as unknown as PrismaClient;
+
+  return { db, calls: () => ({ ...calls }), taskFindManyArgs };
+}
+
+const MEMBER = { id: "u1", name: "Dana Reeve", title: "Designer", active: true };
+
+const projectRow = (id: string, name: string) => ({
+  project: { id, name, clientId: "c1", client: { name: "Harlow & Fitch" } },
+});
+
+describe("getMemberProfile", () => {
+  it("returns null for an unknown member and issues no task query", async () => {
+    const { db, calls } = fakeProfileDb({ member: null });
+    expect(await getMemberProfile(db, "ghost")).toBeNull();
+    expect(calls().taskFindMany).toBe(0);
+  });
+
+  it("issues exactly three queries whatever the row count", async () => {
+    const { db, calls } = fakeProfileDb({
+      member: MEMBER,
+      projectRows: [projectRow("p1", "Brand Guidelines v3"), projectRow("p2", "Launch Toolkit")],
+    });
+    await getMemberProfile(db, "u1");
+    expect(calls()).toEqual({ userFindUnique: 1, taskFindMany: 2 });
+  });
+
+  it("lists each project once however many tasks the member holds on it", async () => {
+    const { db } = fakeProfileDb({
+      member: MEMBER,
+      projectRows: [projectRow("p1", "Brand Guidelines v3"), projectRow("p1", "Brand Guidelines v3")],
+    });
+    const profile = await getMemberProfile(db, "u1");
+    expect(profile?.projects).toEqual([
+      { id: "p1", name: "Brand Guidelines v3", clientId: "c1", clientName: "Harlow & Fitch" },
+    ]);
+  });
+
+  // A personal task has no project to contribute. Prisma returns project:
+  // null for it, and an unguarded fold would push undefined into the list.
+  it("skips personal tasks when building the project list", async () => {
+    const { db } = fakeProfileDb({
+      member: MEMBER,
+      projectRows: [{ project: null }, projectRow("p1", "Brand Guidelines v3")],
+    });
+    const profile = await getMemberProfile(db, "u1");
+    expect(profile?.projects).toHaveLength(1);
+    expect(profile?.projects[0].id).toBe("p1");
+  });
+
+  // The whole reason the project list has its own query. If it folded out of
+  // the filtered task rows, filtering to Done would claim the member is
+  // active on nothing.
+  it("returns the same project list with a status filter as without one", async () => {
+    const rows = [projectRow("p1", "Brand Guidelines v3")];
+    const unfiltered = fakeProfileDb({ member: MEMBER, projectRows: rows });
+    const filtered = fakeProfileDb({ member: MEMBER, projectRows: rows });
+
+    const a = await getMemberProfile(unfiltered.db, "u1");
+    const b = await getMemberProfile(filtered.db, "u1", { status: "DONE" });
+    expect(b?.projects).toEqual(a?.projects);
+  });
+
+  it("excludes DONE tasks from the project query", async () => {
+    const { db, taskFindManyArgs } = fakeProfileDb({ member: MEMBER });
+    await getMemberProfile(db, "u1");
+    expect(taskFindManyArgs[1]).toMatchObject({
+      where: { assignees: { some: { userId: "u1" } }, status: { not: "DONE" } },
+    });
+  });
+
+  it("carries the member's own fields and derived initials", async () => {
+    const { db } = fakeProfileDb({ member: { ...MEMBER, active: false } });
+    const profile = await getMemberProfile(db, "u1");
+    expect(profile).toMatchObject({
+      id: "u1",
+      name: "Dana Reeve",
+      initials: "DR",
+      title: "Designer",
+      active: false,
+    });
   });
 });
