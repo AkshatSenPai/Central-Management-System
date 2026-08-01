@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
@@ -15,23 +18,37 @@ export function BoardCard({
   row,
   draggable = false,
   onDragStart,
+  onDragEnd,
   error,
 }: {
   row: TaskListRow;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
   error?: string | null;
 }) {
   const { shown, extra } = capAssignees(row.assignees);
+  // Dragging has no CSS pseudo-class, so the held state has to be tracked.
+  const [dragging, setDragging] = useState(false);
 
   return (
     <div
       draggable={draggable}
-      onDragStart={onDragStart}
+      onDragStart={(e) => {
+        setDragging(true);
+        onDragStart?.(e);
+      }}
+      // Fires however the drag ends — dropped, Esc, or released outside a
+      // column — which is what lets the board clear its drag-over highlight.
+      // Its absence is why that highlight could stick (Phase 3b follow-up).
+      onDragEnd={() => {
+        setDragging(false);
+        onDragEnd?.();
+      }}
       style={{ viewTransitionName: `task-${row.id}` }}
-      className={`space-y-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 ${
-        draggable ? "cursor-grab active:cursor-grabbing" : ""
-      }`}
+      className={`space-y-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 transition-[opacity,box-shadow] duration-150 ${
+        draggable ? "cursor-grab active:cursor-grabbing hover:shadow-[var(--shadow-md)]" : ""
+      } ${dragging ? "opacity-50" : ""}`}
     >
       <Link href={`/tasks/${row.id}`} transitionTypes={["nav-forward"]} className="block min-w-0">
         <p className="truncate text-sm font-medium text-[var(--text)]">{row.title}</p>

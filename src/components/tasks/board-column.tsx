@@ -8,6 +8,7 @@ export function BoardColumn({
   count,
   isOver = false,
   onDragOver,
+  onDragLeave,
   onDrop,
   children,
 }: {
@@ -15,14 +16,21 @@ export function BoardColumn({
   count: number;
   isOver?: boolean;
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave?: () => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   children: React.ReactNode;
 }) {
   return (
     <div
       onDragOver={onDragOver}
+      // dragleave also fires when the pointer crosses into a child element,
+      // which would flicker the highlight off and on over every card. Only
+      // clear when the pointer has actually left the column.
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDragLeave?.();
+      }}
       onDrop={onDrop}
-      className={`flex min-h-40 flex-col gap-2 rounded-lg border p-3 ${
+      className={`flex min-h-40 flex-col gap-2 rounded-lg border p-3 transition-colors duration-150 ${
         isOver
           ? "border-[var(--accent-line)] bg-[var(--accent-soft)]"
           : "border-[var(--border)] bg-[var(--surface-2)]"

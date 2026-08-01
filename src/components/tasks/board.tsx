@@ -91,6 +91,10 @@ export function Board({ rows }: { rows: TaskListRow[] }) {
             e.preventDefault();
             setOverColumn(status);
           }}
+          // Only clear if this column is still the highlighted one — dragging
+          // from A into B fires B's dragover before A's dragleave, so an
+          // unconditional clear would wipe the highlight B just set.
+          onDragLeave={() => setOverColumn((c) => (c === status ? null : c))}
           onDrop={onDrop(status)}
         >
           {grouped[status].map((row) => (
@@ -99,6 +103,9 @@ export function Board({ rows }: { rows: TaskListRow[] }) {
               row={row}
               draggable
               onDragStart={(e) => e.dataTransfer.setData(DRAG_KEY, row.id)}
+              // The backstop for an abandoned drag — Esc, or a release outside
+              // any column — neither of which produces a drop or a dragleave.
+              onDragEnd={() => setOverColumn(null)}
               error={errors[row.id] ?? null}
             />
           ))}
