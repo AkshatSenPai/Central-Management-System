@@ -72,6 +72,18 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
             <input type="hidden" name="status" value="TO_DO" />
             <input type="hidden" name="priority" value="MEDIUM" />
 
+            {/* taskSchema's optional fields are `.optional().or(z.literal(""))`,
+             * which accepts undefined or "" — never null. A field this form
+             * simply omits comes back from formData.get() as null, so the whole
+             * parse fails with "Invalid input" and the omission looks like a
+             * status bug. <TaskForm> never hits this because it renders all four
+             * and submits them empty; the shortest capture path has to say the
+             * same thing explicitly. */}
+            <input type="hidden" name="description" value="" />
+            <input type="hidden" name="projectId" value="" />
+            <input type="hidden" name="milestoneId" value="" />
+            <input type="hidden" name="dueDate" value="" />
+
             <input
               name="title"
               required

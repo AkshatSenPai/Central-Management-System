@@ -63,6 +63,21 @@ describe("taskSchema", () => {
     expect(parsed.success).toBe(true);
   });
 
+  // The empty-string case above and this one are not the same case, and the
+  // difference is a trap for any form shorter than <TaskForm>. Every optional
+  // field is `.optional().or(z.literal(""))`, which takes undefined or "" and
+  // never null — but formData.get() returns null for a field the form simply
+  // omitted. So a caller that leaves these out entirely fails the whole parse
+  // with a bare "Invalid input" that names no field and reads like a status
+  // problem. <QuickAdd> submits all four as empty hidden inputs for exactly
+  // this reason; if that ever looks like dead markup, this test is why.
+  it("rejects a null description, due date, project or milestone — omitted is not empty", () => {
+    for (const field of ["description", "dueDate", "projectId", "milestoneId"] as const) {
+      const parsed = taskSchema.safeParse({ ...validTask, [field]: null });
+      expect(parsed.success, `${field}: null should not parse`).toBe(false);
+    }
+  });
+
   it("rejects an unknown priority", () => {
     const parsed = taskSchema.safeParse({ ...validTask, priority: "CRITICAL" });
     expect(parsed.success).toBe(false);
