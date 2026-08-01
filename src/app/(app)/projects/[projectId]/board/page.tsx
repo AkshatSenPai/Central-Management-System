@@ -3,10 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getProjectDetail } from "@/lib/project-queries";
 import { listProjectTasks } from "@/lib/task-queries";
-import { groupTasksByStatus, TASK_STATUSES } from "@/lib/task";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BoardCard } from "@/components/tasks/board-card";
-import { BoardColumn } from "@/components/tasks/board-column";
+import { Board } from "@/components/tasks/board";
 
 export default async function ProjectBoardPage(props: {
   params: Promise<{ projectId: string }>;
@@ -16,7 +14,6 @@ export default async function ProjectBoardPage(props: {
   if (!project) notFound();
 
   const tasks = await listProjectTasks(prisma, projectId);
-  const grouped = groupTasksByStatus(tasks);
 
   return (
     <div className="space-y-6 p-8">
@@ -41,15 +38,7 @@ export default async function ProjectBoardPage(props: {
       {tasks.length === 0 ? (
         <EmptyState message="No tasks yet." />
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {TASK_STATUSES.map((status) => (
-            <BoardColumn key={status} status={status} count={grouped[status].length}>
-              {grouped[status].map((row) => (
-                <BoardCard key={row.id} row={row} />
-              ))}
-            </BoardColumn>
-          ))}
-        </div>
+        <Board rows={tasks} />
       )}
     </div>
   );
