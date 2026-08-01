@@ -67,7 +67,7 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
       </Button>
 
       {open ? (
-        <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-lg)]">
           <form key={attempt} action={formAction} className="space-y-3">
             {/* createTaskAction rejects a missing or invalid status. */}
             <input type="hidden" name="status" value="TO_DO" />
