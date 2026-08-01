@@ -58,6 +58,20 @@ body {
   font-family: var(--font-public-sans), -apple-system, "Helvetica Neue", Helvetica, sans-serif;
 }
 
+/* Links are keyboard-focusable but pass through no primitive, so the sweep
+   left every breadcrumb and task-row title with no focus indicator — found
+   by browser QA, invisible to gate 5, which only inspects button/field/
+   checkbox. Fixing the category here rather than the instances means a link
+   added tomorrow is covered too.
+
+   :where() keeps specificity at 0, so anything with its own focus treatment
+   (the primitives, sidebar nav) still wins. */
+:where(a, [tabindex]):not(:disabled):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: 6px;
+}
+
 /* Ships before any motion exists, so no motion task can land without it.
    This phase deliberately chose expressive motion over the design brief's
    "clarity over decoration" (spec D2); honouring the opt-out is the stated
