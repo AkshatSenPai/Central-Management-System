@@ -77,7 +77,12 @@ export function isTaskOverdue(t: { dueDate: Date | null; status: TaskStatus }, n
 }
 
 /** Server-assigned: max + 1, never a count, so deleting a middle task cannot
- * make the next one collide. Mirrors nextMilestoneOrder. */
+ * make the next one collide. Mirrors nextMilestoneOrder.
+ *
+ * `order` is written but currently read by nothing. Phase 3a expected 3b's
+ * kanban to give it meaning; 3b moves cards between columns only, so no
+ * ranking consumes it yet. Reserved deliberately — do not go looking for the
+ * sort that reads it, and do not delete it. */
 export function nextTaskOrder(existing: { order: number }[]): number {
   if (existing.length === 0) return 0;
   return Math.max(...existing.map((t) => t.order)) + 1;
@@ -175,4 +180,18 @@ export function parseTaskStatusFilter(raw: string | string[] | undefined): TaskS
   if (!value) return null;
   if (value === "ALL") return "ALL";
   return (TASK_STATUSES as readonly string[]).includes(value) ? (value as TaskStatus) : null;
+}
+
+/** The board's read shape. Every status is seeded before any row is filed,
+ * so a column is always present and always a valid drop target — the board
+ * never null-checks and an empty column is an empty array, never undefined.
+ * Rows keep the order they arrived in, which is what carries
+ * listProjectTasks' [status, order, createdAt] sort through untouched. */
+export function groupTasksByStatus<T extends { status: TaskStatus }>(
+  rows: T[]
+): Record<TaskStatus, T[]> {
+  const grouped = {} as Record<TaskStatus, T[]>;
+  for (const status of TASK_STATUSES) grouped[status] = [];
+  for (const row of rows) grouped[row.status].push(row);
+  return grouped;
 }

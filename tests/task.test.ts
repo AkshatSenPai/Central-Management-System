@@ -18,7 +18,9 @@ import {
   sortMyTasks,
   parseTaskStatusFilter,
   mergeAssigneeMembers,
+  groupTasksByStatus,
   type TaskSortable,
+  type TaskStatus,
 } from "@/lib/task";
 
 const NOON = "T12:00:00.000Z";
@@ -419,5 +421,42 @@ describe("parseTaskStatusFilter", () => {
 
   it("takes the first entry of an array-valued searchParam", () => {
     expect(parseTaskStatusFilter(["DONE", "TO_DO"])).toBe("DONE");
+  });
+});
+
+describe("groupTasksByStatus", () => {
+  const row = (id: string, status: TaskStatus) => ({ id, status });
+
+  it("returns every status as a key even when its column is empty", () => {
+    const grouped = groupTasksByStatus([row("t1", "TO_DO")]);
+    expect(Object.keys(grouped).sort()).toEqual(["DONE", "IN_PROGRESS", "REVIEW", "TO_DO"]);
+    expect(grouped.IN_PROGRESS).toEqual([]);
+    expect(grouped.REVIEW).toEqual([]);
+    expect(grouped.DONE).toEqual([]);
+  });
+
+  it("files each row under its own status", () => {
+    const grouped = groupTasksByStatus([
+      row("t1", "TO_DO"),
+      row("t2", "DONE"),
+      row("t3", "TO_DO"),
+    ]);
+    expect(grouped.TO_DO.map((r) => r.id)).toEqual(["t1", "t3"]);
+    expect(grouped.DONE.map((r) => r.id)).toEqual(["t2"]);
+  });
+
+  // listProjectTasks already sorts [status, order, createdAt]; the board must
+  // not disturb that, or the column ordering silently becomes insertion order.
+  it("preserves input order within a group", () => {
+    const grouped = groupTasksByStatus([
+      row("c", "REVIEW"),
+      row("a", "REVIEW"),
+      row("b", "REVIEW"),
+    ]);
+    expect(grouped.REVIEW.map((r) => r.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("returns all four empty groups for an empty list", () => {
+    expect(groupTasksByStatus([])).toEqual({ TO_DO: [], IN_PROGRESS: [], REVIEW: [], DONE: [] });
   });
 });
