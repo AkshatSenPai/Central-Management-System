@@ -84,6 +84,14 @@ describe("fieldClass", () => {
     expect(fieldClass()).toContain("focus-visible:shadow-[var(--ring)]");
   });
 
+  // The constants this replaces disagreed about width on purpose: form fields
+  // were w-full, the bare selects in the project stat strip were not. Baking
+  // w-full into the base stretches those selects and breaks that row.
+  it("is not full-width by default — width belongs to the call site", () => {
+    expect(fieldClass()).not.toContain("w-full");
+    expect(fieldClass({ className: "w-full" })).toContain("w-full");
+  });
+
   it("appends caller classes last so they can override", () => {
     expect(fieldClass({ className: "max-w-xs" }).endsWith("max-w-xs")).toBe(true);
   });

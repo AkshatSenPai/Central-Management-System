@@ -7,8 +7,13 @@ import type {
 
 export type FieldSize = "sm" | "md";
 
+/** Deliberately NOT `w-full`. The per-file constants this replaces disagreed
+ * about width — client-form's FIELD was `w-full`, project-filters' SELECT was
+ * not — because width is a layout decision belonging to the call site. Baking
+ * it in here would stretch every bare select in the project stat strip. Form
+ * fields pass `className="w-full"`. */
 const BASE =
-  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text)] " +
+  "rounded-md border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text)] " +
   "transition-colors focus-visible:outline-none focus-visible:shadow-[var(--ring)] " +
   "placeholder:text-[var(--text-3)] disabled:opacity-50";
 
