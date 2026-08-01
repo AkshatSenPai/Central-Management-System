@@ -197,7 +197,7 @@ describe("taskListSummary", () => {
   });
 
   // My Tasks calls this as taskListSummary(rows, { filtered: status !== "ALL" }).
-  // The default view (status === null) is open-only — listMyTasks applies
+  // The default view (status === null) is open-only — listAssignedTasks applies
   // status: { not: "DONE" } exactly when there is no filter — so its rows can
   // never structurally contain a DONE task; only the ALL view's rows can.
   it("renders a bare count for the default My Tasks view (status null, so filtered: true), even though its rows can never contain a DONE task", () => {

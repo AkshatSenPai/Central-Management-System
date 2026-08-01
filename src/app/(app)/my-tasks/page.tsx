@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listMyTasks } from "@/lib/task-queries";
+import { listAssignedTasks } from "@/lib/task-queries";
 import { parseTaskStatusFilter, taskListSummary } from "@/lib/task";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,7 +20,7 @@ export default async function MyTasksPage(props: {
   const status = parseTaskStatusFilter(raw.status);
 
   const [rows, projects, members] = await Promise.all([
-    listMyTasks(prisma, { userId, status }),
+    listAssignedTasks(prisma, { userId, status }),
     prisma.project.findMany({
       where: { status: { not: "DONE" } },
       select: { id: true, name: true, clientId: true },
@@ -33,7 +33,7 @@ export default async function MyTasksPage(props: {
     }),
   ]);
 
-  // The default view is open-only — listMyTasks applies status: { not: "DONE" }
+  // The default view is open-only — listAssignedTasks applies status: { not: "DONE" }
   // exactly when there is no filter — so a "done" fraction of its rows is
   // structurally always zero there; only the ALL view's rows can actually
   // contain DONE work, so only ALL gets the "N tasks · M done" phrasing.

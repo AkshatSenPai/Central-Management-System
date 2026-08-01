@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { listMyTasks, listProjectTasks, getTaskDetail } from "@/lib/task-queries";
+import { listAssignedTasks, listProjectTasks, getTaskDetail } from "@/lib/task-queries";
 
 type TaskRow = {
   id: string;
@@ -88,10 +88,10 @@ function detailRow(overrides: Partial<DetailRow> = {}): DetailRow {
   };
 }
 
-describe("listMyTasks", () => {
+describe("listAssignedTasks", () => {
   it("returns only tasks assigned to the viewer", async () => {
     const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
-    await listMyTasks(db, { userId: "u1" });
+    await listAssignedTasks(db, { userId: "u1" });
     expect((findManyArgs[0] as { where: { assignees?: unknown } }).where.assignees).toEqual({
       some: { userId: "u1" },
     });
@@ -99,25 +99,25 @@ describe("listMyTasks", () => {
 
   it("excludes DONE by default", async () => {
     const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
-    await listMyTasks(db, { userId: "u1" });
+    await listAssignedTasks(db, { userId: "u1" });
     expect((findManyArgs[0] as { where: { status?: unknown } }).where.status).toEqual({ not: "DONE" });
   });
 
   it("drops the status constraint entirely when asked for ALL", async () => {
     const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
-    await listMyTasks(db, { userId: "u1", status: "ALL" });
+    await listAssignedTasks(db, { userId: "u1", status: "ALL" });
     expect((findManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty("status");
   });
 
   it("filters to a single status when given one, including DONE", async () => {
     const { db, findManyArgs } = fakeDb({ tasks: [taskRow({ status: "DONE" })] });
-    await listMyTasks(db, { userId: "u1", status: "DONE" });
+    await listAssignedTasks(db, { userId: "u1", status: "DONE" });
     expect((findManyArgs[0] as { where: { status?: unknown } }).where.status).toBe("DONE");
   });
 
   it("orders the query by createdAt ascending so the stable sort has a deterministic input", async () => {
     const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
-    await listMyTasks(db, { userId: "u1" });
+    await listAssignedTasks(db, { userId: "u1" });
     expect((findManyArgs[0] as { orderBy: unknown }).orderBy).toEqual({ createdAt: "asc" });
   });
 
@@ -127,29 +127,29 @@ describe("listMyTasks", () => {
     const c = taskRow({ id: "c", dueDate: new Date("2026-08-10T00:00:00.000Z"), priority: "HIGH" });
     const d = taskRow({ id: "d", dueDate: null, priority: "URGENT" });
     const { db } = fakeDb({ tasks: [a, b, c, d] });
-    const rows = await listMyTasks(db, { userId: "u1" });
+    const rows = await listAssignedTasks(db, { userId: "u1" });
     expect(rows.map((r) => r.id)).toEqual(["c", "b", "d", "a"]);
   });
 
   it("issues exactly one db call regardless of row count", async () => {
     const three = fakeDb({ tasks: [taskRow({ id: "1" }), taskRow({ id: "2" }), taskRow({ id: "3" })] });
-    await listMyTasks(three.db, { userId: "u1" });
+    await listAssignedTasks(three.db, { userId: "u1" });
     expect(three.callsByDelegate()).toEqual({ task: 1 });
 
     const nine = fakeDb({ tasks: Array.from({ length: 9 }, (_, i) => taskRow({ id: `t${i}` })) });
-    await listMyTasks(nine.db, { userId: "u1" });
+    await listAssignedTasks(nine.db, { userId: "u1" });
     expect(nine.callsByDelegate()).toEqual({ task: 1 });
   });
 
   it("carries a subtitle naming the client and project", async () => {
     const { db } = fakeDb({ tasks: [taskRow()] });
-    const rows = await listMyTasks(db, { userId: "u1" });
+    const rows = await listAssignedTasks(db, { userId: "u1" });
     expect(rows[0].subtitle).toBe("Harlow & Fitch · Brand Guidelines v3 · due 14 Aug");
   });
 
   it('carries "Personal" for a task with no project', async () => {
     const { db } = fakeDb({ tasks: [taskRow({ projectId: null, project: null })] });
-    const rows = await listMyTasks(db, { userId: "u1" });
+    const rows = await listAssignedTasks(db, { userId: "u1" });
     expect(rows[0].subtitle).toBe("Personal · due 14 Aug");
     expect(rows[0].projectId).toBeNull();
     expect(rows[0].projectName).toBeNull();
@@ -161,7 +161,7 @@ describe("listMyTasks", () => {
     const { db } = fakeDb({
       tasks: [taskRow({ assignees: [{ user: { id: "u1", name: "Dana Reeve" } }] })],
     });
-    const rows = await listMyTasks(db, { userId: "u1" });
+    const rows = await listAssignedTasks(db, { userId: "u1" });
     expect(rows[0].assignees).toEqual([{ id: "u1", name: "Dana Reeve", initials: "DR" }]);
   });
 
@@ -172,7 +172,7 @@ describe("listMyTasks", () => {
         taskRow({ id: "done", status: "DONE", dueDate: PAST }),
       ],
     });
-    const rows = await listMyTasks(db, { userId: "u1", status: "ALL" });
+    const rows = await listAssignedTasks(db, { userId: "u1", status: "ALL" });
     expect(rows.find((r) => r.id === "open")?.overdue).toBe(true);
     expect(rows.find((r) => r.id === "done")?.overdue).toBe(false);
   });

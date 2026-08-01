@@ -26,7 +26,7 @@ export type TaskListRow = {
 };
 
 /** The shape every list query selects, whatever its where/orderBy — shared so
- * listMyTasks and listProjectTasks read (and map) identically, and diverge
+ * listAssignedTasks and listProjectTasks read (and map) identically, and diverge
  * only in the where clause, ordering and subtitle they build on top. */
 const taskRowSelect = {
   id: true,
@@ -74,12 +74,13 @@ function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
   };
 }
 
-/** My Tasks: scoped to the viewer's own assignments, open work only unless
- * asked otherwise — the same "not DONE unless ALL or an explicit status"
- * rule as listProjects. Ordered by createdAt ascending so sortMyTasks' stable
- * in-memory sort has a deterministic input to work from; exactly one db call,
- * whatever the row count. */
-export async function listMyTasks(
+/** Tasks assigned to one member, open work only unless asked otherwise — the
+ * same "not DONE unless ALL or an explicit status" rule as listProjects.
+ * Named for the assignee rather than the viewer because /team/[memberId]
+ * reads it for someone other than the person looking. Ordered by createdAt
+ * ascending so sortMyTasks' stable in-memory sort has a deterministic input;
+ * exactly one db call, whatever the row count. */
+export async function listAssignedTasks(
   db: PrismaClient,
   input: { userId: string; status?: TaskStatusFilter | null }
 ): Promise<TaskListRow[]> {
