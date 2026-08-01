@@ -5,7 +5,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 
-export type FieldSize = "sm" | "md";
+export type FieldSize = "xs" | "sm" | "md";
 
 /** Deliberately NOT `w-full`. The per-file constants this replaces disagreed
  * about width — client-form's FIELD was `w-full`, project-filters' SELECT was
@@ -13,13 +13,18 @@ export type FieldSize = "sm" | "md";
  * it in here would stretch every bare select in the project stat strip. Form
  * fields pass `className="w-full"`. */
 const BASE =
-  "rounded-md border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--text)] " +
+  "rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] " +
   "transition-colors focus-visible:outline-none focus-visible:shadow-[var(--ring)] " +
   "placeholder:text-[var(--text-3)] disabled:opacity-50";
 
+/** Matches Button's three sizes. `xs` exists for the dense row controls —
+ * task-status-control's select is `px-2 py-1 text-xs` inside a task row, and
+ * inflating it to `sm` would visibly loosen every row on three screens. Text
+ * size lives here rather than in BASE because xs is text-xs. */
 const SIZE_CLASS: Record<FieldSize, string> = {
-  sm: "px-3 py-1.5",
-  md: "px-3 py-2",
+  xs: "px-2 py-1 text-xs",
+  sm: "px-3 py-1.5 text-sm",
+  md: "px-3 py-2 text-sm",
 };
 
 const LABEL = "block text-sm text-[var(--text-2)]";
@@ -56,13 +61,18 @@ function Wrap({
   );
 }
 
+/** `size` is omitted from the native attributes on purpose: <input> and
+ * <select> both declare `size?: number` in the DOM, so intersecting that with
+ * a string union collapses the prop to never and every call site fails with
+ * "Type 'string' is not assignable to type 'undefined'". The native attribute
+ * is a character-width hint nothing in this codebase uses. */
 export function Field({
   label,
   error,
   size,
   className,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & {
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
   label?: string;
   error?: string | null;
   size?: FieldSize;
@@ -81,7 +91,7 @@ export function SelectField({
   className,
   children,
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & {
+}: Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & {
   label?: string;
   error?: string | null;
   size?: FieldSize;

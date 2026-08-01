@@ -2,12 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { addMilestoneAction } from "@/server/actions/projects";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
-
-const FIELD =
-  "rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]";
 
 type Values = { title: string; dueDate: string };
 
@@ -50,13 +49,7 @@ export function MilestoneForm({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-      >
-        Add milestone
-      </button>
+      <Button onClick={() => setOpen(true)}>Add milestone</Button>
     );
   }
 
@@ -66,35 +59,25 @@ export function MilestoneForm({
       <input type="hidden" name="clientId" value={clientId} />
       {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <Field
+          size="sm"
           name="title"
           required
           placeholder="Milestone title"
           value={values.title}
           onChange={(e) => set("title", e.target.value)}
-          className={FIELD}
         />
-        <input
+        <Field
+          size="sm"
           type="date"
           name="dueDate"
           value={values.dueDate}
           onChange={(e) => set("dueDate", e.target.value)}
-          className={FIELD}
         />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-[var(--btn)] px-3 py-1.5 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={cancel}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button onClick={cancel}>Cancel</Button>
       </div>
     </form>
   );

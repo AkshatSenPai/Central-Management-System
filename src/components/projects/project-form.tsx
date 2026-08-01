@@ -11,6 +11,9 @@ import {
 } from "@/lib/project";
 import { toDateInputValue } from "@/lib/dates";
 import { createProjectAction, updateProjectAction } from "@/server/actions/projects";
+import { Button } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
+import { Field, SelectField, TextareaField } from "@/components/ui/field";
 
 type ProjectDefaults = {
   id: string;
@@ -25,10 +28,6 @@ type ProjectDefaults = {
 
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
-
-const FIELD =
-  "mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
-const LABEL = "block text-sm text-[var(--text-2)]";
 
 type Values = {
   clientId: string;
@@ -102,17 +101,13 @@ export function ProjectForm({
 
   if (!open) {
     return (
-      <button
-        type="button"
+      <Button
         onClick={() => setOpen(true)}
-        className={
-          project
-            ? "rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-            : "rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)]"
-        }
+        variant={project ? "secondary" : "primary"}
+        size={project ? "sm" : "md"}
       >
         {project ? "Edit" : "New project"}
-      </button>
+      </Button>
     );
   }
 
@@ -120,124 +115,100 @@ export function ProjectForm({
     <form
       key={attempt}
       action={formAction}
-      className="w-full max-w-xl space-y-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4"
+      className={cardClass({ className: "w-full max-w-xl space-y-4 p-4" })}
     >
       {project ? <input type="hidden" name="projectId" value={project.id} /> : null}
       {fixedClientId ? <input type="hidden" name="clientId" value={fixedClientId} /> : null}
       {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
 
       {!fixedClientId && clients ? (
-        <label className={LABEL}>
-          Client
-          <select
-            name="clientId"
-            required
-            value={values.clientId}
-            onChange={(e) => set("clientId", e.target.value)}
-            className={FIELD}
-          >
-            <option value="" disabled>
-              Select a client
+        <SelectField
+          label="Client"
+          className="w-full"
+          name="clientId"
+          required
+          value={values.clientId}
+          onChange={(e) => set("clientId", e.target.value)}
+        >
+          <option value="" disabled>
+            Select a client
+          </option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
             </option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          ))}
+        </SelectField>
       ) : null}
 
-      <label className={LABEL}>
-        Name
-        <input
-          name="name"
-          required
-          value={values.name}
-          onChange={(e) => set("name", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <Field
+        label="Name"
+        className="w-full"
+        name="name"
+        required
+        value={values.name}
+        onChange={(e) => set("name", e.target.value)}
+      />
 
-      <label className={LABEL}>
-        Description
-        <textarea
-          name="description"
-          rows={3}
-          value={values.description}
-          onChange={(e) => set("description", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <TextareaField
+        label="Description"
+        className="w-full"
+        name="description"
+        rows={3}
+        value={values.description}
+        onChange={(e) => set("description", e.target.value)}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className={LABEL}>
-          Status
-          <select
-            name="status"
-            value={values.status}
-            onChange={(e) => set("status", e.target.value as ProjectStatus)}
-            className={FIELD}
-          >
-            {PROJECT_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {PROJECT_STATUS_LABEL[status]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={LABEL}>
-          Health
-          <select
-            name="health"
-            value={values.health}
-            onChange={(e) => set("health", e.target.value as ProjectHealth)}
-            className={FIELD}
-          >
-            {PROJECT_HEALTHS.map((health) => (
-              <option key={health} value={health}>
-                {PROJECT_HEALTH_LABEL[health]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={LABEL}>
-          Start date
-          <input
-            type="date"
-            name="startDate"
-            value={values.startDate}
-            onChange={(e) => set("startDate", e.target.value)}
-            className={FIELD}
-          />
-        </label>
-        <label className={LABEL}>
-          Due date
-          <input
-            type="date"
-            name="dueDate"
-            value={values.dueDate}
-            onChange={(e) => set("dueDate", e.target.value)}
-            className={FIELD}
-          />
-        </label>
+        <SelectField
+          label="Status"
+          className="w-full"
+          name="status"
+          value={values.status}
+          onChange={(e) => set("status", e.target.value as ProjectStatus)}
+        >
+          {PROJECT_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {PROJECT_STATUS_LABEL[status]}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField
+          label="Health"
+          className="w-full"
+          name="health"
+          value={values.health}
+          onChange={(e) => set("health", e.target.value as ProjectHealth)}
+        >
+          {PROJECT_HEALTHS.map((health) => (
+            <option key={health} value={health}>
+              {PROJECT_HEALTH_LABEL[health]}
+            </option>
+          ))}
+        </SelectField>
+        <Field
+          label="Start date"
+          className="w-full"
+          type="date"
+          name="startDate"
+          value={values.startDate}
+          onChange={(e) => set("startDate", e.target.value)}
+        />
+        <Field
+          label="Due date"
+          className="w-full"
+          type="date"
+          name="dueDate"
+          value={values.dueDate}
+          onChange={(e) => set("dueDate", e.target.value)}
+        />
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" size="md" disabled={pending}>
           {pending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={cancel}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button onClick={cancel}>Cancel</Button>
       </div>
     </form>
   );

@@ -9,6 +9,8 @@ import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { buttonClass } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
 import { ProjectForm } from "@/components/projects/project-form";
 import { ProjectHealthControl } from "@/components/projects/project-health-control";
 import { ProjectStatusControl } from "@/components/projects/project-status-control";
@@ -81,7 +83,7 @@ export default async function ProjectDetailPage(props: {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-start gap-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className={cardClass({ className: "flex flex-wrap items-start gap-8 p-4" })}>
         <div className="min-w-[220px]">
           <p className={STAT_LABEL}>Progress</p>
           <div className="mt-1.5">
@@ -143,7 +145,7 @@ export default async function ProjectDetailPage(props: {
           <div className="flex items-center gap-2">
             <Link
               href={`/projects/${project.id}/board`}
-              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+              className={buttonClass()}
             >
               Board
             </Link>
@@ -159,7 +161,7 @@ export default async function ProjectDetailPage(props: {
         {tasks.length === 0 ? (
           <EmptyState message="No tasks yet." />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+          <div className={cardClass({ className: "overflow-hidden" })}>
             {tasks.map((row) => (
               <TaskRow key={row.id} row={row} />
             ))}

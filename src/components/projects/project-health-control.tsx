@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PROJECT_HEALTHS, PROJECT_HEALTH_LABEL, type ProjectHealth } from "@/lib/project";
 import { setProjectHealthAction } from "@/server/actions/projects";
+import { SelectField } from "@/components/ui/field";
 
 /** Health is set by a human, never derived. */
 export function ProjectHealthControl({
@@ -31,18 +32,18 @@ export function ProjectHealthControl({
       <form action={run}>
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="clientId" value={clientId} />
-        <select
+        <SelectField
+          size="sm"
           name="health"
           defaultValue={health}
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]"
         >
           {PROJECT_HEALTHS.map((h) => (
             <option key={h} value={h}>
               {PROJECT_HEALTH_LABEL[h]}
             </option>
           ))}
-        </select>
+        </SelectField>
       </form>
       {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
     </div>

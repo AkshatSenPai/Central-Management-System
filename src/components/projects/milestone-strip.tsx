@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { toggleMilestoneAction, removeMilestoneAction } from "@/server/actions/projects";
 import type { MilestoneState } from "@/lib/milestones";
+import { Button } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
 
 type StripMilestone = {
   id: string;
@@ -43,16 +45,13 @@ export function MilestoneStrip({
     }
   }
 
-  const rowBtn =
-    "rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-2)] hover:bg-[var(--surface-2)]";
-
   return (
     <div className="space-y-2">
       <div className="flex gap-3 overflow-x-auto pb-1">
         {milestones.map((m) => (
           <div
             key={m.id}
-            className="flex w-56 flex-none flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3"
+            className={cardClass({ className: "flex w-56 flex-none flex-col gap-2 p-3" })}
           >
             <div className="flex items-start gap-2">
               <span className={`mt-1.5 h-1.5 w-1.5 flex-none rounded-full ${DOT_CLASS[m.dot]}`} />
@@ -71,17 +70,13 @@ export function MilestoneStrip({
                   name="complete"
                   value={m.completedAt ? "false" : "true"}
                 />
-                <button type="submit" className={rowBtn}>
-                  {m.completedAt ? "Reopen" : "Complete"}
-                </button>
+                <Button type="submit">{m.completedAt ? "Reopen" : "Complete"}</Button>
               </form>
               <form action={(fd) => run(removeMilestoneAction, fd)}>
                 <input type="hidden" name="projectId" value={projectId} />
                 <input type="hidden" name="clientId" value={clientId} />
                 <input type="hidden" name="milestoneId" value={m.id} />
-                <button type="submit" className={rowBtn}>
-                  Remove
-                </button>
+                <Button type="submit">Remove</Button>
               </form>
             </div>
           </div>

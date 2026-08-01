@@ -3,6 +3,8 @@
 import { useActionState, useState } from "react";
 import type { ProgressMode } from "@/lib/progress";
 import { setProjectProgressAction } from "@/server/actions/projects";
+import { Button } from "@/components/ui/button";
+import { Field, SelectField } from "@/components/ui/field";
 
 /** Switching to Auto leaves the stored manual value untouched server-side, so
  * toggling back and forth is lossless. */
@@ -39,16 +41,18 @@ export function ProgressControl({
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="clientId" value={clientId} />
       <div className="flex items-center gap-2">
-        <select
+        <SelectField
+          size="sm"
           name="progressMode"
           value={mode}
           onChange={(e) => setMode(e.currentTarget.value as ProgressMode)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]"
         >
           <option value="AUTO">Auto</option>
           <option value="MANUAL">Manual</option>
-        </select>
-        <input
+        </SelectField>
+        <Field
+          size="sm"
+          className="w-20"
           type="number"
           name="manualProgress"
           min={0}
@@ -56,15 +60,10 @@ export function ProgressControl({
           disabled={mode !== "MANUAL"}
           value={percent}
           onChange={(e) => setPercent(e.target.value)}
-          className="w-20 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)] disabled:opacity-50"
         />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
-        >
+        <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </div>
       {state && !state.ok ? <span className="text-xs text-[var(--bad)]">{state.error}</span> : null}
     </form>

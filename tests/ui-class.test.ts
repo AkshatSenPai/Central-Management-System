@@ -32,9 +32,19 @@ describe("buttonClass", () => {
     expect(cls).toContain("hover:bg-[var(--surface-2)]");
   });
 
-  it("switches padding on size", () => {
-    expect(buttonClass({ size: "sm" })).toContain("px-3 py-1.5");
-    expect(buttonClass({ size: "md" })).toContain("px-4 py-2");
+  // Three sizes, not two: `px-2 py-1 text-xs` appears in eight files, more
+  // call sites than the danger and ghost variants combined. Folding it into
+  // sm would inflate every dense row control in the app.
+  it("switches padding and text size across all three sizes", () => {
+    expect(buttonClass({ size: "xs" })).toContain("px-2 py-1 text-xs");
+    expect(buttonClass({ size: "sm" })).toContain("px-3 py-1.5 text-sm");
+    expect(buttonClass({ size: "md" })).toContain("px-4 py-2 text-sm");
+  });
+
+  it("declares text size exactly once, so xs is not overridden by the base", () => {
+    for (const size of ["xs", "sm", "md"] as const) {
+      expect(buttonClass({ size }).match(/text-(xs|sm)/g), size).toHaveLength(1);
+    }
   });
 
   // --ring was defined in Phase 1 and used zero times across 60 files. Every
@@ -68,9 +78,16 @@ describe("fieldClass", () => {
     expect(fieldClass()).toContain("px-3 py-2");
   });
 
-  it("switches padding on size", () => {
-    expect(fieldClass({ size: "sm" })).toContain("px-3 py-1.5");
-    expect(fieldClass({ size: "md" })).toContain("px-3 py-2");
+  it("switches padding and text size across all three sizes", () => {
+    expect(fieldClass({ size: "xs" })).toContain("px-2 py-1 text-xs");
+    expect(fieldClass({ size: "sm" })).toContain("px-3 py-1.5 text-sm");
+    expect(fieldClass({ size: "md" })).toContain("px-3 py-2 text-sm");
+  });
+
+  it("declares text size exactly once, so xs is not overridden by the base", () => {
+    for (const size of ["xs", "sm", "md"] as const) {
+      expect(fieldClass({ size }).match(/text-(xs|sm)/g), size).toHaveLength(1);
+    }
   });
 
   it("uses the surface and border tokens", () => {

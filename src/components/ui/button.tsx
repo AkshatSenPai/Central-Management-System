@@ -1,13 +1,16 @@
 import type { ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
-export type ButtonSize = "sm" | "md";
+export type ButtonSize = "xs" | "sm" | "md";
 
 /** Focus lives in the base, not per variant. `--ring` was defined in Phase 1
  * and consumed nowhere; declaring it once here is what closes the app's
- * keyboard-accessibility hole in one file instead of sixty. */
+ * keyboard-accessibility hole in one file instead of sixty.
+ *
+ * Text size belongs to SIZE_CLASS, not here, because `xs` is text-xs while
+ * the other two are text-sm. */
 const BASE =
-  "inline-flex items-center justify-center rounded-md text-sm transition-colors " +
+  "inline-flex items-center justify-center rounded-md transition-colors " +
   "focus-visible:outline-none focus-visible:shadow-[var(--ring)] disabled:opacity-50";
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
@@ -24,9 +27,17 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   ghost: "text-[var(--text-2)] hover:bg-[var(--surface-2)]",
 };
 
+/** Three sizes, not two. The plan derived only sm and md, having counted
+ * buttons but not the dense row controls: `px-2 py-1 text-xs` appears in
+ * eight files — contact-list, invite-form, member-row-actions,
+ * task-status-control, checklist, quick-add, assignee-picker, topbar — which
+ * is more call sites than the danger and ghost variants combined. Folding
+ * them into sm would have inflated every one of them, several inside table
+ * rows whose density is the point, and no gate would have noticed. */
 const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: "px-3 py-1.5",
-  md: "px-4 py-2",
+  xs: "px-2 py-1 text-xs",
+  sm: "px-3 py-1.5 text-sm",
+  md: "px-4 py-2 text-sm",
 };
 
 /** Exported apart from <Button> because several call sites are <Link>s that

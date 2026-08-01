@@ -50,7 +50,7 @@ export function BoardCard({
             </span>
           ))}
           {extra > 0 ? (
-            <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full ring-2 ring-[var(--surface)] bg-[var(--surface-3)] text-[10px] font-bold text-[var(--text-2)]">
+            <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full ring-2 ring-[var(--surface)] bg-[var(--avatar-2)] text-[10px] font-bold text-[var(--text-2)]">
               +{extra}
             </span>
           ) : null}

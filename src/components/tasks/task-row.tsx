@@ -49,7 +49,7 @@ export function TaskRow({ row }: { row: TaskListRow }) {
           </span>
         ))}
         {extra > 0 ? (
-          <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full ring-2 ring-[var(--surface)] bg-[var(--surface-3)] text-[11px] font-bold text-[var(--text-2)]">
+          <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full ring-2 ring-[var(--surface)] bg-[var(--avatar-2)] text-[11px] font-bold text-[var(--text-2)]">
             +{extra}
           </span>
         ) : null}

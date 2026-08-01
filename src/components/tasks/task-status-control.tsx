@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TASK_STATUSES, TASK_STATUS_LABEL, type TaskStatus } from "@/lib/task";
 import { setTaskStatusAction } from "@/server/actions/tasks";
+import { SelectField } from "@/components/ui/field";
 
 /** Status is set by a human, never derived — same fire-and-forget shape as
  * ProjectHealthControl. projectId/clientId are only present for a task that
@@ -36,19 +37,19 @@ export function TaskStatusControl({
         <input type="hidden" name="taskId" value={taskId} />
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
         {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
-        <select
+        <SelectField
           key={status}
+          size="xs"
           name="status"
           defaultValue={status}
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text)]"
         >
           {TASK_STATUSES.map((s) => (
             <option key={s} value={s}>
               {TASK_STATUS_LABEL[s]}
             </option>
           ))}
-        </select>
+        </SelectField>
       </form>
       {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
     </div>
