@@ -102,7 +102,11 @@ Returns the member (name, job title, initials, active flag), their assigned task
 
 That makes the function's name wrong: it is called for someone other than the viewer. **Rename `listMyTasks` to `listAssignedTasks`** and update its two call sites and its tests. A read model whose name asserts a viewer it does not have is how a later phase ends up writing a third copy of the same query.
 
-**Query budget: two, constant.** One `user.findUnique` for the member, one from `listAssignedTasks`. The project list folds out of those same rows in memory. This is held to the same anti-N+1 standard as `listProjects` and `listTeamCards`, and asserted the same way.
+**Query budget: three, constant.** One `user.findUnique`, one from `listAssignedTasks` for the filtered task list, and one narrow query for the project list.
+
+The project list gets its own query deliberately. Folding it out of the filtered task rows would have been two queries, but then filtering the page to "Done" would empty it — the member would appear active on no projects, because the fact was computed from a view. **"Projects they are active on" must not move when a view filter moves.** The dedicated query is `task.findMany` where the member is an assignee and `status` is not `DONE`, selecting only the project and client names, deduplicated in memory.
+
+Constant-query-count is the property the anti-N+1 standard protects, and three satisfies it as well as two; correctness does not.
 
 - Status filter reuses the `method="get"` form pattern, so it survives a reload and is shareable as a URL — identical to My Tasks and the project filters.
 - An unknown id renders `notFound()`.
@@ -158,7 +162,7 @@ The Phase 2/3a split holds. Pure modules and read models are TDD'd with hand-rol
 Only two functions are testable at that layer, and both must be:
 
 1. `groupTasksByStatus` — every status key present when its column is empty; input order preserved within a group; a status the enum does not contain never appears.
-2. `getMemberProfile` — the two-query budget asserted by call count; the derived project list containing each project once even when the member holds several tasks on it, excluding projects whose only tasks are `DONE`, and excluding personal tasks, which have no project to contribute; an unknown id returning null.
+2. `getMemberProfile` — the three-query budget asserted by call count; the derived project list containing each project once even when the member holds several tasks on it, excluding personal tasks, which have no project to contribute; **the project list identical under a status filter and without one**, which is the whole reason it has its own query; an unknown id returning null.
 
 The rename of `listMyTasks` to `listAssignedTasks` is covered by its existing tests, which move with it. No behaviour changes.
 
