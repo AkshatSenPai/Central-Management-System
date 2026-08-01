@@ -10,10 +10,18 @@ import { BoardColumn } from "@/components/tasks/board-column";
 const DRAG_KEY = "text/plain";
 
 /** Rollback is deliberately absent as code. setTaskStatusAction calls
- * revalidatePath only on success, so a rejected move leaves server state
- * untouched; when the transition ends React discards the optimistic overlay
- * and the card is already back where it started. Writing an explicit revert
- * here would fight that, not help it. */
+ * revalidatePath unconditionally after setTaskStatus returns — on both the
+ * ok and the error path, not only on success. Rollback still works, but for
+ * a different reason: a rejected move never wrote to the database, so the
+ * revalidated refetch returns the original status, and when the transition
+ * ends React discards the optimistic overlay onto that unchanged state — the
+ * card is already back where it started. Writing an explicit revert here
+ * would fight that, not help it.
+ *
+ * One known gap this leaves: when setTaskStatus fails because the task no
+ * longer exists ("Task not found"), the revalidated refetch omits the row
+ * entirely, so the card disappears along with it — its per-card error in
+ * `errors` never gets a chance to render. Not worked around here. */
 export function Board({ rows }: { rows: TaskListRow[] }) {
   const [, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -32,7 +40,13 @@ export function Board({ rows }: { rows: TaskListRow[] }) {
       e.preventDefault();
       setOverColumn(null);
       const taskId = e.dataTransfer.getData(DRAG_KEY);
-      const row = rows.find((r) => r.id === taskId);
+      // Looked up in optimisticRows, not rows: rows is the server snapshot
+      // from the last revalidation and goes stale the moment an optimistic
+      // move lands, so comparing against it here would let a second drag —
+      // fired before the first one's round trip resolves — read the card's
+      // pre-transition status and wrongly treat a real move as a same-column
+      // no-op.
+      const row = optimisticRows.find((r) => r.id === taskId);
       // Unknown id, or a drop back onto the card's own column: nothing to do.
       // setTaskStatus would also no-op, but not issuing the call at all keeps
       // the board silent instead of round-tripping to say nothing changed.
