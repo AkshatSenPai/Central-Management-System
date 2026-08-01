@@ -140,13 +140,21 @@ export default async function ProjectDetailPage(props: {
             <h2 className="text-lg font-medium text-[var(--text)]">Tasks</h2>
             <span className="text-xs text-[var(--text-3)]">{taskListSummary(tasks)}</span>
           </div>
-          <TaskForm
-            projectId={project.id}
-            clientId={project.clientId}
-            projects={[]}
-            milestones={{ projectId: project.id, options: milestoneOptions }}
-            members={members}
-          />
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/projects/${project.id}/board`}
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+            >
+              Board
+            </Link>
+            <TaskForm
+              projectId={project.id}
+              clientId={project.clientId}
+              projects={[]}
+              milestones={{ projectId: project.id, options: milestoneOptions }}
+              members={members}
+            />
+          </div>
         </div>
         {tasks.length === 0 ? (
           <EmptyState message="No tasks yet." />
