@@ -70,13 +70,17 @@ export function MilestoneStrip({
                   name="complete"
                   value={m.completedAt ? "false" : "true"}
                 />
-                <Button type="submit">{m.completedAt ? "Reopen" : "Complete"}</Button>
+                <Button type="submit" size="xs">
+                  {m.completedAt ? "Reopen" : "Complete"}
+                </Button>
               </form>
               <form action={(fd) => run(removeMilestoneAction, fd)}>
                 <input type="hidden" name="projectId" value={projectId} />
                 <input type="hidden" name="clientId" value={clientId} />
                 <input type="hidden" name="milestoneId" value={m.id} />
-                <Button type="submit">Remove</Button>
+                <Button type="submit" size="xs">
+                  Remove
+                </Button>
               </form>
             </div>
           </div>
