@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buttonClass } from "@/components/ui/button";
+import { fieldClass } from "@/components/ui/field";
 
 describe("buttonClass", () => {
   it("defaults to the secondary variant at sm, the codebase's dominant pair", () => {
@@ -59,5 +60,35 @@ describe("buttonClass", () => {
     for (const variant of ["primary", "secondary", "danger", "ghost"] as const) {
       expect(buttonClass({ variant }), variant).not.toMatch(/#[0-9a-fA-F]{3,6}/);
     }
+  });
+});
+
+describe("fieldClass", () => {
+  it("defaults to md, matching the form fields that dominate the codebase", () => {
+    expect(fieldClass()).toContain("px-3 py-2");
+  });
+
+  it("switches padding on size", () => {
+    expect(fieldClass({ size: "sm" })).toContain("px-3 py-1.5");
+    expect(fieldClass({ size: "md" })).toContain("px-3 py-2");
+  });
+
+  it("uses the surface and border tokens", () => {
+    const cls = fieldClass();
+    expect(cls).toContain("border-[var(--border)]");
+    expect(cls).toContain("bg-[var(--surface)]");
+    expect(cls).toContain("text-[var(--text)]");
+  });
+
+  it("carries a focus ring", () => {
+    expect(fieldClass()).toContain("focus-visible:shadow-[var(--ring)]");
+  });
+
+  it("appends caller classes last so they can override", () => {
+    expect(fieldClass({ className: "max-w-xs" }).endsWith("max-w-xs")).toBe(true);
+  });
+
+  it("emits no hardcoded colour", () => {
+    expect(fieldClass()).not.toMatch(/#[0-9a-fA-F]{3,6}/);
   });
 });
