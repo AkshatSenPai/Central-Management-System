@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { clientInitials } from "@/lib/client";
 import { setPrimaryContactAction, removeContactAction } from "@/server/actions/clients";
 
@@ -31,9 +32,6 @@ export function ContactList({ clientId, contacts }: { clientId: string; contacts
     }
   }
 
-  const rowBtn =
-    "rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-2)] hover:bg-[var(--surface-2)]";
-
   return (
     <div className="space-y-3">
       {contacts.map((contact) => (
@@ -55,17 +53,17 @@ export function ContactList({ clientId, contacts }: { clientId: string; contacts
                 <form action={(fd) => run(setPrimaryContactAction, fd)}>
                   <input type="hidden" name="clientId" value={clientId} />
                   <input type="hidden" name="contactId" value={contact.id} />
-                  <button type="submit" className={rowBtn}>
+                  <Button type="submit" size="xs">
                     Make primary
-                  </button>
+                  </Button>
                 </form>
               ) : null}
               <form action={(fd) => run(removeContactAction, fd)}>
                 <input type="hidden" name="clientId" value={clientId} />
                 <input type="hidden" name="contactId" value={contact.id} />
-                <button type="submit" className={rowBtn}>
+                <Button type="submit" size="xs">
                   Remove
-                </button>
+                </Button>
               </form>
             </div>
           </div>

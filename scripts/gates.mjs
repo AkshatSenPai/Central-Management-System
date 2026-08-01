@@ -13,6 +13,20 @@ function grep(args) {
   }
 }
 
+/** Drops matches inside line comments. client-form.tsx explains a React 19
+ * quirk with the words "but a <select> does not", which is indistinguishable
+ * from JSX to a regex. A gate that fails on prose teaches people to ignore
+ * it, so the prose is filtered rather than the comment reworded. */
+function stripComments(output) {
+  return output
+    .split("\n")
+    .filter((line) => {
+      const code = line.replace(/^[^:]*:\d+:/, "");
+      return line && !/^\s*(\/\/|\*|\/\*)/.test(code);
+    })
+    .join("\n");
+}
+
 const UI = "src/components/ui";
 const TSX = "src/**/*.tsx";
 
@@ -23,7 +37,7 @@ const gates = [
   },
   {
     name: "2. no raw <button> outside the Button primitive",
-    run: () => grep(["<button", "--", TSX, `:!${UI}/button.tsx`]),
+    run: () => stripComments(grep(["<button", "--", TSX, `:!${UI}/button.tsx`])),
   },
   {
     // 60 hidden inputs carry every taskId/projectId/clientId in the app. They
@@ -31,7 +45,7 @@ const gates = [
     // on day one is a gate that gets deleted in week two.
     name: "3. no raw <input>/<select>/<textarea> outside ui/ (hidden inputs exempt)",
     run: () =>
-      grep(["<(input|select|textarea)", "--", TSX, `:!${UI}/*`])
+      stripComments(grep(["<(input|select|textarea)", "--", TSX, `:!${UI}/*`]))
         .split("\n")
         .filter((l) => l && !l.includes('type="hidden"'))
         .join("\n"),

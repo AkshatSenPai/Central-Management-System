@@ -4,6 +4,9 @@ import { useActionState, useState } from "react";
 import { CLIENT_STATUSES, CLIENT_STATUS_LABEL, type ClientStatus } from "@/lib/client";
 import { toDateInputValue } from "@/lib/dates";
 import { createClientAction, updateClientAction } from "@/server/actions/clients";
+import { Button } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
+import { Field, SelectField, TextareaField } from "@/components/ui/field";
 
 type ClientDefaults = {
   id: string;
@@ -21,10 +24,6 @@ type ClientDefaults = {
  * nothing but ok/error from it. */
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
-
-const FIELD =
-  "mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
-const LABEL = "block text-sm text-[var(--text-2)]";
 
 type Values = {
   name: string;
@@ -94,17 +93,13 @@ export function ClientForm({
 
   if (!open) {
     return (
-      <button
-        type="button"
+      <Button
         onClick={() => setOpen(true)}
-        className={
-          client
-            ? "rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-            : "rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)]"
-        }
+        variant={client ? "secondary" : "primary"}
+        size={client ? "sm" : "md"}
       >
         {client ? "Edit" : "New client"}
-      </button>
+      </Button>
     );
   }
 
@@ -112,120 +107,94 @@ export function ClientForm({
     <form
       key={attempt}
       action={formAction}
-      className="w-full max-w-xl space-y-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4"
+      className={cardClass({ className: "w-full max-w-xl space-y-4 p-4" })}
     >
       {client ? <input type="hidden" name="clientId" value={client.id} /> : null}
       {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
 
-      <label className={LABEL}>
-        Name
-        <input
-          name="name"
-          required
-          value={values.name}
-          onChange={(e) => set("name", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <Field
+        label="Name"
+        className="w-full"
+        name="name"
+        required
+        value={values.name}
+        onChange={(e) => set("name", e.target.value)}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className={LABEL}>
-          Status
-          <select
-            name="status"
-            value={values.status}
-            onChange={(e) => set("status", e.target.value as ClientStatus)}
-            className={FIELD}
-          >
-            {CLIENT_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {CLIENT_STATUS_LABEL[status]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={LABEL}>
-          Sector
-          <input
-            name="sector"
-            value={values.sector}
-            onChange={(e) => set("sector", e.target.value)}
-            className={FIELD}
-          />
-        </label>
-        <label className={LABEL}>
-          Website
-          <input
-            name="website"
-            placeholder="https://"
-            value={values.website}
-            onChange={(e) => set("website", e.target.value)}
-            className={FIELD}
-          />
-        </label>
-        <label className={LABEL}>
-          Engagement type
-          <input
-            name="engagementType"
-            value={values.engagementType}
-            onChange={(e) => set("engagementType", e.target.value)}
-            className={FIELD}
-          />
-        </label>
-        <label className={LABEL}>
-          Client since
-          <input
-            type="date"
-            name="clientSince"
-            value={values.clientSince}
-            onChange={(e) => set("clientSince", e.target.value)}
-            className={FIELD}
-          />
-        </label>
-        <label className={LABEL}>
-          Account lead
-          <select
-            name="accountLeadId"
-            value={values.accountLeadId}
-            onChange={(e) => set("accountLeadId", e.target.value)}
-            className={FIELD}
-          >
-            <option value="">No account lead</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Status"
+          className="w-full"
+          name="status"
+          value={values.status}
+          onChange={(e) => set("status", e.target.value as ClientStatus)}
+        >
+          {CLIENT_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {CLIENT_STATUS_LABEL[status]}
+            </option>
+          ))}
+        </SelectField>
+        <Field
+          label="Sector"
+          className="w-full"
+          name="sector"
+          value={values.sector}
+          onChange={(e) => set("sector", e.target.value)}
+        />
+        <Field
+          label="Website"
+          className="w-full"
+          name="website"
+          placeholder="https://"
+          value={values.website}
+          onChange={(e) => set("website", e.target.value)}
+        />
+        <Field
+          label="Engagement type"
+          className="w-full"
+          name="engagementType"
+          value={values.engagementType}
+          onChange={(e) => set("engagementType", e.target.value)}
+        />
+        <Field
+          label="Client since"
+          className="w-full"
+          type="date"
+          name="clientSince"
+          value={values.clientSince}
+          onChange={(e) => set("clientSince", e.target.value)}
+        />
+        <SelectField
+          label="Account lead"
+          className="w-full"
+          name="accountLeadId"
+          value={values.accountLeadId}
+          onChange={(e) => set("accountLeadId", e.target.value)}
+        >
+          <option value="">No account lead</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </SelectField>
       </div>
 
-      <label className={LABEL}>
-        Notes
-        <textarea
-          name="notes"
-          rows={3}
-          value={values.notes}
-          onChange={(e) => set("notes", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <TextareaField
+        label="Notes"
+        className="w-full"
+        name="notes"
+        rows={3}
+        value={values.notes}
+        onChange={(e) => set("notes", e.target.value)}
+      />
 
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" size="md" disabled={pending}>
           {pending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={cancel}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button onClick={cancel}>Cancel</Button>
       </div>
     </form>
   );

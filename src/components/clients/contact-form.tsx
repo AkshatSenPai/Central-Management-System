@@ -2,13 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { addContactAction } from "@/server/actions/clients";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
-
-const FIELD =
-  "mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text)]";
-const LABEL = "block text-xs text-[var(--text-2)]";
 
 type Values = { name: string; email: string; phone: string; role: string };
 
@@ -47,13 +45,7 @@ export function ContactForm({ clientId }: { clientId: string }) {
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-      >
-        Add contact
-      </button>
+      <Button onClick={() => setOpen(true)}>Add contact</Button>
     );
   }
 
@@ -62,60 +54,46 @@ export function ContactForm({ clientId }: { clientId: string }) {
       <input type="hidden" name="clientId" value={clientId} />
       {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
 
-      <label className={LABEL}>
-        Name
-        <input
-          name="name"
-          required
-          value={values.name}
-          onChange={(e) => set("name", e.target.value)}
-          className={FIELD}
-        />
-      </label>
-      <label className={LABEL}>
-        Email
-        <input
-          name="email"
-          type="email"
-          value={values.email}
-          onChange={(e) => set("email", e.target.value)}
-          className={FIELD}
-        />
-      </label>
-      <label className={LABEL}>
-        Phone
-        <input
-          name="phone"
-          value={values.phone}
-          onChange={(e) => set("phone", e.target.value)}
-          className={FIELD}
-        />
-      </label>
-      <label className={LABEL}>
-        Role
-        <input
-          name="role"
-          value={values.role}
-          onChange={(e) => set("role", e.target.value)}
-          className={FIELD}
-        />
-      </label>
+      <Field
+        label="Name"
+        size="sm"
+        className="w-full"
+        name="name"
+        required
+        value={values.name}
+        onChange={(e) => set("name", e.target.value)}
+      />
+      <Field
+        label="Email"
+        size="sm"
+        className="w-full"
+        name="email"
+        type="email"
+        value={values.email}
+        onChange={(e) => set("email", e.target.value)}
+      />
+      <Field
+        label="Phone"
+        size="sm"
+        className="w-full"
+        name="phone"
+        value={values.phone}
+        onChange={(e) => set("phone", e.target.value)}
+      />
+      <Field
+        label="Role"
+        size="sm"
+        className="w-full"
+        name="role"
+        value={values.role}
+        onChange={(e) => set("role", e.target.value)}
+      />
 
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-[var(--btn)] px-3 py-1.5 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={cancel}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button onClick={cancel}>Cancel</Button>
       </div>
     </form>
   );

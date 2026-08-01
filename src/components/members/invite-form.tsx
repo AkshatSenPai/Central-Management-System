@@ -2,6 +2,9 @@
 
 import { useActionState, useRef, useState } from "react";
 import { createInviteAction } from "@/server/actions/invites";
+import { Button } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
+import { Field, SelectField } from "@/components/ui/field";
 
 export function InviteForm() {
   const [state, formAction, pending] = useActionState(createInviteAction, null);
@@ -22,42 +25,31 @@ export function InviteForm() {
   return (
     <div className="max-w-md space-y-3">
       <form action={formAction} className="flex gap-2">
-        <input
+        <Field
+          className="flex-1"
           name="email"
           type="email"
           required
           placeholder="teammate@company.com"
-          className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-3)]"
         />
-        <select
-          name="role"
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-2 text-sm text-[var(--text)]"
-        >
+        <SelectField name="role">
           <option value="MEMBER">Member</option>
           <option value="ADMIN">Admin</option>
-        </select>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-[var(--btn)] px-4 py-2 text-sm text-[var(--on-btn)] hover:bg-[var(--btn-h)] disabled:opacity-50"
-        >
+        </SelectField>
+        <Button type="submit" variant="primary" size="md" disabled={pending}>
           {pending ? "Inviting…" : "Invite"}
-        </button>
+        </Button>
       </form>
       {state && !state.ok && <p className="text-sm text-[var(--bad)]">{state.error}</p>}
       {state?.ok && (
-        <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 text-sm text-[var(--text)]">
+        <div className={cardClass({ className: "p-3 text-sm text-[var(--text)]" })}>
           <p className="mb-2">Invite created — share this link (valid 7 days):</p>
           <code className="block break-all text-xs text-[var(--text-2)]">
             {state.data.inviteUrl}
           </code>
-          <button
-            type="button"
-            onClick={() => copyLink(state.data.inviteUrl)}
-            className="mt-2 rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-2)] hover:bg-[var(--surface-2)]"
-          >
+          <Button size="xs" className="mt-2" onClick={() => copyLink(state.data.inviteUrl)}>
             {copyState === "copied" ? "Copied" : "Copy link"}
-          </button>
+          </Button>
           {copyState === "failed" && (
             <p className="mt-2 text-xs text-[var(--bad)]">
               Couldn&apos;t copy — select the link above and copy it manually.

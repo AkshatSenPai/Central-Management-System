@@ -8,6 +8,7 @@ import { CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from "@/lib/client";
 import { isProjectActive } from "@/lib/project";
 import { monthYear } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
+import { cardClass } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { ActivityTimeline } from "@/components/activity/activity-timeline";
@@ -19,7 +20,6 @@ import { ProjectRow } from "@/components/projects/project-row";
 import { ProjectForm } from "@/components/projects/project-form";
 
 const CHIP = "text-xs text-[var(--text-3)]";
-const CARD = "rounded-lg border border-[var(--border)] bg-[var(--surface)]";
 
 export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await props.params;
@@ -117,7 +117,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             {client.projects.length === 0 ? (
               <EmptyState message="No projects for this client yet." />
             ) : (
-              <div className={`overflow-hidden ${CARD}`}>
+              <div className={cardClass({ className: "overflow-hidden" })}>
                 {client.projects.map((row) => (
                   <ProjectRow key={row.id} row={row} />
                 ))}
@@ -131,7 +131,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           </section>
         </div>
 
-        <aside className={`h-fit space-y-4 p-4 ${CARD}`}>
+        <aside className={cardClass({ className: "h-fit space-y-4 p-4" })}>
           <h2 className="text-sm font-semibold text-[var(--text)]">Contacts</h2>
           {client.contacts.length === 0 ? (
             <EmptyState message="No contacts yet." />

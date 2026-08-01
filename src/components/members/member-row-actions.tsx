@@ -5,6 +5,7 @@ import {
   toggleMemberActiveAction,
   setMemberRoleAction,
 } from "@/server/actions/members";
+import { Button } from "@/components/ui/button";
 
 export function MemberRowActions({
   userId,
@@ -29,8 +30,6 @@ export function MemberRowActions({
     }
   }
 
-  const btn = "rounded-md border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-2)]";
-
   return (
     <div className="flex items-center gap-2">
       <form
@@ -38,17 +37,17 @@ export function MemberRowActions({
       >
         <input type="hidden" name="userId" value={userId} />
         <input type="hidden" name="role" value={role === "ADMIN" ? "MEMBER" : "ADMIN"} />
-        <button type="submit" className={btn}>
+        <Button type="submit" size="xs">
           {role === "ADMIN" ? "Make Member" : "Make Admin"}
-        </button>
+        </Button>
       </form>
       {!isSelf && (
         <form action={(fd) => run(toggleMemberActiveAction, fd)}>
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="active" value={active ? "false" : "true"} />
-          <button type="submit" className={btn}>
+          <Button type="submit" size="xs">
             {active ? "Deactivate" : "Reactivate"}
-          </button>
+          </Button>
         </form>
       )}
       {error && <span className="text-xs text-[var(--bad)]">{error}</span>}
