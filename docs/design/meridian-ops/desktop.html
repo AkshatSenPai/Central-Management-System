@@ -124,6 +124,9 @@ button{cursor:pointer}
 [data-pj="6"]{background:var(--pj6);border-color:var(--pj6)}
 [data-drag="true"]{opacity:.4}
 [data-over="true"]{background:var(--accent-soft)!important;border-color:var(--accent-line)!important}
+[data-err="true"]{border-color:var(--bad)!important;box-shadow:0 0 0 3px var(--bad-bg)!important}
+[data-on="true"]{border-color:var(--accent)!important;background:var(--accent-soft)!important;color:var(--text)!important}
+[data-pick="on"]{border-color:var(--accent)!important;box-shadow:0 0 0 2px var(--accent-line)!important}
 @keyframes slideIn{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes popIn{from{transform:translateY(6px) scale(.98);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
@@ -280,9 +283,14 @@ button{cursor:pointer}
       </div>
 
       <div style="display:flex;align-items:center;gap:6px;flex:none">
-        <button onClick="{{ openNewTask }}" style="height:32px;padding:0 12px;border:none;border-radius:8px;background:var(--btn);color:var(--on-btn);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px" style-hover="background:var(--btn-h)">
-          <span style="font:var(--ico-s)">add</span>New task
-        </button>
+        <div style="display:flex;align-items:stretch;flex:none">
+          <button onClick="{{ openNewTask }}" style="height:32px;padding:0 12px;border:none;border-radius:8px 0 0 8px;background:var(--btn);color:var(--on-btn);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px" style-hover="background:var(--btn-h)">
+            <span style="font:var(--ico-s)">add</span>New task
+          </button>
+          <button onClick="{{ toggleCreateMenu }}" title="More to create" style="width:26px;height:32px;border:none;border-left:1px solid rgba(255,255,255,.22);border-radius:0 8px 8px 0;background:var(--btn);color:var(--on-btn);display:flex;align-items:center;justify-content:center" style-hover="background:var(--btn-h)">
+            <span style="font:var(--ico-s)">expand_more</span>
+          </button>
+        </div>
         <button onClick="{{ toggleNotif }}" title="Notifications" style="position:relative;width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-2);display:flex;align-items:center;justify-content:center" style-hover="background:var(--surface-2);color:var(--text)">
           <span style="font:var(--ico-s)">notifications</span>
           <span style="position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;font-size:9.5px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface)">3</span>
@@ -292,6 +300,30 @@ button{cursor:pointer}
           <span style="font:var(--ico-s);color:var(--text-3)">expand_more</span>
         </button>
       </div>
+
+      <sc-if value="{{ createMenuOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;top:52px;right:112px;width:236px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow-lg);padding:6px;z-index:40;animation:popIn .12s ease">
+        <button onClick="{{ openNewTask }}" style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 9px;border:none;border-radius:8px;background:transparent;text-align:left" style-hover="background:var(--surface-2)">
+          <span style="font:var(--ico-s);color:var(--text-3)">check_circle</span>
+          <span style="font-size:13px;font-weight:500;flex:1">Task</span>
+          <span style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">T</span>
+        </button>
+        <button onClick="{{ openNewProject }}" style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 9px;border:none;border-radius:8px;background:transparent;text-align:left" style-hover="background:var(--surface-2)">
+          <span style="font:var(--ico-s);color:var(--text-3)">layers</span>
+          <span style="font-size:13px;font-weight:500;flex:1">Project</span>
+          <span style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">P</span>
+        </button>
+        <div style="height:1px;background:var(--border);margin:5px 0"></div>
+        <button style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 9px;border:none;border-radius:8px;background:transparent;text-align:left" style-hover="background:var(--surface-2)">
+          <span style="font:var(--ico-s);color:var(--text-3)">business_center</span>
+          <span style="font-size:13px;font-weight:500;flex:1">Client</span>
+        </button>
+        <button style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 9px;border:none;border-radius:8px;background:transparent;text-align:left" style-hover="background:var(--surface-2)">
+          <span style="font:var(--ico-s);color:var(--text-3)">receipt_long</span>
+          <span style="font-size:13px;font-weight:500;flex:1">Invoice record</span>
+        </button>
+      </div>
+      </sc-if>
 
       <sc-if value="{{ userMenuOpen }}" hint-placeholder-val="{{ false }}">
       <div style="position:absolute;top:52px;right:20px;width:244px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow-lg);padding:6px;animation:popIn .12s ease">
@@ -509,7 +541,7 @@ button{cursor:pointer}
           <span style="font-size:12.5px;color:var(--text-3)">6 active projects across 5 clients</span>
           <div style="flex:1"></div>
           <button style="height:30px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-2);font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:6px" style-hover="background:var(--surface-2);color:var(--text)"><span style="font:var(--ico-s)">filter_list</span>Health: Any</button>
-          <button style="height:30px;padding:0 12px;border:none;border-radius:8px;background:var(--btn);color:var(--on-btn);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px" style-hover="background:var(--btn-h)"><span style="font:var(--ico-s)">add</span>New project</button>
+          <button onClick="{{ openNewProject }}" style="height:30px;padding:0 12px;border:none;border-radius:8px;background:var(--btn);color:var(--on-btn);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px" style-hover="background:var(--btn-h)"><span style="font:var(--ico-s)">add</span>New project</button>
         </div>
         <div style="border:1px solid var(--border);background:var(--surface);border-radius:10px;overflow-x:auto;box-shadow:var(--shadow)">
           <div style="display:grid;min-width:860px;grid-template-columns:minmax(0,2.1fr) minmax(0,1.4fr) 128px 108px 92px 92px;gap:14px;padding:9px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-3)">
@@ -1418,6 +1450,199 @@ button{cursor:pointer}
   </div>
   </sc-if>
 
+  <sc-if value="{{ taskModalOpen }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="New task" style="position:fixed;inset:0;z-index:70;display:flex;align-items:flex-start;justify-content:center;padding:56px 20px 20px">
+    <div onClick="{{ closeCreate }}" style="position:absolute;inset:0;background:rgba(12,12,16,.34);animation:fadeIn .12s ease"></div>
+    <div onClick="{{ stop }}" style="position:relative;width:648px;max-width:100%;max-height:calc(100vh - 76px);background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;animation:popIn .14s ease">
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)">
+        <span style="font:var(--ico-s);color:var(--text-3)">check_circle</span>
+        <span style="font-size:14.5px;font-weight:700;letter-spacing:-.01em;flex:1">New task</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text-3)">MER-024</span>
+        <button onClick="{{ closeCreate }}" style="border:none;background:none;padding:0;color:var(--text-3);display:flex" style-hover="color:var(--text)"><span style="font:var(--ico)">close</span></button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:16px">
+        <input data-err="{{ errFlag }}" value="{{ ntTitle }}" onChange="{{ setNtTitle }}" placeholder="What needs doing?" style="width:100%;height:42px;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);outline:none;font-size:16px;font-weight:600;letter-spacing:-.01em" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+        <sc-if value="{{ nErr }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;font-weight:600;color:var(--bad)"><span style="font:15px/1 'Material Symbols Outlined'">error</span>A title is required.</div>
+        </sc-if>
+        <textarea value="{{ ntDesc }}" onChange="{{ setNtDesc }}" placeholder="Add context, acceptance criteria, or links. Markdown works." style="width:100%;min-height:78px;margin-top:9px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);outline:none;font-size:13.5px;line-height:1.55;resize:vertical" style-focus="border-color:var(--accent);box-shadow:var(--ring)"></textarea>
+
+        <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:11px 12px;align-items:center;margin-top:16px">
+          <span style="font-size:12px;color:var(--text-3)">Project</span>
+          <select onChange="{{ setNtProject }}" value="{{ ntProject }}" style="width:100%;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);outline:none;font-size:13px" style-focus="border-color:var(--accent);box-shadow:var(--ring)">
+            <sc-for list="{{ projectOpts }}" as="o" hint-placeholder-count="6">
+              <option value="{{ o.id }}">{{ o.label }}</option>
+            </sc-for>
+          </select>
+
+          <span style="font-size:12px;color:var(--text-3)">Status</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ ntStatusOpts }}" as="o" hint-placeholder-count="4">
+              <button onClick="{{ o.pick }}" data-pick="{{ o.on }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:12.5px;font-weight:500;color:var(--text-2)" style-hover="background:var(--surface-2);color:var(--text)">
+                <span data-dot="{{ o.dot }}" style="width:7px;height:7px;border-radius:50%"></span>{{ o.v }}
+              </button>
+            </sc-for>
+          </div>
+
+          <span style="font-size:12px;color:var(--text-3)">Priority</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ ntPriOpts }}" as="o" hint-placeholder-count="4">
+              <button onClick="{{ o.pick }}" data-badge="{{ o.pk }}" data-pick="{{ o.on }}" style="display:inline-flex;align-items:center;height:30px;padding:0 11px;border:1px solid;border-radius:8px;font-size:12.5px;font-weight:700" style-hover="filter:brightness(.97)">{{ o.v }}</button>
+            </sc-for>
+          </div>
+
+          <span style="font-size:12px;color:var(--text-3)">Assignees</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ ntPeople }}" as="p" hint-placeholder-count="5">
+              <button onClick="{{ p.pick }}" data-on="{{ p.on }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px 0 3px;border:1px solid var(--border);border-radius:15px;background:var(--surface);font-size:12.5px;color:var(--text-2)" style-hover="background:var(--surface-2)">
+                <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>{{ p.first }}
+              </button>
+            </sc-for>
+          </div>
+
+          <span style="font-size:12px;color:var(--text-3)">Due date</span>
+          <div style="display:flex;align-items:center;gap:9px">
+            <input type="date" value="{{ ntDue }}" onChange="{{ setNtDue }}" style="height:32px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);outline:none;font-size:13px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+            <span style="font-size:12px;color:var(--text-3)">·</span>
+            <label style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2)">
+              <input type="checkbox" style="width:15px;height:15px;accent-color:var(--btn);margin:0" />Repeat weekly
+            </label>
+          </div>
+        </div>
+
+        <div style="height:1px;background:var(--border);margin:16px 0 13px"></div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+          <span style="font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-3)">Checklist</span>
+          <span style="font-size:12px;color:var(--text-3)">optional</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ ntChecks }}" as="c" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-2);flex:none"></span>
+              <input value="{{ c.v }}" onChange="{{ c.set }}" placeholder="{{ c.ph }}" style="flex:1;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);outline:none;font-size:13px" style-focus="border-color:var(--accent);background:var(--surface);box-shadow:var(--ring)" />
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 12px;border:1px dashed var(--border-2);border-radius:9px">
+          <span style="font:var(--ico-s);color:var(--text-3)">attach_file</span>
+          <span style="font-size:12.5px;color:var(--text-3);flex:1">Drop files here, or <a href="#">browse</a></span>
+        </div>
+      </div>
+
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px;border-top:1px solid var(--border);background:var(--surface-2)">
+        <button onClick="{{ toggleAnother }}" style="display:inline-flex;align-items:center;gap:8px;border:none;background:none;padding:0;font-size:12.5px;color:var(--text-2)" style-hover="color:var(--text)">
+          <span data-badge="{{ anotherBox }}" style="width:17px;height:17px;border-radius:5px;border:1.5px solid;display:flex;align-items:center;justify-content:center;font:13px/1 'Material Symbols Outlined'">{{ anotherMark }}</span>Create another
+        </button>
+        <span style="flex:1"></span>
+        <button onClick="{{ closeCreate }}" style="height:34px;padding:0 13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text-2);font-size:13px;font-weight:600" style-hover="color:var(--text)">Cancel</button>
+        <button onClick="{{ submitTask }}" style="height:34px;padding:0 15px;border:none;border-radius:9px;background:var(--btn);color:var(--on-btn);font-size:13px;font-weight:600" style-hover="background:var(--btn-h)">Create task</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ projectModalOpen }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="New project" style="position:fixed;inset:0;z-index:70;display:flex;align-items:flex-start;justify-content:center;padding:56px 20px 20px">
+    <div onClick="{{ closeCreate }}" style="position:absolute;inset:0;background:rgba(12,12,16,.34);animation:fadeIn .12s ease"></div>
+    <div onClick="{{ stop }}" style="position:relative;width:720px;max-width:100%;max-height:calc(100vh - 76px);background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;animation:popIn .14s ease">
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)">
+        <span style="font:var(--ico-s);color:var(--text-3)">layers</span>
+        <span style="font-size:14.5px;font-weight:700;letter-spacing:-.01em;flex:1">New project</span>
+        <button onClick="{{ closeCreate }}" style="border:none;background:none;padding:0;color:var(--text-3);display:flex" style-hover="color:var(--text)"><span style="font:var(--ico)">close</span></button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:16px">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 236px;gap:12px">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;color:var(--text-3)">Project name</span>
+            <input data-err="{{ errFlag }}" value="{{ npName }}" onChange="{{ setNpName }}" placeholder="e.g. Autumn Lookbook Site" style="height:40px;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);outline:none;font-size:15px;font-weight:600;letter-spacing:-.01em" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;color:var(--text-3)">Client</span>
+            <select onChange="{{ setNpClient }}" value="{{ npClient }}" style="height:40px;padding:0 9px;border:1px solid var(--border);border-radius:9px;background:var(--surface);outline:none;font-size:13.5px" style-focus="border-color:var(--accent);box-shadow:var(--ring)">
+              <sc-for list="{{ clientOpts }}" as="o" hint-placeholder-count="5">
+                <option value="{{ o.id }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
+          </label>
+        </div>
+        <sc-if value="{{ nErr }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;font-weight:600;color:var(--bad)"><span style="font:15px/1 'Material Symbols Outlined'">error</span>Give the project a name.</div>
+        </sc-if>
+
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:13px">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;color:var(--text-3)">Start</span>
+            <input type="date" value="{{ npStart }}" onChange="{{ setNpStart }}" style="height:32px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);outline:none;font-size:13px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;color:var(--text-3)">Target delivery</span>
+            <input type="date" value="{{ npDue }}" onChange="{{ setNpDue }}" style="height:32px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);outline:none;font-size:13px" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;color:var(--text-3)">Budget (hours)</span>
+            <input value="{{ npHours }}" onChange="{{ setNpHours }}" style="height:32px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);outline:none;font-size:13px;font-variant-numeric:tabular-nums" style-focus="border-color:var(--accent);box-shadow:var(--ring)" />
+          </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:11px 12px;align-items:center;margin-top:15px">
+          <span style="font-size:12px;color:var(--text-3)">Health</span>
+          <div style="display:flex;gap:6px">
+            <sc-for list="{{ npHealthOpts }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.pick }}" data-badge="{{ o.hk }}" data-pick="{{ o.on }}" style="display:inline-flex;align-items:center;height:30px;padding:0 11px;border:1px solid;border-radius:8px;font-size:12.5px;font-weight:700" style-hover="filter:brightness(.97)">{{ o.v }}</button>
+            </sc-for>
+          </div>
+          <span style="font-size:12px;color:var(--text-3)">Team</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ npPeople }}" as="p" hint-placeholder-count="5">
+              <button onClick="{{ p.pick }}" data-on="{{ p.on }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px 0 3px;border:1px solid var(--border);border-radius:15px;background:var(--surface);font-size:12.5px;color:var(--text-2)" style-hover="background:var(--surface-2)">
+                <span style="width:24px;height:24px;border-radius:50%;background:var(--avatar);color:var(--avatar-t);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>{{ p.first }}
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="height:1px;background:var(--border);margin:16px 0 13px"></div>
+
+        <div style="font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-3);margin-bottom:9px">Start from</div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px">
+          <sc-for list="{{ npTemplates }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.pick }}" data-on="{{ t.on }}" style="text-align:left;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)" style-hover="background:var(--surface-2)">
+              <span style="display:block;font-size:13px;font-weight:600">{{ t.name }}</span>
+              <span style="display:block;font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.4">{{ t.sub }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="height:1px;background:var(--border);margin:16px 0 13px"></div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+          <span style="font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-3)">Milestones</span>
+          <span style="font-size:12px;color:var(--text-3)">these drive the progress bar</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ npMiles }}" as="m" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--border-2);flex:none"></span>
+              <input value="{{ m.n }}" onChange="{{ m.setN }}" placeholder="{{ m.ph }}" style="flex:1;height:32px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);outline:none;font-size:13px" style-focus="border-color:var(--accent);background:var(--surface);box-shadow:var(--ring)" />
+              <input type="date" value="{{ m.d }}" onChange="{{ m.setD }}" style="width:150px;height:32px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);outline:none;font-size:13px;flex:none" style-focus="border-color:var(--accent);background:var(--surface);box-shadow:var(--ring)" />
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px;border-top:1px solid var(--border);background:var(--surface-2)">
+        <span style="font-size:12px;color:var(--text-3);flex:1">The whole team can see this project once it exists.</span>
+        <button onClick="{{ closeCreate }}" style="height:34px;padding:0 13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text-2);font-size:13px;font-weight:600" style-hover="color:var(--text)">Cancel</button>
+        <button onClick="{{ submitProject }}" style="height:34px;padding:0 15px;border:none;border-radius:9px;background:var(--btn);color:var(--on-btn);font-size:13px;font-weight:600" style-hover="background:var(--btn-h)">Create project</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
   <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
   <div style="position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-lg);animation:popIn .14s ease">
     <span style="font:var(--ico-s);color:var(--ok)">check_circle</span>
@@ -1610,7 +1835,11 @@ class Component extends DCLogic {
     timerOn: false, timerSec: 11700,
     calView: 'month', calFilter: 'Everyone',
     vaultSel: 'v3', revealed: false, shareOpen: false,
-    toast: null
+    toast: null,
+    createMode: null, nErr: false, another: false,
+    nt: {title:'', desc:'', project:'p1', status:'To Do', pri:'Medium', due:'2026-08-07', people:['DR'], checks:['','']},
+    np: {name:'', client:'c1', health:'On Track', start:'2026-08-03', due:'2026-10-16', hours:'180',
+         template:'web', people:['ME','DR'], miles:[{n:'Kickoff & discovery',d:'2026-08-07'},{n:'Design sign-off',d:'2026-09-04'},{n:'',d:''}]}
   };
 
   componentDidMount() {
@@ -1706,6 +1935,45 @@ class Component extends DCLogic {
   hhmm(s) { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return h + 'h ' + String(m).padStart(2,'0') + 'm'; }
 
   autoHide() { if (this.toastT) clearTimeout(this.toastT); this.toastT = setTimeout(() => this.setState({toast: null}), 2600); }
+
+  setF(bag, key) {
+    return e => { const v = e && e.target ? e.target.value : e;
+      this.setState(st => ({[bag]: {...st[bag], [key]: v}, nErr: false})); };
+  }
+  togglePerson(bag, i) {
+    return () => this.setState(st => {
+      const cur = st[bag].people, has = cur.indexOf(i) >= 0;
+      return {[bag]: {...st[bag], people: has ? cur.filter(x => x !== i) : cur.concat([i])}};
+    });
+  }
+  setRow(bag, list, k, field) {
+    return e => { const v = e.target.value;
+      this.setState(st => {
+        const rows = st[bag][list].map((r, j) => j === k ? (field ? {...r, [field]: v} : v) : r);
+        if (k === rows.length - 1 && v) rows.push(field ? {n:'',d:''} : '');
+        return {[bag]: {...st[bag], [list]: rows}};
+      }); };
+  }
+  submitTask() {
+    const nt = this.state.nt;
+    if (!nt.title.trim()) { this.setState({nErr: true}); return; }
+    const p = PROJECTS.find(x => x.id === nt.project) || PROJECTS[0];
+    this.setState(st => ({
+      createMode: st.another ? 'task' : null, nErr: false,
+      nt: st.another ? {...st.nt, title:'', desc:'', checks:['','']} : st.nt,
+      toast: 'Task created in ' + p.name
+    }));
+    this.autoHide();
+  }
+  submitProject() {
+    const np = this.state.np;
+    if (!np.name.trim()) { this.setState({nErr: true}); return; }
+    const c = CLIENTS.find(x => x.id === np.client) || CLIENTS[0];
+    const n = np.miles.filter(m => m.n.trim()).length;
+    this.setState({createMode: null, nErr: false,
+      toast: 'Project created for ' + c.name + ' · ' + n + ' milestones'});
+    this.autoHide();
+  }
 
   monthCells(all) {
     const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1864,7 +2132,45 @@ class Component extends DCLogic {
 
       drawerOpen: !!s.openTaskId,
       closeDrawer: () => this.setState({openTaskId: null}),
-      openNewTask: e => { if (e && e.preventDefault) e.preventDefault(); this.setState({openTaskId: 't1'}); },
+      openNewTask: e => { if (e && e.preventDefault) e.preventDefault();
+        this.setState({createMode: 'task', createMenu: false, nErr: false, notifOpen: false, userMenuOpen: false}); },
+      openNewProject: e => { if (e && e.preventDefault) e.preventDefault();
+        this.setState({createMode: 'project', createMenu: false, nErr: false, notifOpen: false, userMenuOpen: false}); },
+      createMenuOpen: !!s.createMenu,
+      toggleCreateMenu: () => this.setState(st => ({createMenu: !st.createMenu, notifOpen: false, userMenuOpen: false})),
+      closeCreate: () => this.setState({createMode: null, nErr: false}),
+      stop: e => { if (e && e.stopPropagation) e.stopPropagation(); },
+      taskModalOpen: s.createMode === 'task', projectModalOpen: s.createMode === 'project',
+      nErr: s.nErr, errFlag: s.nErr ? 'true' : 'false',
+      another: s.another, anotherBox: s.another ? 'ok' : 'neutral', anotherMark: s.another ? 'check' : '',
+      toggleAnother: () => this.setState(st => ({another: !st.another})),
+
+      ntTitle: s.nt.title, ntDesc: s.nt.desc, ntDue: s.nt.due,
+      setNtTitle: this.setF('nt','title'), setNtDesc: this.setF('nt','desc'),
+      setNtProject: this.setF('nt','project'), setNtDue: this.setF('nt','due'),
+      ntProject: s.nt.project, ntStatus: s.nt.status, ntPri: s.nt.pri,
+      ntStatusOpts: ['To Do','In Progress','Review','Done'].map(v => ({v, on: s.nt.status === v ? 'on' : 'off',
+        pick: () => this.setState(st => ({nt: {...st.nt, status: v}})), dot: ST_DOT[v]})),
+      ntPriOpts: ['Low','Medium','High','Urgent'].map(v => ({v, on: s.nt.pri === v ? 'on' : 'off',
+        pick: () => this.setState(st => ({nt: {...st.nt, pri: v}})), pk: PRI_KIND[v]})),
+      ntPeople: TEAM.map(m => ({...m, first: m.n.split(' ')[0], on: s.nt.people.indexOf(m.i) >= 0 ? 'true' : 'false', pick: this.togglePerson('nt', m.i)})),
+      ntChecks: s.nt.checks.map((c, k) => ({v: c, set: this.setRow('nt','checks',k,null),
+        ph: k === 0 ? 'Add a checklist item' : 'Another item'})),
+      projectOpts: PROJECTS.map(p => ({id: p.id, label: p.client + ' — ' + p.name})),
+      clientOpts: CLIENTS.map(c => ({id: c.id, label: c.name})),
+
+      npName: s.np.name, npStart: s.np.start, npDue: s.np.due, npHours: s.np.hours, npClient: s.np.client,
+      setNpName: this.setF('np','name'), setNpClient: this.setF('np','client'),
+      setNpStart: this.setF('np','start'), setNpDue: this.setF('np','due'), setNpHours: this.setF('np','hours'),
+      npHealthOpts: [['On Track','ok'],['At Risk','warn'],['Blocked','bad']].map(h => ({v: h[0], hk: h[1],
+        on: s.np.health === h[0] ? 'on' : 'off', pick: () => this.setState(st => ({np: {...st.np, health: h[0]}}))})),
+      npTemplates: [['blank','Blank board','Four empty columns'],['web','Web build','12 starter tasks, 3 milestones'],['brand','Brand system','9 starter tasks, 2 milestones']]
+        .map(t => ({id: t[0], name: t[1], sub: t[2], on: s.np.template === t[0] ? 'true' : 'false',
+          pick: () => this.setState(st => ({np: {...st.np, template: t[0]}}))})),
+      npPeople: TEAM.map(m => ({...m, first: m.n.split(' ')[0], on: s.np.people.indexOf(m.i) >= 0 ? 'true' : 'false', pick: this.togglePerson('np', m.i)})),
+      npMiles: s.np.miles.map((m, k) => ({n: m.n, d: m.d, setN: this.setRow('np','miles',k,'n'), setD: this.setRow('np','miles',k,'d'),
+        ph: 'Milestone ' + (k + 1)})),
+      submitTask: () => this.submitTask(), submitProject: () => this.submitProject(),
       task: {...task, ref: 'MER-' + String(task.id.slice(1)).padStart(3, '0')},
       assignees: task.people.map(i => { const m = TEAM.find(x => x.i === i) || {n: i, i}; return {i, n: m.n.split(' ')[0]}; }),
       checklist: CHECKLIST.map((c, idx) => {
