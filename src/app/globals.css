@@ -1,4 +1,12 @@
-@import "tailwindcss";
+/* source(none) disables Tailwind v4's automatic project-wide scanning, then
+   the @source below restricts candidates to actual source files.
+   Without this Tailwind also scans scripts/ and docs/, where prose and test
+   assertions mention class names — a gate description containing an
+   arbitrary-value shadow class was emitted as a real utility with an invalid
+   var() name and broke the CSS build. Documentation should not be able to
+   affect the stylesheet. */
+@import "tailwindcss" source(none);
+@source "../**/*.{ts,tsx}";
 
 :root{
 --bg:#f6f6f7;--surface:#ffffff;--surface-2:#fafafa;--surface-3:#f0f0f2;

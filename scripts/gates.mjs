@@ -72,12 +72,19 @@ const gates = [
     run: () => grep(["^ *const (FIELD|LABEL|CARD|BTN|SELECT) =", "--", TSX, `:!${UI}/*`]),
   },
   {
-    // Tailwind's own shadow-lg is a fixed value; --shadow-lg differs sharply
-    // between themes (rgba(16,17,26,.14) light vs rgba(3,5,10,.7) dark). The
-    // quick-add popover shipped with the Tailwind one, so it read identically
-    // in both themes. Gate 1 cannot see it — there is no hex involved.
-    name: "6. no built-in Tailwind shadow utilities — use shadow-[var(--shadow*)]",
-    run: () => stripComments(grep(["(^|[\"' ])shadow-(sm|md|lg|xl|2xl)([\"' ]|$)", "--", TSX])),
+    // Tailwind's own shadow-lg is a fixed value; the shadow tokens differ
+    // sharply between themes (rgba(16,17,26,.14) light vs rgba(3,5,10,.7)
+    // dark). The quick-add popover shipped with the Tailwind one, so it read
+    // identically in both themes. Gate 1 cannot see it — no hex is involved.
+    //
+    // NOTE: this file must never contain a literal arbitrary-value class such
+    // as the bracketed shadow-token syntax. Tailwind v4 scans the whole
+    // project for class candidates, including scripts/, and an earlier
+    // version of this very description was emitted as a real utility with an
+    // invalid var() name, which broke the CSS build. Patterns here are built
+    // from fragments for that reason.
+    name: "6. built-in Tailwind shadow utilities — use the shadow tokens instead",
+    run: () => stripComments(grep(["(^|[\"' ])" + "shadow-" + "(sm|md|lg|xl|2xl)([\"' ]|$)", "--", TSX])),
   },
   {
     name: "5. every interactive primitive carries focus-visible styling",
