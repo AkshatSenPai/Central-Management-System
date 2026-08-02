@@ -27,6 +27,24 @@ export function monthYear(d: Date): string {
   return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+/** Stored due dates are UTC midnight — parseDateInput guarantees it — so every
+ * calendar comparison in the app is a UTC calendar-day comparison. Doing it in
+ * local time would put a task due "today" into yesterday for anyone west of
+ * UTC, which is the overdue bucket.
+ *
+ * Lived in dashboard.ts until Phase 4; moved here so the calendar does not
+ * import a dashboard module to ask what day it is. */
+export function startOfUtcDay(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+export function addDays(d: Date, days: number): Date {
+  return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+/** Instant-granular: a task due at UTC midnight today is "overdue" one
+ * millisecond later. Correct for a deadline, wrong for a calendar cell — see
+ * isOverdueOnDay in calendar.ts, which compares whole days instead. */
 export function isOverdue(due: Date | null, now: Date = new Date()): boolean {
   if (!due) return false;
   return due.getTime() < now.getTime();

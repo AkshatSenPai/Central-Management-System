@@ -107,6 +107,61 @@ export async function listAssignedTasks(
   return sortMyTasks(rows);
 }
 
+/** Tasks due inside a half-open window, for the calendar.
+ *
+ * A third caller of `taskRowSelect` / `toTaskListRow`, not a widening of
+ * `listAssignedTasks` — making that function's `userId` optional would turn
+ * /my-tasks and /team/[memberId] into all-tasks views the moment a caller
+ * passed undefined, which no type would catch.
+ *
+ * Two consequences of the range clause, both intended:
+ *
+ * - **Undated tasks never appear.** Any `gte`/`lt` on a nullable column
+ *   excludes nulls, and a task with no due date has no cell to sit in.
+ *   /my-tasks remains where undated work is found.
+ * - **The window is half-open**, matching `bucketMyTasks` and `weekStats`, so
+ *   a task due exactly on a boundary lands in one cell rather than two.
+ *
+ * Status follows the same rule as `listProjects` and `listAssignedTasks`: no
+ * status given means open work only; "ALL" drops the constraint so completed
+ * work stays visible; anything else filters to that one status.
+ */
+export async function listTasksInRange(
+  db: PrismaClient,
+  input: {
+    from: Date;
+    to: Date;
+    userId?: string | null;
+    projectId?: string | null;
+    status?: TaskStatusFilter | null;
+  }
+): Promise<TaskListRow[]> {
+  const where: Prisma.TaskWhereInput = { dueDate: { gte: input.from, lt: input.to } };
+  if (!input.status) where.status = { not: "DONE" };
+  else if (input.status !== "ALL") where.status = input.status;
+  if (input.userId) where.assignees = { some: { userId: input.userId } };
+  if (input.projectId) where.projectId = input.projectId;
+
+  const tasks = await db.task.findMany({
+    where,
+    // By due date, then priority, so a cell with several tasks leads with the
+    // most urgent rather than the most recently created.
+    orderBy: [{ dueDate: "asc" }, { priority: "asc" }, { createdAt: "asc" }],
+    select: taskRowSelect,
+  });
+
+  return tasks.map((t) =>
+    toTaskListRow(
+      t,
+      taskRowSubtitle({
+        clientName: t.project?.client.name ?? null,
+        projectName: t.project?.name ?? null,
+        dueDate: t.dueDate,
+      })
+    )
+  );
+}
+
 /** A project's task board: every status stays visible so completed work is
  * never hidden, ordered so DONE lands last by the enum's own declaration
  * order rather than any completedAt timestamp. The subtitle is the due

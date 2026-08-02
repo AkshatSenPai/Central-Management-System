@@ -1,5 +1,5 @@
 {
-  "signature": "9c6124c68a432587",
+  "signature": "f02bb63dc7b88b4d",
   "icons": [
     "add",
     "alternate_email",
@@ -8,6 +8,7 @@
     "call",
     "campaign",
     "check_circle",
+    "chevron_left",
     "chevron_right",
     "close",
     "dark_mode",
@@ -33,5 +34,5 @@
     "settings",
     "space_dashboard"
   ],
-  "bytes": 5144
+  "bytes": 5196
 }

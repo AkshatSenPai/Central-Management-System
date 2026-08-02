@@ -1,19 +1,14 @@
 import type { TaskListRow } from "@/lib/task-queries";
+import { addDays, startOfUtcDay } from "@/lib/dates";
 
 /** Everything here is pure and takes `now` explicitly, so the tests can pin a
  * date instead of hoping the suite never runs across midnight. */
 
-/** Stored due dates are UTC midnight — `parseDateInput` guarantees it — so
- * every comparison in this file is a UTC calendar-day comparison. Doing it in
- * local time would put a task due "today" into the overdue bucket for anyone
- * west of UTC for part of the day. */
-export function startOfUtcDay(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-export function addDays(d: Date, days: number): Date {
-  return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
-}
+// startOfUtcDay and addDays moved to lib/dates.ts in Phase 4, so the calendar
+// can reach them without importing a dashboard module. Re-exported because
+// dashboard-queries and the dashboard tests already import them from here, and
+// churning those call sites would only obscure the diff.
+export { addDays, startOfUtcDay };
 
 /** "Wednesday, 29 July" — the design's subtitle for the Today section.
  *

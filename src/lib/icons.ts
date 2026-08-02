@@ -46,6 +46,7 @@ export const ICON_NAMES = [
   // Content and state.
   "error",
   "event",
+  "chevron_left",
   "chevron_right",
   "drag_indicator",
   "mail",

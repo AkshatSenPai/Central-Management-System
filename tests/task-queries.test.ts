@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { listAssignedTasks, listProjectTasks, getTaskDetail } from "@/lib/task-queries";
+import {
+  listAssignedTasks,
+  listProjectTasks,
+  getTaskDetail,
+  listTasksInRange,
+} from "@/lib/task-queries";
 
 type TaskRow = {
   id: string;
@@ -276,5 +281,74 @@ describe("getTaskDetail", () => {
     });
     const detail = await getTaskDetail(db, "t1");
     expect(detail?.assignees).toEqual([{ id: "u1", name: "Dana Reeve", initials: "DR" }]);
+  });
+});
+
+describe("listTasksInRange", () => {
+  const FROM = new Date("2026-07-27T00:00:00.000Z");
+  const TO = new Date("2026-09-07T00:00:00.000Z");
+  const where = (args: unknown) => (args as { where: Record<string, unknown> }).where;
+
+  it("filters by a half-open due-date window", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO });
+    expect(where(findManyArgs[0]).dueDate).toEqual({ gte: FROM, lt: TO });
+  });
+
+  it("issues exactly one query", async () => {
+    const { db, callsByDelegate } = fakeDb({ tasks: [taskRow()] });
+    await listTasksInRange(db, { from: FROM, to: TO });
+    expect(callsByDelegate()).toEqual({ task: 1 });
+  });
+
+  // Same rule as listProjects and listAssignedTasks.
+  it("hides DONE by default", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO });
+    expect(where(findManyArgs[0]).status).toEqual({ not: "DONE" });
+  });
+
+  it("drops the status constraint for ALL", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO, status: "ALL" });
+    expect(where(findManyArgs[0]).status).toBeUndefined();
+  });
+
+  it("filters to one status when given one", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO, status: "IN_PROGRESS" });
+    expect(where(findManyArgs[0]).status).toBe("IN_PROGRESS");
+  });
+
+  it("adds a person filter only when asked", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO });
+    expect(where(findManyArgs[0]).assignees).toBeUndefined();
+
+    const second = fakeDb({ tasks: [] });
+    await listTasksInRange(second.db, { from: FROM, to: TO, userId: "u1" });
+    expect(where(second.findManyArgs[0]).assignees).toEqual({ some: { userId: "u1" } });
+  });
+
+  it("adds a project filter only when asked", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO, projectId: "p1" });
+    expect(where(findManyArgs[0]).projectId).toBe("p1");
+  });
+
+  // An empty string is what an unselected <select> submits; it must not
+  // become a filter matching nothing.
+  it("ignores empty-string filters", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [] });
+    await listTasksInRange(db, { from: FROM, to: TO, userId: "", projectId: "" });
+    expect(where(findManyArgs[0]).assignees).toBeUndefined();
+    expect(where(findManyArgs[0]).projectId).toBeUndefined();
+  });
+
+  it("maps rows through the shared row shape", async () => {
+    const { db } = fakeDb({ tasks: [taskRow({ dueDate: DUE })] });
+    const rows = await listTasksInRange(db, { from: FROM, to: TO });
+    expect(rows[0]).toMatchObject({ id: "t1", dueDate: DUE });
+    expect(rows[0].subtitle).toBeTruthy();
   });
 });
