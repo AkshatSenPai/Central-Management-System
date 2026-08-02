@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { Icon } from "@/components/ui/icon";
+import { ContactForm } from "@/components/clients/contact-form";
 import { clientInitials } from "@/lib/client";
 import { setPrimaryContactAction, removeContactAction } from "@/server/actions/clients";
 
@@ -70,7 +71,8 @@ export function ContactList({ clientId, contacts }: { clientId: string; contacts
                 <span className="truncate">{contact.phone}</span>
               </a>
             ) : null}
-            <div className="mt-1.5 flex items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <ContactForm clientId={clientId} contact={contact} />
               {!contact.isPrimary ? (
                 <form action={(fd) => run(setPrimaryContactAction, fd)}>
                   <input type="hidden" name="clientId" value={clientId} />
