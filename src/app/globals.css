@@ -119,6 +119,14 @@ body {
   font: var(--ico-s);
 }
 
+/* Figures that sit in a column and have to line up — the dashboard's This
+   week card, the checklist ratio. A class rather than an arbitrary Tailwind
+   value because `font-[...]` is ambiguous between family and weight, and the
+   disambiguating syntax reads worse than the thing it disambiguates. */
+.mono {
+  font-family: var(--mono);
+}
+
 /* The status filters on My Tasks and the member profile are native
    <form method="get"> submits, so changing one replaces the document rather
    than routing client-side — verified: a marker set on window is gone

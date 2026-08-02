@@ -222,6 +222,34 @@ function toMeta(value: Prisma.JsonValue | null): ActivityMeta {
     : null;
 }
 
+/** The dashboard's Recent activity feed: the whole studio, not one client.
+ *
+ * Deliberately unscoped. Every other activity surface is anchored to a client
+ * and filters by clientId; this one is the "what has been happening" panel on
+ * the landing screen, and narrowing it to the viewer's own actions would make
+ * it a list of things they already know they did.
+ *
+ * Rows with a null clientId — client.deleted, which outlives its client — are
+ * included here for the same reason: they are exactly the events worth seeing.
+ */
+export async function listRecentActivity(
+  db: PrismaClient,
+  input: { limit?: number } = {}
+): Promise<ActivityEntry[]> {
+  const rows = await db.activityLog.findMany({
+    orderBy: { at: "desc" },
+    take: input.limit ?? 10,
+    include: { actor: { select: { name: true } } },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    actorName: r.actor.name,
+    action: r.action,
+    meta: toMeta(r.meta),
+    at: r.at,
+  }));
+}
+
 export async function listClientActivity(
   db: PrismaClient,
   input: { clientId: string; limit?: number }
