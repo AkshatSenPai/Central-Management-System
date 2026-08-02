@@ -31,7 +31,8 @@ Attachments have the same shape of problem: a brief, a contract or a proof is em
 | # | Decision |
 |---|---|
 | **D1** | **Comment bodies are plain text**, not markdown. Line breaks are preserved, bare URLs become links, `@Name` becomes a mention link. **No HTML is generated anywhere** — the renderer emits React elements, so React's own escaping is the whole XSS story and there is nothing to sanitise. A markdown parser plus a sanitiser would be two dependencies and a permanent security surface, in exchange for bold text in a task comment. Revisit if people start asking for lists. |
-| **D2** | **Attachments on all three parents** — task, project and client. `parentType` is in the model regardless, per §7; building one surface and deferring two would leave the polymorphic path half-exercised and untested. |
+| **D2** | **Attachments on all three parents** — task, project and client. `parentType` is in the model regardless, per §7; building one surface and deferring two would leave the polymorphic path half-exercised and untested. **PARKED 2026-08-02, after the schema landed — see D4.** |
+| **D4** | **Attachments are parked; comments shipped alone.** R2 needs a Cloudflare account with a card on file, which the owner does not hold personally. Nothing on the roadmap is blocked by this: the only item that structurally needs object storage is the Phase 5 Vault, and even there only the *files* type — notes and credentials need none. The `Attachment` table is migrated and live, so resuming costs no migration and no rework, only the upload code in §6. Resume when someone first needs to attach a brief and cannot, or when the card is obtained for Vercel Pro at deployment — whichever comes first. |
 | **D3** | **The author may edit their own comment; the author or an admin may delete.** An edited comment is marked "edited" so the thread stays honest, and every edit and delete writes to the activity log. Immutable comments were considered and rejected: a wrong @mention would be permanent. |
 
 ## 4. Data model
@@ -128,12 +129,18 @@ New icons: `attach_file`, `alternate_email`, `chat_bubble`, `download`. Added to
 
 ## 9. Success criteria
 
-- [ ] A member can comment on a task, mention a colleague, and see the mention link to that colleague's profile.
-- [ ] An author can edit their own comment; it shows "edited". A non-author cannot edit it.
-- [ ] An admin can delete anyone's comment; a member can delete only their own.
-- [ ] Every comment and attachment event appears in the client's activity timeline.
+Comments — **all met 2026-08-02**, verified against the running app:
+
+- [x] A member can comment on a task, mention a colleague, and see the mention link to that colleague's profile.
+- [x] An author can edit their own comment; it shows "edited". A non-author cannot edit it.
+- [x] An admin can delete anyone's comment; a member can delete only their own.
+- [x] Every comment event appears in the client's activity timeline, scoped by the right `clientId`.
+- [x] `mentionedUserIds` is populated correctly and deduplicated, ready for Phase 4 to notify from.
+- [x] The mention UI states plainly that nobody is notified yet.
+- [x] A body containing `<script>` renders as literal text and injects zero script elements.
+- [x] Gates pass and every pure function introduced has tests.
+
+Attachments — **parked, see D4.** Unmet by decision, not by defect:
+
 - [ ] A file can be attached to a task, a project and a client, and downloaded again.
 - [ ] Deleting a task deletes its attachments' R2 objects, verified by listing the bucket.
-- [ ] `mentionedUserIds` is populated correctly, ready for Phase 4 to notify from.
-- [ ] The mention UI states plainly that nobody is notified yet.
-- [ ] Gates pass, including the two new ones, and the phase adds tests for every pure function it introduces.

@@ -66,6 +66,30 @@ Unchanged from the last handoff: `.superpowers/mint-session.mjs` mints a **Test 
 
 `scripts/fetch-icon-font.mjs` regenerates the icon font from `src/lib/icons.ts`. Adding an icon: add the name, run the script, use it — gate 7 fails if you list one and render it nowhere, gate 8 fails if the font is stale.
 
+## Parked, with the trigger to unpark it
+
+**Attachments (Phase 3c).** The `Attachment` table is migrated and live; only the R2 upload code is missing. Parked because R2 needs a Cloudflare account with a company card, which the owner does not hold personally.
+
+Nothing on the roadmap is blocked. The only item that structurally needs object storage is the Phase 5 Vault, and there only the *files* type — notes and credentials need none.
+
+**Unpark when** either: someone first needs to attach a brief and cannot, or the card is obtained for Vercel Pro at deployment. Do both in one call; R2 costs nothing sitting idle. Resuming needs no migration and no rework — see §6 of the 3c spec for the upload design, which is already written.
+
+## Costs, established 2026-08-02
+
+Nothing is paid today; the app runs on localhost and Neon's free tier. Checked against the vendors' own pricing pages:
+
+| Service | Cost |
+|---|---|
+| Neon | $0 free tier (0.5 GB). Then ~$0.35/GB-month, no minimum |
+| Cloudflare R2 | $0 to 10 GB, egress always free. Card needed to activate |
+| **Vercel** | **$20/month** — see below |
+| Resend (Phase 4) | Free tier ~3,000/month — *unverified, re-check at Phase 4* |
+| Google OAuth, Auth.js, cron | $0 |
+
+**Vercel's free Hobby tier is licensed non-commercial**, and a studio's internal ops tool is commercial use, so a real deployment needs Pro at $20/month. That is per *Vercel seat* — the people who deploy — not per studio member, so $20 total rather than $300. It also consumes the whole of the master spec's "under ~$20/month at 15 users" criterion on its own; everything else genuinely is free at this scale.
+
+Agreed approach: deploy to Hobby while building and testing, decide hosting properly before the team onboards. If the $20 is the sticking point the lever is hosting, not the rest — a small VPS is ~€4/month, or Cloudflare's free tier permits commercial use but needs checking against the Next.js features in use.
+
 ## Open items carried
 
 1. **The populated dashboard has not been seen.** Item 1 above.
