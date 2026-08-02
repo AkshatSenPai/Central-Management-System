@@ -12,26 +12,28 @@ enum Role {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  name           String
-  passwordHash   String?
-  role           Role      @default(MEMBER)
-  active         Boolean   @default(true)
-  title          String?
-  phone          String?
-  avatarUrl      String?
-  emailVerified  DateTime?
-  image          String?
-  accounts       Account[]
-  sessions       Session[]
-  invitesCreated Invite[]  @relation("InviteCreator")
-  activity       ActivityLog[] @relation("ActivityActor")
-  clientsLed     Client[]      @relation("ClientAccountLead")
+  id              String         @id @default(cuid())
+  email           String         @unique
+  name            String
+  passwordHash    String?
+  role            Role           @default(MEMBER)
+  active          Boolean        @default(true)
+  title           String?
+  phone           String?
+  avatarUrl       String?
+  emailVerified   DateTime?
+  image           String?
+  accounts        Account[]
+  sessions        Session[]
+  invitesCreated  Invite[]       @relation("InviteCreator")
+  activity        ActivityLog[]  @relation("ActivityActor")
+  clientsLed      Client[]       @relation("ClientAccountLead")
   tasksCreated    Task[]         @relation("TaskCreator")
   taskAssignments TaskAssignee[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  comments        Comment[]      @relation("CommentAuthor")
+  attachments     Attachment[]   @relation("AttachmentUploader")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model Invite {
@@ -224,6 +226,7 @@ model Task {
   order       Int
   assignees   TaskAssignee[]
   checklist   ChecklistItem[]
+  comments    Comment[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -253,4 +256,65 @@ model ChecklistItem {
   updatedAt DateTime @updatedAt
 
   @@index([taskId])
+}
+
+/// Plain text, never markdown or HTML (spec 3c D1). The renderer emits React
+/// elements, so React's escaping is the whole XSS story and there is nothing
+/// to sanitise on the way in or out.
+model Comment {
+  id       String @id @default(cuid())
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId   String
+  author   User   @relation("CommentAuthor", fields: [authorId], references: [id])
+  authorId String
+  body     String
+
+  /// Denormalised at write time, per the master spec's sketch. This is NOT
+  /// what draws the mention links — the renderer re-derives those from the
+  /// body against the live member list, so a renamed member's old mentions
+  /// still resolve. This array is what Phase 4 will notify from, and what
+  /// makes "where was I mentioned" answerable without scanning every body.
+  mentionedUserIds String[]
+
+  /// Null until the first edit; its presence renders the "edited" marker.
+  /// updatedAt cannot do that job because Prisma touches it on every write.
+  editedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId, createdAt])
+}
+
+enum AttachmentParent {
+  TASK
+  PROJECT
+  CLIENT
+}
+
+/// A file in R2. The row is the index; the bytes never touch this server.
+model Attachment {
+  id         String           @id @default(cuid())
+  parentType AttachmentParent
+
+  /// Deliberately NO relation and no onDelete — the same decision, for the
+  /// same reason, as ActivityLog.clientId: a polymorphic parent cannot carry
+  /// three foreign keys at once. The cost is real and is paid in the service
+  /// layer — deleting a task, project or client must delete its R2 objects,
+  /// because the database cannot cascade into a bucket. Do not "fix" this by
+  /// adding a relation.
+  parentId String
+
+  /// The R2 object key. Unique, so a retried confirm cannot register twice.
+  fileKey     String @unique
+  fileName    String
+  contentType String
+  size        Int
+
+  uploadedBy   User   @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  uploadedById String
+
+  createdAt DateTime @default(now())
+
+  @@index([parentType, parentId, createdAt])
 }
