@@ -211,7 +211,18 @@ enum TaskPriority {
 }
 
 model Task {
-  id          String          @id @default(cuid())
+  id String @id @default(cuid())
+
+  /// The human-facing handle — rendered as MER-024. A cuid is unspeakable;
+  /// this is the thing someone says out loud on a call. Postgres owns the
+  /// sequence, so two simultaneous creates cannot collide, which a
+  /// max()+1 read in the service could not promise.
+  ///
+  /// Never reused. Deleting MER-024 does not free the number, and it should
+  /// not: a reference in someone's notes must not later point at a different
+  /// task.
+  reference Int @unique @default(autoincrement())
+
   title       String
   description String?
   project     Project?        @relation(fields: [projectId], references: [id])

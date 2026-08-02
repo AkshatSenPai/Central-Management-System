@@ -5,7 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { getTaskDetail } from "@/lib/task-queries";
 import { listTaskComments } from "@/lib/comment-queries";
 import { CommentThread } from "@/components/comments/comment-thread";
-import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, mergeAssigneeMembers } from "@/lib/task";
+import {
+  TASK_PRIORITY_BADGE,
+  TASK_PRIORITY_LABEL,
+  mergeAssigneeMembers,
+  taskReference,
+} from "@/lib/task";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { cardClass } from "@/components/ui/card";
@@ -126,6 +131,9 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
             {task.dueDate ? `Due ${shortDate(task.dueDate)}` : "No due date"}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {/* First, and in mono, because it is the handle someone reads out
+                on a call — "can you look at MER-24". */}
+            <span className={`${CHIP} mono`}>{taskReference(task.reference)}</span>
             <span className={CHIP}>Created by {task.creator.name}</span>
             {task.milestoneTitle ? <span className={CHIP}>Milestone {task.milestoneTitle}</span> : null}
           </div>
@@ -134,6 +142,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
           <TaskForm
             task={{
               id: task.id,
+              reference: task.reference,
               title: task.title,
               description: task.description,
               projectId: task.projectId,

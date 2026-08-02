@@ -124,6 +124,7 @@ export async function listProjectTasks(db: PrismaClient, projectId: string): Pro
 
 export type TaskDetail = {
   id: string;
+  reference: number;
   title: string;
   description: string | null;
   status: TaskStatus;
@@ -145,6 +146,7 @@ export type TaskDetail = {
 
 const taskDetailSelect = {
   id: true,
+  reference: true,
   title: true,
   description: true,
   status: true,
@@ -177,6 +179,7 @@ export async function getTaskDetail(db: PrismaClient, taskId: string): Promise<T
 
   return {
     id: task.id,
+    reference: task.reference,
     title: task.title,
     description: task.description,
     status: task.status,

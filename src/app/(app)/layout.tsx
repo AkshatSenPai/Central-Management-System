@@ -1,9 +1,16 @@
 import { ViewTransition } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
+
+/** The sidebar's collapsed preference. A cookie rather than localStorage
+ * because the server has to know it: localStorage is unreadable during a
+ * server render, so the rail would paint full-width and snap narrow on every
+ * page load. */
+const SIDEBAR_COOKIE = "sidebar";
 
 export default async function AppLayout({
   children,
@@ -12,6 +19,8 @@ export default async function AppLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+
+  const collapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === "collapsed";
 
   // One round trip, not two: the sidebar's My Tasks count and quick-add's
   // member list are both needed on every screen and neither depends on the
@@ -34,9 +43,29 @@ export default async function AppLayout({
     await signOut({ redirectTo: "/login" });
   }
 
+  // A Server Action, so the toggle is a plain form post: no client state, no
+  // hydration guard, and it works with JavaScript off. Setting a cookie here
+  // returns the re-rendered layout in the same roundtrip.
+  async function toggleSidebarAction() {
+    "use server";
+    const store = await cookies();
+    store.set(
+      SIDEBAR_COOKIE,
+      store.get(SIDEBAR_COOKIE)?.value === "collapsed" ? "expanded" : "collapsed",
+      // A year: this is a display preference, not a session. sameSite lax is
+      // enough — nothing here is a credential, and the worst a forged toggle
+      // could do is make someone's sidebar narrow.
+      { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" }
+    );
+  }
+
   return (
     <div className="flex h-screen">
-      <Sidebar myTaskCount={myTaskCount} />
+      <Sidebar
+        myTaskCount={myTaskCount}
+        collapsed={collapsed}
+        toggleAction={toggleSidebarAction}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           userName={session.user.name ?? ""}

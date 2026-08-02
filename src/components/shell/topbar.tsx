@@ -2,12 +2,19 @@
 
 import { QuickAdd } from "@/components/tasks/quick-add";
 import { AccountMenu } from "@/components/shell/account-menu";
-import { Field } from "@/components/ui/field";
-import { Icon } from "@/components/ui/icon";
 
 /** `z-30` and `relative` because the account menu and quick-add popover
  * escape this header; without a stacking context of its own the page content
- * below can paint over them. Matches the design's own z-30 on the header. */
+ * below can paint over them. Matches the design's own z-30 on the header.
+ *
+ * The design centres a search field here. It is deliberately absent: global
+ * search is Phase 6, and what shipped in its place was a disabled input
+ * reading "Search (coming soon)" on every screen in the app. A control that
+ * cannot be used is worse than no control — it advertises a feature on every
+ * page load and refuses it every time. It comes back when it works.
+ *
+ * The notification bell is absent for the same reason (Phase 4): a bell that
+ * never rings is a lie told fifty times a day. */
 export function Topbar({
   userName,
   userEmail,
@@ -29,39 +36,15 @@ export function Topbar({
   return (
     <header
       style={{ viewTransitionName: "app-topbar" }}
-      className="relative z-30 flex h-14 flex-none items-center gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-5"
+      className="relative z-30 flex h-14 flex-none items-center justify-end gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-5"
     >
-      {/* Centred and capped at 400px, as in the design. The icon sits inside
-          the <label> so clicking it still focuses the input; it is padding,
-          not a control, hence pointer-events-none. */}
-      <div className="flex flex-1 justify-center">
-        <label className="relative flex w-full max-w-[400px] items-center">
-          <Icon
-            name="search"
-            size="sm"
-            className="pointer-events-none absolute left-2.5 text-[var(--text-3)]"
-          />
-          <Field
-            size="sm"
-            className="h-8 w-full bg-[var(--surface-2)] pl-[34px]"
-            placeholder="Search (coming soon)"
-            aria-label="Search"
-            disabled
-          />
-        </label>
-      </div>
-
-      {/* The design's notification bell is deliberately absent: notifications
-          are Phase 4, and a bell that never rings is worse than no bell. */}
-      <div className="flex flex-none items-center gap-1.5">
-        <QuickAdd members={members} />
-        <AccountMenu
-          userName={userName}
-          userEmail={userEmail}
-          initials={initials}
-          signOutAction={signOutAction}
-        />
-      </div>
+      <QuickAdd members={members} />
+      <AccountMenu
+        userName={userName}
+        userEmail={userEmail}
+        initials={initials}
+        signOutAction={signOutAction}
+      />
     </header>
   );
 }

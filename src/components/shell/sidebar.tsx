@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/lib/icons";
 
@@ -30,28 +31,53 @@ const ROW =
   "flex h-[34px] items-center gap-[11px] rounded-lg px-[9px] text-[13.5px] font-medium " +
   "transition-colors focus-visible:outline-none focus-visible:shadow-[var(--ring)]";
 
-export function Sidebar({ myTaskCount }: { myTaskCount: number }) {
+/** `collapsed` arrives from the layout, which read it from a cookie, so the
+ * server renders the correct width on the very first frame. That is the whole
+ * reason the preference is a cookie and not localStorage: localStorage cannot
+ * be read during a server render, so the sidebar would paint expanded and
+ * then snap narrow on every single page load.
+ *
+ * It also means the toggle works with JavaScript disabled — it is a form
+ * posting to a Server Action, not an onClick. */
+export function Sidebar({
+  myTaskCount,
+  collapsed,
+  toggleAction,
+}: {
+  myTaskCount: number;
+  collapsed: boolean;
+  toggleAction: () => Promise<void>;
+}) {
   const pathname = usePathname();
+
   return (
     <aside
       style={{ viewTransitionName: "app-sidebar" }}
-      className="flex w-[232px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]"
+      className={`flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width] duration-150 ${
+        collapsed ? "w-[60px]" : "w-[232px]"
+      }`}
     >
       {/* Same 56px as the topbar, so the two bottom rules meet and the shell
           reads as one band across the top rather than two misaligned ones. */}
-      <div className="flex h-14 flex-none items-center gap-2.5 border-b border-[var(--border)] px-3.5">
+      <div
+        className={`flex h-14 flex-none items-center gap-2.5 border-b border-[var(--border)] ${
+          collapsed ? "justify-center px-0" : "px-3.5"
+        }`}
+      >
         <span
           aria-hidden="true"
           className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[7px] bg-[var(--btn)] text-[13px] font-bold tracking-[-0.02em] text-[var(--on-btn)]"
         >
           M
         </span>
-        <span className="min-w-0">
-          <span className="block text-[13.5px] font-bold leading-tight tracking-[-0.01em]">
-            Meridian
+        {collapsed ? null : (
+          <span className="min-w-0">
+            <span className="block text-[13.5px] font-bold leading-tight tracking-[-0.01em]">
+              Meridian
+            </span>
+            <span className="block text-[11px] leading-tight text-[var(--text-3)]">Studio Ops</span>
           </span>
-          <span className="block text-[11px] leading-tight text-[var(--text-3)]">Studio Ops</span>
-        </span>
+        )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-px overflow-y-auto px-2 py-2.5">
@@ -65,29 +91,56 @@ export function Sidebar({ myTaskCount }: { myTaskCount: number }) {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`${ROW} ${
+                // The label is the accessible name when it is rendered; when
+                // collapsed there is no text, so the title carries it — and
+                // doubles as the hover tooltip that makes a narrow rail
+                // usable at all.
+                title={collapsed ? item.label : undefined}
+                aria-label={collapsed ? item.label : undefined}
+                className={`${ROW} ${collapsed ? "justify-center px-0" : ""} ${
                   active
                     ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
                     : "text-[var(--text-2)] hover:bg-[var(--surface-3)] hover:text-[var(--text)]"
                 }`}
               >
                 <Icon name={item.icon} />
-                <span className="flex-1 whitespace-nowrap">{item.label}</span>
-                {/* Only My Tasks carries a count. It is the one route whose
-                    contents are the reader's own backlog, so the number is
-                    about them; a count on Clients or Projects would be a row
-                    total nobody asked for. Hidden at zero — "0" reads as a
-                    problem, an absent badge reads as nothing to do. */}
-                {item.href === "/my-tasks" && myTaskCount > 0 ? (
-                  <span className="text-[11px] font-semibold text-[var(--text-3)]">
-                    {myTaskCount}
-                  </span>
-                ) : null}
+                {collapsed ? null : (
+                  <>
+                    <span className="flex-1 whitespace-nowrap">{item.label}</span>
+                    {/* Only My Tasks carries a count. It is the one route
+                        whose contents are the reader's own backlog, so the
+                        number is about them. Hidden at zero — "0" reads as a
+                        problem, an absent badge reads as nothing to do. */}
+                    {item.href === "/my-tasks" && myTaskCount > 0 ? (
+                      <span className="text-[11px] font-semibold text-[var(--text-3)]">
+                        {myTaskCount}
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </Link>
             </div>
           );
         })}
       </nav>
+
+      <div className="flex-none border-t border-[var(--border)] p-2">
+        <form action={toggleAction}>
+          <Button
+            type="submit"
+            variant="ghost"
+            size="none"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`h-8 w-full gap-[11px] rounded-lg px-[9px] text-[12.5px] font-medium text-[var(--text-3)] hover:bg-[var(--surface-3)] hover:text-[var(--text-2)] ${
+              collapsed ? "justify-center px-0" : ""
+            }`}
+          >
+            <Icon name={collapsed ? "right_panel_open" : "left_panel_close"} />
+            {collapsed ? null : <span className="whitespace-nowrap">Collapse</span>}
+          </Button>
+        </form>
+      </div>
     </aside>
   );
 }

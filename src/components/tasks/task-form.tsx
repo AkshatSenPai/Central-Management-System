@@ -6,6 +6,7 @@ import {
   TASK_PRIORITY_LABEL,
   TASK_STATUSES,
   TASK_STATUS_LABEL,
+  taskReference,
   type TaskPriority,
 } from "@/lib/task";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { AssigneePicker } from "@/components/tasks/assignee-picker";
 
 type TaskDefaults = {
   id: string;
+  reference: number;
   title: string;
   description: string | null;
   projectId: string | null;
@@ -164,6 +166,10 @@ export function TaskForm({
         onClose={cancel}
         title={task ? "Edit task" : "New task"}
         icon="check_circle"
+        // Edit mode only: a task that does not exist yet has no reference,
+        // and inventing one before the insert would be a promise the
+        // sequence has not made.
+        meta={task ? taskReference(task.reference) : undefined}
         footer={
           <>
             <span className="flex-1" />

@@ -28,6 +28,7 @@ export function Modal({
   onClose,
   title,
   icon,
+  meta,
   width = 648,
   footer,
   children,
@@ -38,6 +39,9 @@ export function Modal({
   /** Echoes the entity being created, the way the design's headers do —
    * check_circle for a task, layers for a project. */
   icon: IconName;
+  /** A quiet identifier beside the title — the task's MER-024. Right-aligned
+   * and muted in the design, because it is for citing, not for reading. */
+  meta?: ReactNode;
   width?: number;
   footer?: ReactNode;
   children: ReactNode;
@@ -91,6 +95,7 @@ export function Modal({
           >
             {title}
           </h2>
+          {meta ? <span className="mono text-[11px] text-[var(--text-3)]">{meta}</span> : null}
           <Button
             onClick={onClose}
             aria-label="Close"

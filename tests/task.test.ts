@@ -19,6 +19,8 @@ import {
   parseTaskStatusFilter,
   mergeAssigneeMembers,
   groupTasksByStatus,
+  taskReference,
+  TASK_REFERENCE_PREFIX,
   type TaskSortable,
   type TaskStatus,
 } from "@/lib/task";
@@ -473,5 +475,22 @@ describe("groupTasksByStatus", () => {
 
   it("returns all four empty groups for an empty list", () => {
     expect(groupTasksByStatus([])).toEqual({ TO_DO: [], IN_PROGRESS: [], REVIEW: [], DONE: [] });
+  });
+});
+
+describe("taskReference", () => {
+  it("pads to three digits so references line up in a column", () => {
+    expect(taskReference(8)).toBe("MER-008");
+    expect(taskReference(24)).toBe("MER-024");
+    expect(taskReference(999)).toBe("MER-999");
+  });
+
+  // Truncating past 999 would break the uniqueness the column guarantees.
+  it("grows rather than truncating past three digits", () => {
+    expect(taskReference(1000)).toBe("MER-1000");
+  });
+
+  it("uses the studio prefix", () => {
+    expect(taskReference(1).startsWith(`${TASK_REFERENCE_PREFIX}-`)).toBe(true);
   });
 });

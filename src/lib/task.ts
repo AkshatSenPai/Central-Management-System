@@ -36,6 +36,18 @@ export const TASK_PRIORITY_BADGE: Record<TaskPriority, BadgeKind> = {
   URGENT: "bad",
 };
 
+/** Meridian. One studio, one prefix — this is not configurable, because a
+ * second prefix would mean deciding what a task's prefix is derived from
+ * (client? project?) and then living with references that change when a task
+ * moves between them. A reference must be stable for life. */
+export const TASK_REFERENCE_PREFIX = "MER";
+
+/** 8 -> "MER-008". Padded to three digits so references line up in a column;
+ * past 999 it simply grows, because truncating would break uniqueness. */
+export function taskReference(reference: number): string {
+  return `${TASK_REFERENCE_PREFIX}-${String(reference).padStart(3, "0")}`;
+}
+
 /** Lower ranks first — URGENT sorts ahead of LOW when due dates tie. */
 export const TASK_PRIORITY_RANK: Record<TaskPriority, number> = {
   URGENT: 0,

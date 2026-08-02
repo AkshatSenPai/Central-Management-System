@@ -30,7 +30,6 @@ export const ICON_NAMES = [
   "receipt_long",
   "settings",
   // Shell chrome.
-  "search",
   "expand_more",
   "light_mode",
   "dark_mode",
@@ -51,6 +50,8 @@ export const ICON_NAMES = [
   "mail",
   "call",
   "alternate_email",
+  "left_panel_close",
+  "right_panel_open",
 ] as const;
 
 /* Deliberately absent, having been tried and removed rather than overlooked:
@@ -58,6 +59,9 @@ export const ICON_NAMES = [
  *   more_horiz     — the design uses it for row overflow menus. This app has
  *                    no overflow menus; member row actions are two labelled
  *                    buttons, which is better at that count.
+ *   search         — went out with the disabled "Search (coming soon)" field
+ *                    it labelled. Global search is Phase 6; the icon comes
+ *                    back with it.
  *   notifications  — Phase 4.
  *   push_pin, schedule, attach_file — Phases 3c and 6.
  *
