@@ -66,6 +66,24 @@ Unchanged from the last handoff: `.superpowers/mint-session.mjs` mints a **Test 
 
 `scripts/fetch-icon-font.mjs` regenerates the icon font from `src/lib/icons.ts`. Adding an icon: add the name, run the script, use it — gate 7 fails if you list one and render it nowhere, gate 8 fails if the font is stale.
 
+## Phase 4 — half done, and the half that is missing is blocked on you
+
+**Built and live:** the notification centre (bell, badge, panel, mark-read) with triggers on assignment, @mention and status change; and the calendar (month, week, day) with person, project and status filters.
+
+**Not built, blocked:**
+
+| Piece | Needs |
+|---|---|
+| Email delivery | A Resend API key **and a domain you own and verify**. Resend's sandbox address only delivers to your own account, so a key alone is not enough |
+| Reminders (due-soon, overdue digest) | A deployed URL for Vercel Cron |
+| Recurring tasks | The same cron, plus a schema change (`recurrenceRule`, `recurringTemplateId`) and an RRULE dependency |
+
+`NotificationType` already carries `TASK_DUE_SOON` and `Notification.actorId` is nullable for exactly that case, so the reminder cron writes rows without a migration.
+
+**Resend free tier, verified 2026-08-02:** 3,000 emails/month, **capped at 100/day**, one custom domain. That daily cap is a design constraint, not a footnote — spec §5.7 lists status changes as an email trigger, and 50 board moves × 2 interested people would rate-limit you before lunch. **Keep status changes in-app only when email lands.** Assignment, mentions and due-soon are the ones worth an inbox.
+
+**Known papercut:** deactivated members still receive notifications. Harmless now — they cannot sign in — but worth an `active: true` filter on the recipient set before anyone leaves.
+
 ## Parked, with the trigger to unpark it
 
 **Attachments (Phase 3c).** The `Attachment` table is migrated and live; only the R2 upload code is missing. Parked because R2 needs a Cloudflare account with a company card, which the owner does not hold personally.
@@ -83,7 +101,7 @@ Nothing is paid today; the app runs on localhost and Neon's free tier. Checked a
 | Neon | $0 free tier (0.5 GB). Then ~$0.35/GB-month, no minimum |
 | Cloudflare R2 | $0 to 10 GB, egress always free. Card needed to activate |
 | **Vercel** | **$20/month** — see below |
-| Resend (Phase 4) | Free tier ~3,000/month — *unverified, re-check at Phase 4* |
+| Resend (Phase 4) | Free: 3,000/month, **100/day**, 1 domain — verified 2026-08-02 |
 | Google OAuth, Auth.js, cron | $0 |
 
 **Vercel's free Hobby tier is licensed non-commercial**, and a studio's internal ops tool is commercial use, so a real deployment needs Pro at $20/month. That is per *Vercel seat* — the people who deploy — not per studio member, so $20 total rather than $300. It also consumes the whole of the master spec's "under ~$20/month at 15 users" criterion on its own; everything else genuinely is free at this scale.
