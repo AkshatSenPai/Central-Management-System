@@ -127,6 +127,27 @@ body {
   font-family: var(--mono);
 }
 
+/* Show a subtree only in one theme, decided by CSS rather than by React.
+   next-themes writes data-theme onto <html> from a blocking script before
+   first paint, so these are correct on the very first frame — server and
+   client render identical markup and neither has to know the theme.
+
+   The alternative is a hydration guard, and both usual guards are awkward
+   here: `useState(false)` + `useEffect(() => setMounted(true))` trips
+   react-hooks/set-state-in-effect, and useSyncExternalStore with differing
+   server and client snapshots re-renders the whole layout the instant
+   hydration finishes. Neither is needed — the theme is already in the DOM.
+
+   `display: none` also removes the hidden branch from the accessibility tree,
+   which is what lets each branch carry its own static aria-checked instead of
+   one control with a value nobody can compute without JavaScript. */
+[data-theme="dark"] .when-light {
+  display: none;
+}
+:root:not([data-theme="dark"]) .when-dark {
+  display: none;
+}
+
 /* The status filters on My Tasks and the member profile are native
    <form method="get"> submits, so changing one replaces the document rather
    than routing client-side — verified: a marker set on window is gone

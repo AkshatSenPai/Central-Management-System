@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -25,24 +25,43 @@ const ROW =
   "text-[var(--text-2)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] " +
   "focus-visible:outline-none focus-visible:shadow-[var(--ring)]";
 
-/** True only after hydration.
+/** One row per theme. Both are always rendered; the `when-light` /
+ * `when-dark` classes in globals.css put only the current one in the
+ * document.
  *
- * next-themes cannot know the resolved theme until it has read the DOM on the
- * client, so `resolvedTheme` is undefined on the server and for the first
- * client render. Without a guard the theme row paints a light-mode icon and
- * the word "Light" for one frame in a dark UI, and the two renders disagree.
+ * Nothing here reads the theme during render, and that is the point. This
+ * component sits in the layout, so it mounts on every screen; a hydration
+ * guard here re-renders the whole app the moment hydration finishes, and gets
+ * the label wrong for one frame before it does. next-themes has already
+ * written data-theme onto <html> before first paint, so CSS can answer the
+ * question and React never has to.
  *
- * useSyncExternalStore rather than the usual `useState(false)` +
- * `useEffect(() => setMounted(true))`: the store's server snapshot is false
- * and its client snapshot is true, which is exactly the question being asked,
- * and it avoids the cascading render that `react-hooks/set-state-in-effect`
- * correctly objects to. The subscriber never fires — hydration happens once. */
-const noopSubscribe = () => () => {};
-function useHasHydrated() {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false
+ * `aria-checked` is a literal and still correct: the hidden row is
+ * `display: none`, so it is absent from the accessibility tree entirely. */
+function ThemeRow({ current, onSwitch }: { current: "light" | "dark"; onSwitch: () => void }) {
+  const isDark = current === "dark";
+  return (
+    <Button
+      onClick={onSwitch}
+      role="switch"
+      aria-checked={isDark}
+      aria-label="Dark theme"
+      size="none"
+      className={`${ROW} justify-between ${isDark ? "when-dark" : "when-light"}`}
+    >
+      <span className="flex items-center gap-[9px]">
+        <Icon name={isDark ? "dark_mode" : "light_mode"} size="sm" />
+        {isDark ? "Dark" : "Light"}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`flex h-[22px] w-[38px] flex-none rounded-full border border-[var(--border-2)] bg-[var(--surface-3)] p-0.5 ${
+          isDark ? "justify-end" : "justify-start"
+        }`}
+      >
+        <span className="block h-4 w-4 rounded-full bg-[var(--btn)]" />
+      </span>
+    </Button>
   );
 }
 
@@ -59,10 +78,8 @@ export function AccountMenu({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const { resolvedTheme, setTheme } = useTheme();
-
-  const mounted = useHasHydrated();
-  const isDark = resolvedTheme === "dark";
+  // setTheme only — `resolvedTheme` is deliberately not read. See ThemeRow.
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     if (!open) return;
@@ -108,31 +125,8 @@ export function AccountMenu({
 
           <span aria-hidden="true" className="mb-1.5 mt-0.5 block h-px bg-[var(--border)]" />
 
-          {/* Rendered only once mounted, so the label never claims the wrong
-              theme. The gap it leaves for one frame is invisible next to a
-              row that says "Light" in a dark UI. */}
-          {mounted ? (
-            <Button
-              onClick={() => setTheme(isDark ? "light" : "dark")}
-              role="switch"
-              aria-checked={isDark}
-              size="none"
-              className={`${ROW} justify-between`}
-            >
-              <span className="flex items-center gap-[9px]">
-                <Icon name={isDark ? "dark_mode" : "light_mode"} size="sm" />
-                {isDark ? "Dark" : "Light"}
-              </span>
-              <span
-                aria-hidden="true"
-                className={`flex h-[22px] w-[38px] flex-none rounded-full border border-[var(--border-2)] bg-[var(--surface-3)] p-0.5 ${
-                  isDark ? "justify-end" : "justify-start"
-                }`}
-              >
-                <span className="block h-4 w-4 rounded-full bg-[var(--btn)] transition-all duration-150" />
-              </span>
-            </Button>
-          ) : null}
+          <ThemeRow current="light" onSwitch={() => setTheme("dark")} />
+          <ThemeRow current="dark" onSwitch={() => setTheme("light")} />
 
           <Link href="/settings/profile" onClick={() => setOpen(false)} className={ROW}>
             <Icon name="person" size="sm" />

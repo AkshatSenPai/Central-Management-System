@@ -50,7 +50,15 @@ export function Modal({
     // showModal() throws if the dialog is already open, and close() on an
     // already-closed dialog fires a spurious `close` event that would call
     // onClose again — hence both guards.
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // showModal() focuses the first focusable descendant, which is the
+      // close button in the header — so opening the dialog and pressing
+      // Enter dismisses it instead of submitting. Move focus to the first
+      // real field when there is one; a dialog with no fields keeps the
+      // browser's choice.
+      dialog.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
