@@ -5,6 +5,7 @@ import type { ProgressMode } from "@/lib/progress";
 import { setProjectProgressAction } from "@/server/actions/projects";
 import { Button } from "@/components/ui/button";
 import { Field, SelectField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 /** Switching to Auto leaves the stored manual value untouched server-side, so
  * toggling back and forth is lossless. */
@@ -65,7 +66,7 @@ export function ProgressControl({
           {pending ? "Saving…" : "Save"}
         </Button>
       </div>
-      {state && !state.ok ? <span className="text-xs text-[var(--bad)]">{state.error}</span> : null}
+      {state && !state.ok ? <FormError message={state.error} size="xs" /> : null}
     </form>
   );
 }

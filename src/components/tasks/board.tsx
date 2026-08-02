@@ -6,6 +6,7 @@ import type { TaskListRow } from "@/lib/task-queries";
 import { setTaskStatusAction } from "@/server/actions/tasks";
 import { BoardCard } from "@/components/tasks/board-card";
 import { BoardColumn } from "@/components/tasks/board-column";
+import { Icon } from "@/components/ui/icon";
 
 const DRAG_KEY = "text/plain";
 
@@ -112,5 +113,17 @@ export function Board({ rows }: { rows: TaskListRow[] }) {
         </BoardColumn>
       ))}
     </div>
+  );
+}
+
+/** Drag-and-drop has no visible affordance until you are already dragging,
+ * so the board says out loud what it can do. From the design; sits under the
+ * columns rather than above them because it is a hint, not a heading. */
+export function BoardHint() {
+  return (
+    <p className="mt-3 flex items-center gap-1.5 text-[11.5px] text-[var(--text-3)]">
+      <Icon name="drag_indicator" size="sm" />
+      Drag cards between columns to change status.
+    </p>
   );
 }

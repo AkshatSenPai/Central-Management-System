@@ -5,6 +5,8 @@ import { createInviteAction } from "@/server/actions/invites";
 import { Button } from "@/components/ui/button";
 import { cardClass } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
+import { Icon } from "@/components/ui/icon";
 
 export function InviteForm() {
   const [state, formAction, pending] = useActionState(createInviteAction, null);
@@ -36,11 +38,12 @@ export function InviteForm() {
           <option value="MEMBER">Member</option>
           <option value="ADMIN">Admin</option>
         </SelectField>
-        <Button type="submit" variant="primary" size="md" disabled={pending}>
+        <Button type="submit" variant="primary" size="md" className="gap-1.5" disabled={pending}>
+          <Icon name="person_add" size="sm" />
           {pending ? "Inviting…" : "Invite"}
         </Button>
       </form>
-      {state && !state.ok && <p className="text-sm text-[var(--bad)]">{state.error}</p>}
+      {state && !state.ok && <FormError message={state.error} />}
       {state?.ok && (
         <div className={cardClass({ className: "p-3 text-sm text-[var(--text)]" })}>
           <p className="mb-2">Invite created — share this link (valid 7 days):</p>
@@ -51,9 +54,11 @@ export function InviteForm() {
             {copyState === "copied" ? "Copied" : "Copy link"}
           </Button>
           {copyState === "failed" && (
-            <p className="mt-2 text-xs text-[var(--bad)]">
-              Couldn&apos;t copy — select the link above and copy it manually.
-            </p>
+            <FormError
+              size="xs"
+              className="mt-2"
+              message="Couldn't copy — select the link above and copy it manually."
+            />
           )}
         </div>
       )}

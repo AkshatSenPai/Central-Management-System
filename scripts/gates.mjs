@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { readIconNames } from "./icon-names.mjs";
 
 /** A hidden input is frequently written across several lines, so the
  * `type="hidden"` sits below the `<input`. Line-based filtering misses those
@@ -19,10 +20,18 @@ function tagIsHidden(match) {
 
 /** Node rather than shell because the team is on Windows; `npm run` hands
  * scripts to cmd.exe, where a .sh file needs a POSIX shell that may not be
- * on PATH. */
+ * on PATH.
+ *
+ * `--untracked` matters more than it looks. Without it `git grep` sees only
+ * files already in the index, so a brand-new component is invisible to every
+ * gate until the moment it is committed — which is exactly one commit too
+ * late for a check that exists to run before committing. Found when gate 7
+ * reported five icons as unused while the file rendering them sat untracked
+ * in the working tree. Ignored files stay excluded, so node_modules and
+ * .next are still out of scope. */
 function grep(args) {
   try {
-    return execFileSync("git", ["grep", "-nE", ...args], { encoding: "utf8" }).trim();
+    return execFileSync("git", ["grep", "--untracked", "-nE", ...args], { encoding: "utf8" }).trim();
   } catch (e) {
     // git grep exits 1 with no output when nothing matches. That is success.
     if (e.status === 1 && !e.stdout.trim()) return "";
@@ -94,6 +103,41 @@ const gates = [
       );
       return missing.length ? `missing focus-visible ring: ${missing.join(", ")}` : "";
     },
+  },
+  {
+    // The precise failure this exists to prevent, from Phase 3b's postmortem:
+    // --ico was added, never consumed, and later deleted for being unused.
+    // An icon nobody renders is dead weight in the font subset and a lie in
+    // the vocabulary. Listing one is now a commitment to using it.
+    name: "7. every icon in src/lib/icons.ts is used somewhere",
+    run: () => {
+      const unused = readIconNames().filter(
+        (n) => grep([`"${n}"`, "--", TSX, "src/**/*.ts", ":!src/lib/icons.ts"]) === ""
+      );
+      return unused.length ? `declared but never rendered: ${unused.join(", ")}` : "";
+    },
+  },
+  {
+    name: "8. the committed icon font matches src/lib/icons.ts",
+    run: () => {
+      try {
+        execFileSync("node", ["scripts/fetch-icon-font.mjs", "--check"], { encoding: "utf8" });
+        return "";
+      } catch (e) {
+        return (e.stderr || e.stdout || String(e)).trim();
+      }
+    },
+  },
+  {
+    // Icons go through <Icon>, the way colours go through tokens. A raw
+    // ligature span skips the aria-hidden that stops screen readers reading
+    // "check underscore circle", and skips the text-transform guards that
+    // stop the glyph decaying back into visible text.
+    name: "9. no raw icon spans — use the Icon primitive",
+    run: () =>
+      stripComments(
+        grep(["Material Symbols|class(Name)?=\"ico(-s)?\"", "--", TSX, `:!${UI}/icon.tsx`])
+      ),
   },
 ];
 

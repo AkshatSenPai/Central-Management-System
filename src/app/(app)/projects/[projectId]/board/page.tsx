@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getProjectDetail } from "@/lib/project-queries";
 import { listProjectTasks } from "@/lib/task-queries";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Board } from "@/components/tasks/board";
+import { Board, BoardHint } from "@/components/tasks/board";
 
 export default async function ProjectBoardPage(props: {
   params: Promise<{ projectId: string }>;
@@ -41,7 +41,10 @@ export default async function ProjectBoardPage(props: {
       {tasks.length === 0 ? (
         <EmptyState message="No tasks yet." />
       ) : (
-        <Board rows={tasks} />
+        <>
+          <Board rows={tasks} />
+          <BoardHint />
+        </>
       )}
     </div>
   );

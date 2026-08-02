@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
+import { FormError } from "@/components/ui/form-error";
 import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, capAssignees } from "@/lib/task";
 import type { TaskListRow } from "@/lib/task-queries";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
@@ -82,7 +83,7 @@ export function BoardCard({
         status={row.status}
       />
 
-      {error ? <p className="text-xs text-[var(--bad)]">{error}</p> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

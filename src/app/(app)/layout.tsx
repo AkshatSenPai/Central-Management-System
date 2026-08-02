@@ -13,11 +13,21 @@ export default async function AppLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const members = await prisma.user.findMany({
-    where: { active: true },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  // One round trip, not two: the sidebar's My Tasks count and quick-add's
+  // member list are both needed on every screen and neither depends on the
+  // other.
+  const [members, myTaskCount] = await Promise.all([
+    prisma.user.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    // Open work only, matching what /my-tasks shows by default — a count
+    // that includes DONE would never go down and would stop meaning anything.
+    prisma.task.count({
+      where: { assignees: { some: { userId: session.user.id } }, status: { not: "DONE" } },
+    }),
+  ]);
 
   async function signOutAction() {
     "use server";
@@ -26,9 +36,14 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar myTaskCount={myTaskCount} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar userName={session.user.name ?? ""} signOutAction={signOutAction} members={members} />
+        <Topbar
+          userName={session.user.name ?? ""}
+          userEmail={session.user.email ?? ""}
+          signOutAction={signOutAction}
+          members={members}
+        />
         {/* `update`, not `enter`/`exit`. Those two fire when a ViewTransition
             mounts or unmounts; this one lives in the layout and stays mounted
             across every route, so a navigation only ever changes its children

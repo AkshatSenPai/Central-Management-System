@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABEL, type ProjectStatus } from "@/lib/project";
 import { setProjectStatusAction } from "@/server/actions/projects";
 import { SelectField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 /** Status is reversible from the project's own page — a project moved to Done
  * must always be able to come back. */
@@ -46,7 +47,7 @@ export function ProjectStatusControl({
           ))}
         </SelectField>
       </form>
-      {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

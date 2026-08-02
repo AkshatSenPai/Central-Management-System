@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { addMilestoneAction } from "@/server/actions/projects";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
@@ -57,7 +58,7 @@ export function MilestoneForm({
     <form key={attempt} action={formAction} className="space-y-2">
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="clientId" value={clientId} />
-      {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
+      {state && !state.ok ? <FormError message={state.error} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         <Field
           size="sm"

@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 type ChecklistItem = { id: string; title: string; done: boolean; order: number };
 
@@ -109,7 +110,7 @@ export function Checklist({
               </form>
               </div>
               {error?.scope === item.id ? (
-                <p className="mt-1 pl-6 text-xs text-[var(--bad)]">{error.message}</p>
+                <FormError message={error.message} size="xs" className="mt-1 pl-6" />
               ) : null}
             </li>
           ))}
@@ -135,7 +136,7 @@ export function Checklist({
       </form>
 
       {error?.scope === ADD_SCOPE ? (
-        <p className="text-xs text-[var(--bad)]">{error.message}</p>
+        <FormError message={error.message} size="xs" />
       ) : null}
     </div>
   );

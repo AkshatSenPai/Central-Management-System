@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
-export type ButtonSize = "xs" | "sm" | "md";
+export type ButtonSize = "xs" | "sm" | "md" | "none";
 
 /** Focus lives in the base, not per variant. `--ring` was defined in Phase 1
  * and consumed nowhere; declaring it once here is what closes the app's
@@ -34,10 +34,18 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
  * is more call sites than the danger and ghost variants combined. Folding
  * them into sm would have inflated every one of them, several inside table
  * rows whose density is the point, and no gate would have noticed. */
+/** `none` emits nothing, for the shapes the scale genuinely does not
+ * describe: the 32×32 square icon buttons in the topbar and the full-width
+ * rows inside the account menu. It exists so those call sites can state their
+ * own geometry instead of layering a second `px-*` on top of this one and
+ * relying on Tailwind's emission order to break the tie — an override that
+ * works today and silently stops working when the utility registry reorders.
+ * Reach for it only when the shape is deliberate; it is not a default. */
 const SIZE_CLASS: Record<ButtonSize, string> = {
   xs: "px-2 py-1 text-xs",
   sm: "px-3 py-1.5 text-sm",
   md: "px-4 py-2 text-sm",
+  none: "",
 };
 
 /** Exported apart from <Button> because several call sites are <Link>s that

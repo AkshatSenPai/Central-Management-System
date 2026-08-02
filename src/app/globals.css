@@ -24,6 +24,20 @@
 --dur-exit:150ms;--dur-enter:210ms;
 --leave:#fdf8f0;
 --pj1:#5a5fb8;--pj2:#43708d;--pj3:#3f7a60;--pj4:#8a6440;--pj5:#7d5480;--pj6:#69713f;
+/* Font shorthands, not colours. An earlier pass added --ico as #55555f,
+   having grepped the mockup for the token name without ever opening it;
+   these are the mockup's actual values, with the family swapped for the
+   next/font variable so the file is self-hosted. Shorthand rather than
+   font-family because an icon glyph's size is part of the token — the
+   design uses exactly two, 20px and 18px, and nothing else. */
+--ico:20px/1 var(--font-material-symbols);
+--ico-s:18px/1 var(--font-material-symbols);
+--mono:var(--font-ibm-plex-mono),ui-monospace,monospace;
+/* The mockup hardcodes rgba(12,12,16,.34) for the modal backdrop, which is
+   a light-theme value: a 34%-black scrim over an already-dark surface
+   barely separates the dialog from the page behind it. A token per theme
+   is what makes the dialog read as lifted in both. */
+--scrim:rgba(12,17,26,.34);
 }
 [data-theme="dark"]{
 --bg:#0d1017;--surface:#141824;--surface-2:#1a1f2d;--surface-3:#222839;
@@ -39,6 +53,7 @@
 --shadow-md:0 2px 6px rgba(0,0,0,.45);
 --shadow-lg:0 16px 44px rgba(3,5,10,.7);
 --leave:#211d13;
+--scrim:rgba(2,4,9,.62);
 --pj1:#98a1f0;--pj2:#7fb0d0;--pj3:#79bd9b;--pj4:#c9a67c;--pj5:#b892ba;--pj6:#a8b17c;
 }
 [data-theme="dark"][data-tone="black"]{
@@ -55,12 +70,53 @@
 --shadow-md:0 2px 6px rgba(0,0,0,.6);
 --shadow-lg:0 16px 44px rgba(0,0,0,.8);
 --leave:#1e1a12;
+--scrim:rgba(0,0,0,.7);
 }
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 body {
   font-family: var(--font-public-sans), -apple-system, "Helvetica Neue", Helvetica, sans-serif;
+  /* The mockup sets this on body, and it is why its numbers line up in
+     columns — task counts, stat figures, dates. Proportional digits make a
+     right-aligned column of numbers wobble. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Material Symbols renders through ligatures: the element's text content is
+   the literal icon name and the font substitutes a glyph for it. Everything
+   below exists to stop something upstream from breaking that substitution —
+   an inherited `text-transform: uppercase` turns `check_circle` into
+   `CHECK_CIRCLE`, which has no ligature and renders as raw text. Same for
+   letter-spacing, wrapping, and RTL. Google ships this same defensive set
+   with the font.
+
+   The size and family come from --ico / --ico-s; only the properties a
+   shorthand cannot carry live here. `font` also resets font-weight to
+   normal, which is why the @font-face in layout.tsx declares weight 400 —
+   the glyphs are already drawn at wght 300 by the subsetter, so the
+   descriptor only has to match, not describe. */
+.ico,
+.ico-s {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  user-select: none;
+  -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+.ico {
+  font: var(--ico);
+}
+.ico-s {
+  font: var(--ico-s);
 }
 
 /* The status filters on My Tasks and the member profile are native
@@ -143,6 +199,67 @@ body {
 @keyframes slide-y {
   from { transform: translateY(10px); }
   to { transform: translateY(0); }
+}
+
+/* Modal entry and exit.
+   `allow-discrete` on `display` and `overlay` is what makes a native
+   <dialog> animate *out* at all: without it the element leaves the top layer
+   the instant close() is called and the exit transition never gets a frame.
+   `@starting-style` supplies the from-state for the entry, which a discrete
+   display change otherwise has no way to interpolate from.
+
+   The scrim fades on its own timing because it is a separate pseudo-element
+   with no shared transition group. Both durations come from the motion
+   tokens, so the reduced-motion block at the bottom of this file neutralises
+   them along with everything else. */
+dialog[data-modal] {
+  opacity: 0;
+  translate: 0 -8px;
+  scale: 0.98;
+  transition:
+    opacity var(--dur-exit) ease-in,
+    translate var(--dur-exit) ease-in,
+    scale var(--dur-exit) ease-in,
+    overlay var(--dur-exit) ease-in allow-discrete,
+    display var(--dur-exit) ease-in allow-discrete;
+}
+dialog[data-modal][open] {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+  transition:
+    opacity var(--dur-enter) ease-out,
+    translate var(--dur-enter) ease-out,
+    scale var(--dur-enter) ease-out,
+    overlay var(--dur-enter) ease-out allow-discrete,
+    display var(--dur-enter) ease-out allow-discrete;
+}
+@starting-style {
+  dialog[data-modal][open] {
+    opacity: 0;
+    translate: 0 -8px;
+    scale: 0.98;
+  }
+}
+
+dialog[data-modal]::backdrop {
+  background: transparent;
+  transition:
+    background var(--dur-exit) ease-in,
+    overlay var(--dur-exit) ease-in allow-discrete,
+    display var(--dur-exit) ease-in allow-discrete;
+}
+dialog[data-modal][open]::backdrop {
+  background: var(--scrim);
+  transition:
+    background var(--dur-enter) ease-out,
+    overlay var(--dur-enter) ease-out allow-discrete,
+    display var(--dur-enter) ease-out allow-discrete;
+}
+@starting-style {
+  dialog[data-modal][open]::backdrop {
+    background: transparent;
+  }
 }
 
 /* Links are keyboard-focusable but pass through no primitive, so the sweep

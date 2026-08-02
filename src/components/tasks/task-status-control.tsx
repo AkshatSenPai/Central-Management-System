@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TASK_STATUSES, TASK_STATUS_LABEL, type TaskStatus } from "@/lib/task";
 import { setTaskStatusAction } from "@/server/actions/tasks";
 import { SelectField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 /** Status is set by a human, never derived — same fire-and-forget shape as
  * ProjectHealthControl. projectId/clientId are only present for a task that
@@ -51,7 +52,7 @@ export function TaskStatusControl({
           ))}
         </SelectField>
       </form>
-      {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

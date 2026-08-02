@@ -6,6 +6,7 @@ import {
   setMemberRoleAction,
 } from "@/server/actions/members";
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/form-error";
 
 export function MemberRowActions({
   userId,
@@ -50,7 +51,7 @@ export function MemberRowActions({
           </Button>
         </form>
       )}
-      {error && <span className="text-xs text-[var(--bad)]">{error}</span>}
+      {error && <FormError message={error} size="xs" />}
     </div>
   );
 }

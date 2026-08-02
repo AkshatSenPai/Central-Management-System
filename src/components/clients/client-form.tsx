@@ -7,6 +7,7 @@ import { createClientAction, updateClientAction } from "@/server/actions/clients
 import { Button } from "@/components/ui/button";
 import { cardClass } from "@/components/ui/card";
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 type ClientDefaults = {
   id: string;
@@ -110,7 +111,7 @@ export function ClientForm({
       className={cardClass({ className: "w-full max-w-xl space-y-4 p-4" })}
     >
       {client ? <input type="hidden" name="clientId" value={client.id} /> : null}
-      {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
+      {state && !state.ok ? <FormError message={state.error} /> : null}
 
       <Field
         label="Name"

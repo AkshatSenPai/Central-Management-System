@@ -10,6 +10,7 @@ import {
 } from "@/lib/project";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
 
 /**
  * One GET form for both filters, so changing either keeps the other — two
@@ -24,6 +25,9 @@ export function ProjectFilters({
 }) {
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
+      {/* Labels the row as a filter set without spending a word on it — the
+          two selects already say what they filter. */}
+      <Icon name="filter_list" size="sm" className="text-[var(--text-3)]" />
       <SelectField
         size="sm"
         name="status"

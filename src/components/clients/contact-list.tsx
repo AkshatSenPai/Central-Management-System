@@ -4,6 +4,7 @@ import { useState } from "react";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/form-error";
 import { clientInitials } from "@/lib/client";
 import { setPrimaryContactAction, removeContactAction } from "@/server/actions/clients";
 
@@ -69,7 +70,7 @@ export function ContactList({ clientId, contacts }: { clientId: string; contacts
           </div>
         </div>
       ))}
-      {error ? <p className="text-xs text-[var(--bad)]">{error}</p> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

@@ -1,20 +1,24 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import { QuickAdd } from "@/components/tasks/quick-add";
-import { Button } from "@/components/ui/button";
+import { AccountMenu } from "@/components/shell/account-menu";
 import { Field } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
 
+/** `z-30` and `relative` because the account menu and quick-add popover
+ * escape this header; without a stacking context of its own the page content
+ * below can paint over them. Matches the design's own z-30 on the header. */
 export function Topbar({
   userName,
+  userEmail,
   signOutAction,
   members,
 }: {
   userName: string;
+  userEmail: string;
   signOutAction: () => Promise<void>;
   members: { id: string; name: string }[];
 }) {
-  const { resolvedTheme, setTheme } = useTheme();
   const initials = userName
     .split(/\s+/)
     .map((p) => p[0])
@@ -25,30 +29,38 @@ export function Topbar({
   return (
     <header
       style={{ viewTransitionName: "app-topbar" }}
-      className="flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4"
+      className="relative z-30 flex h-14 flex-none items-center gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-5"
     >
-      <Field
-        size="sm"
-        className="w-64 bg-[var(--surface-2)]"
-        placeholder="Search (coming soon)"
-        disabled
-      />
-      <div className="flex items-center gap-3">
+      {/* Centred and capped at 400px, as in the design. The icon sits inside
+          the <label> so clicking it still focuses the input; it is padding,
+          not a control, hence pointer-events-none. */}
+      <div className="flex flex-1 justify-center">
+        <label className="relative flex w-full max-w-[400px] items-center">
+          <Icon
+            name="search"
+            size="sm"
+            className="pointer-events-none absolute left-2.5 text-[var(--text-3)]"
+          />
+          <Field
+            size="sm"
+            className="h-8 w-full bg-[var(--surface-2)] pl-[34px]"
+            placeholder="Search (coming soon)"
+            aria-label="Search"
+            disabled
+          />
+        </label>
+      </div>
+
+      {/* The design's notification bell is deliberately absent: notifications
+          are Phase 4, and a bell that never rings is worse than no bell. */}
+      <div className="flex flex-none items-center gap-1.5">
         <QuickAdd members={members} />
-        <Button onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
-          {resolvedTheme === "dark" ? "Light" : "Dark"}
-        </Button>
-        <span
-          title={userName}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--avatar)] text-xs font-medium text-[var(--avatar-t)]"
-        >
-          {initials}
-        </span>
-        <form action={signOutAction}>
-          <Button type="submit" variant="ghost">
-            Sign out
-          </Button>
-        </form>
+        <AccountMenu
+          userName={userName}
+          userEmail={userEmail}
+          initials={initials}
+          signOutAction={signOutAction}
+        />
       </div>
     </header>
   );

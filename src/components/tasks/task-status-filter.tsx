@@ -7,12 +7,14 @@ import {
 } from "@/lib/task";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
 
 /** Copy of ProjectFilters for the single task-status axis: a GET form whose
  * select submits itself on change, plus a <noscript> fallback button. */
 export function TaskStatusFilter({ status }: { status: TaskStatusFilterValue | null }) {
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
+      <Icon name="filter_list" size="sm" className="text-[var(--text-3)]" />
       <SelectField
         size="sm"
         name="status"

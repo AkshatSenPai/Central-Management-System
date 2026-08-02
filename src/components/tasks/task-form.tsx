@@ -9,8 +9,10 @@ import {
   type TaskPriority,
 } from "@/lib/task";
 import { Button } from "@/components/ui/button";
-import { cardClass } from "@/components/ui/card";
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
+import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
 import { toDateInputValue } from "@/lib/dates";
 import { createTaskAction, updateTaskAction } from "@/server/actions/tasks";
 import { AssigneePicker } from "@/components/tasks/assignee-picker";
@@ -141,159 +143,177 @@ export function TaskForm({
     }
   }
 
-  if (!open) {
-    return (
+  // Stable across the `attempt` remount, and unique per edit target, because
+  // the footer's submit button reaches this form by id from outside it.
+  const formId = task ? `task-form-${task.id}` : "task-form-new";
+
+  return (
+    <>
       <Button
         onClick={() => setOpen(true)}
         variant={task ? "secondary" : "primary"}
         size={task ? "sm" : "md"}
+        className="gap-1.5"
       >
+        <Icon name={task ? "edit" : "add"} size="sm" />
         {task ? "Edit" : "New task"}
       </Button>
-    );
-  }
 
-  return (
-    <form
-      key={attempt}
-      action={formAction}
-      onChange={handleFormChange}
-      className={cardClass({ className: "w-full max-w-xl space-y-4 p-4" })}
-    >
-      {task ? <input type="hidden" name="taskId" value={task.id} /> : null}
-      <input type="hidden" name="clientId" value={derivedClientId} />
-      {task ? (
-        <>
-          <input type="hidden" name="prevProjectId" value={prevProjectId} />
-          <input type="hidden" name="prevClientId" value={prevClientId} />
-        </>
-      ) : null}
-      {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
-
-      <Field
-        label="Title"
-        className="w-full"
-        name="title"
-        required
-        value={values.title}
-        onChange={(e) => set("title", e.target.value)}
-      />
-
-      <TextareaField
-        label="Description"
-        className="w-full"
-        name="description"
-        rows={3}
-        value={values.description}
-        onChange={(e) => set("description", e.target.value)}
-      />
-
-      {isProjectFixed ? (
-        <input type="hidden" name="projectId" value={projectId ?? ""} />
-      ) : (
-        <SelectField
-          label="Project"
-          className="w-full"
-          name="projectId"
-          value={values.projectId}
-          onChange={(e) => setValues((v) => ({ ...v, projectId: e.target.value, milestoneId: "" }))}
+      <Modal
+        open={open}
+        onClose={cancel}
+        title={task ? "Edit task" : "New task"}
+        icon="check_circle"
+        footer={
+          <>
+            <span className="flex-1" />
+            <Button onClick={cancel}>Cancel</Button>
+            {/* Outside the <form> it submits, which is what `form` is for.
+                Keeping it here rather than in the body is what lets the fields
+                scroll while the commit stays put. */}
+            <Button type="submit" form={formId} variant="primary" disabled={pending}>
+              {pending ? "Saving…" : task ? "Save changes" : "Create task"}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id={formId}
+          key={attempt}
+          action={formAction}
+          onChange={handleFormChange}
+          className="space-y-4"
         >
-            <option value="">No project (personal task)</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-        </SelectField>
-      )}
+          {task ? <input type="hidden" name="taskId" value={task.id} /> : null}
+          <input type="hidden" name="clientId" value={derivedClientId} />
+          {task ? (
+            <>
+              <input type="hidden" name="prevProjectId" value={prevProjectId} />
+              <input type="hidden" name="prevClientId" value={prevClientId} />
+            </>
+          ) : null}
+          {state && !state.ok ? <FormError message={state.error} /> : null}
 
-      {/* Pairing milestone options with the project id they were loaded for
-          keeps a project chosen in the select from quietly contradicting a
-          milestone list this repo (no client-side data fetching) never
-          re-fetched for it. Anything else — no milestones prop, or a project
-          swapped away from the one they were loaded for — hides the select
-          and forces milestoneId to submit empty. */}
-      {milestones !== null && values.projectId === milestones.projectId ? (
-        <SelectField
-          label="Milestone"
-          className="w-full"
-          name="milestoneId"
-          value={values.milestoneId}
-          onChange={(e) => set("milestoneId", e.target.value)}
-        >
-            <option value="">No milestone</option>
-            {milestones.options.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title}
-              </option>
-            ))}
-        </SelectField>
-      ) : (
-        <input type="hidden" name="milestoneId" value="" />
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField
-          label="Priority"
-          className="w-full"
-          name="priority"
-          value={values.priority}
-          onChange={(e) => set("priority", e.target.value as TaskPriority)}
-        >
-            {TASK_PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {TASK_PRIORITY_LABEL[priority]}
-              </option>
-            ))}
-        </SelectField>
-
-        {!task ? (
-          <SelectField
-            label="Status"
+          <Field
+            label="Title"
             className="w-full"
-            name="status"
-            value={values.status}
-            onChange={(e) => set("status", e.target.value as Values["status"])}
-          >
-              {TASK_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {TASK_STATUS_LABEL[status]}
-                </option>
-              ))}
-          </SelectField>
-        ) : null}
+            name="title"
+            required
+            value={values.title}
+            onChange={(e) => set("title", e.target.value)}
+          />
 
-        <Field
-          label="Due date"
-          className="w-full"
-          type="date"
-          name="dueDate"
-          value={values.dueDate}
-          onChange={(e) => set("dueDate", e.target.value)}
-        />
-      </div>
+          <TextareaField
+            label="Description"
+            className="w-full"
+            name="description"
+            rows={3}
+            value={values.description}
+            onChange={(e) => set("description", e.target.value)}
+          />
 
-      {/* Create-only: createTaskAction reads `userId` and seeds the new
-          task's assignees, but updateTaskAction never does — the assignee
-          set is owned solely by setTaskAssignees (task-service.ts), reached
-          through its own dedicated form wherever a task can be edited.
-          Rendering this picker in edit mode would be a second, identical-
-          looking control whose changes silently do nothing on save. */}
-      {!task ? (
-        <div>
-          <p className="block text-sm text-[var(--text-2)]">Assignees</p>
-          <div className="mt-1">
-            <AssigneePicker members={members} selectedIds={values.assigneeIds} />
+          {isProjectFixed ? (
+            <input type="hidden" name="projectId" value={projectId ?? ""} />
+          ) : (
+            <SelectField
+              label="Project"
+              className="w-full"
+              name="projectId"
+              value={values.projectId}
+              onChange={(e) => setValues((v) => ({ ...v, projectId: e.target.value, milestoneId: "" }))}
+            >
+                <option value="">No project (personal task)</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </SelectField>
+          )}
+
+          {/* Pairing milestone options with the project id they were loaded for
+              keeps a project chosen in the select from quietly contradicting a
+              milestone list this repo (no client-side data fetching) never
+              re-fetched for it. Anything else — no milestones prop, or a project
+              swapped away from the one they were loaded for — hides the select
+              and forces milestoneId to submit empty. */}
+          {milestones !== null && values.projectId === milestones.projectId ? (
+            <SelectField
+              label="Milestone"
+              className="w-full"
+              name="milestoneId"
+              value={values.milestoneId}
+              onChange={(e) => set("milestoneId", e.target.value)}
+            >
+                <option value="">No milestone</option>
+                {milestones.options.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title}
+                  </option>
+                ))}
+            </SelectField>
+          ) : (
+            <input type="hidden" name="milestoneId" value="" />
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SelectField
+              label="Priority"
+              className="w-full"
+              name="priority"
+              value={values.priority}
+              onChange={(e) => set("priority", e.target.value as TaskPriority)}
+            >
+                {TASK_PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {TASK_PRIORITY_LABEL[priority]}
+                  </option>
+                ))}
+            </SelectField>
+
+            {!task ? (
+              <SelectField
+                label="Status"
+                className="w-full"
+                name="status"
+                value={values.status}
+                onChange={(e) => set("status", e.target.value as Values["status"])}
+              >
+                  {TASK_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {TASK_STATUS_LABEL[status]}
+                    </option>
+                  ))}
+              </SelectField>
+            ) : null}
+
+            <Field
+              label="Due date"
+              className="w-full"
+              type="date"
+              name="dueDate"
+              value={values.dueDate}
+              onChange={(e) => set("dueDate", e.target.value)}
+            />
           </div>
-        </div>
-      ) : null}
 
-      <div className="flex items-center gap-2">
-        <Button type="submit" variant="primary" size="md" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button onClick={cancel}>Cancel</Button>
-      </div>
-    </form>
+          {/* Create-only: createTaskAction reads `userId` and seeds the new
+              task's assignees, but updateTaskAction never does — the assignee
+              set is owned solely by setTaskAssignees (task-service.ts), reached
+              through its own dedicated form wherever a task can be edited.
+              Rendering this picker in edit mode would be a second, identical-
+              looking control whose changes silently do nothing on save. */}
+          {!task ? (
+            <div>
+              <p className="block text-sm text-[var(--text-2)]">Assignees</p>
+              <div className="mt-1">
+                <AssigneePicker members={members} selectedIds={values.assigneeIds} />
+              </div>
+            </div>
+          ) : null}
+
+        </form>
+      </Modal>
+    </>
   );
 }

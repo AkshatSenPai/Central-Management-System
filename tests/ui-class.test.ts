@@ -47,6 +47,17 @@ describe("buttonClass", () => {
     }
   });
 
+  // `none` exists so a caller with a deliberate shape — the 32x32 icon
+  // buttons in the topbar, the full-width rows in the account menu — states
+  // its own geometry rather than layering a second px-* over this one and
+  // trusting Tailwind's emission order to settle the tie.
+  it("emits no padding or text size at all for size none", () => {
+    const cls = buttonClass({ size: "none" });
+    expect(cls).not.toMatch(/\bp[xy]?-/);
+    expect(cls).not.toMatch(/\btext-(xs|sm)\b/);
+    expect(cls).toContain("focus-visible:shadow-[var(--ring)]");
+  });
+
   // --ring was defined in Phase 1 and used zero times across 60 files. Every
   // variant carries focus styling or the app keeps its keyboard-accessibility
   // hole, which is the entire point of extracting this component.

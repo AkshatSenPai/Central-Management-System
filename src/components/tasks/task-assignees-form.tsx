@@ -5,6 +5,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { setTaskAssigneesAction } from "@/server/actions/tasks";
 import { AssigneePicker } from "@/components/tasks/assignee-picker";
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/form-error";
 
 /** The assignee set has exactly one owner on this page: this form, via
  * setTaskAssigneesAction directly — never <TaskForm>'s own embedded
@@ -47,7 +48,7 @@ export function TaskAssigneesForm({
       {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
       {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}
       <AssigneePicker key={selectedIds.join(",")} members={members} selectedIds={selectedIds} />
-      {state && !state.ok ? <p className="text-xs text-[var(--bad)]">{state.error}</p> : null}
+      {state && !state.ok ? <FormError message={state.error} size="xs" /> : null}
       <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Saving…" : "Save assignees"}
       </Button>

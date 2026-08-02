@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { addContactAction } from "@/server/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 type SaveState = { ok: true; data: unknown } | { ok: false; error: string };
 type SaveAction = (prev: SaveState | null, formData: FormData) => Promise<SaveState>;
@@ -52,7 +53,7 @@ export function ContactForm({ clientId }: { clientId: string }) {
   return (
     <form key={attempt} action={formAction} className="space-y-3">
       <input type="hidden" name="clientId" value={clientId} />
-      {state && !state.ok ? <p className="text-sm text-[var(--bad)]">{state.error}</p> : null}
+      {state && !state.ok ? <FormError message={state.error} /> : null}
 
       <Field
         label="Name"

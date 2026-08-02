@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteClientAction } from "@/server/actions/clients";
 import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/ui/form-error";
+import { Icon } from "@/components/ui/icon";
 
 /** Rendered only for admins. The service refuses while the client still has
  * projects; that refusal is surfaced inline rather than thrown away. */
@@ -30,11 +32,12 @@ export function ClientDeleteButton({ clientId }: { clientId: string }) {
     <div className="flex flex-col items-end gap-1">
       <form action={run}>
         <input type="hidden" name="clientId" value={clientId} />
-        <Button type="submit" variant="danger">
+        <Button type="submit" variant="danger" className="gap-1.5">
+          <Icon name="delete" size="sm" />
           Delete client
         </Button>
       </form>
-      {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

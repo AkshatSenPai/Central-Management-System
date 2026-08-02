@@ -5,6 +5,7 @@ import { toggleMilestoneAction, removeMilestoneAction } from "@/server/actions/p
 import type { MilestoneState } from "@/lib/milestones";
 import { Button } from "@/components/ui/button";
 import { cardClass } from "@/components/ui/card";
+import { FormError } from "@/components/ui/form-error";
 
 type StripMilestone = {
   id: string;
@@ -86,7 +87,7 @@ export function MilestoneStrip({
           </div>
         ))}
       </div>
-      {error ? <p className="text-xs text-[var(--bad)]">{error}</p> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

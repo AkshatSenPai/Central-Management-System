@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PROJECT_HEALTHS, PROJECT_HEALTH_LABEL, type ProjectHealth } from "@/lib/project";
 import { setProjectHealthAction } from "@/server/actions/projects";
 import { SelectField } from "@/components/ui/field";
+import { FormError } from "@/components/ui/form-error";
 
 /** Health is set by a human, never derived. */
 export function ProjectHealthControl({
@@ -45,7 +46,7 @@ export function ProjectHealthControl({
           ))}
         </SelectField>
       </form>
-      {error ? <span className="text-xs text-[var(--bad)]">{error}</span> : null}
+      {error ? <FormError message={error} size="xs" /> : null}
     </div>
   );
 }

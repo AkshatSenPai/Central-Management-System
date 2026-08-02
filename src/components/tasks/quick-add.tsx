@@ -6,6 +6,8 @@ import { createTaskAction } from "@/server/actions/tasks";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
+import { FormError } from "@/components/ui/form-error";
 
 /** A popover, not a modal: no backdrop, no focus trap, no scroll lock. That
  * boundary is what keeps 3a's D6 ("no overlay primitive") from quietly
@@ -58,11 +60,16 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
   return (
     <div ref={rootRef} className="relative">
       <Button
+        variant="primary"
         onClick={() => {
           setOpen((o) => !o);
           setCreatedId(null);
         }}
+        aria-expanded={open}
+        size="none"
+        className="h-8 gap-1.5 rounded-lg px-3 text-[13px] font-semibold"
       >
+        <Icon name="add" size="sm" />
         Quick add
       </Button>
 
@@ -108,7 +115,7 @@ export function QuickAdd({ members }: { members: { id: string; name: string }[] 
               ))}
             </div>
 
-            {state && !state.ok ? <p className="text-xs text-[var(--bad)]">{state.error}</p> : null}
+            {state && !state.ok ? <FormError message={state.error} size="xs" /> : null}
 
             {createdId ? (
               <Link

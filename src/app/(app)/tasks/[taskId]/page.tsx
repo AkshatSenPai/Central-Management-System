@@ -6,6 +6,7 @@ import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, mergeAssigneeMembers } from "
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { cardClass } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
 import { TaskForm } from "@/components/tasks/task-form";
@@ -108,10 +109,11 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
               model, so the one line that states the due date is where it
               has to show. */}
           <p
-            className={`mt-1 text-sm ${
+            className={`mt-1 flex items-center gap-1.5 text-sm ${
               task.overdue ? "text-[var(--bad)]" : "text-[var(--text-3)]"
             }`}
           >
+            <Icon name="event" size="sm" />
             {task.dueDate ? `Due ${shortDate(task.dueDate)}` : "No due date"}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
