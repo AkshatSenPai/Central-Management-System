@@ -50,6 +50,7 @@ export const ICON_NAMES = [
   "drag_indicator",
   "mail",
   "call",
+  "alternate_email",
 ] as const;
 
 /* Deliberately absent, having been tried and removed rather than overlooked:

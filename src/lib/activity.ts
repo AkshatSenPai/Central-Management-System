@@ -6,7 +6,9 @@ export type ActivityEntityType =
   | "PROJECT"
   | "MILESTONE"
   | "TASK"
-  | "CHECKLIST_ITEM";
+  | "CHECKLIST_ITEM"
+  | "COMMENT"
+  | "ATTACHMENT";
 
 /** Stored as a plain String column, never a Prisma enum, so later phases add
  * verbs without a migration. describeActivity must stay total. */
@@ -38,7 +40,12 @@ export type ActivityAction =
   | "checklist.added"
   | "checklist.completed"
   | "checklist.reopened"
-  | "checklist.removed";
+  | "checklist.removed"
+  | "comment.added"
+  | "comment.edited"
+  | "comment.deleted"
+  | "attachment.added"
+  | "attachment.removed";
 
 export type ActivityMeta = Record<string, unknown> | null;
 
@@ -210,6 +217,20 @@ export function describeActivity(entry: {
       return `${who} reopened checklist item ${what}`;
     case "checklist.removed":
       return `${who} removed checklist item ${what}`;
+    // The feed names the task, not the comment — a timeline of comment bodies
+    // would be the thread duplicated badly. `meta.excerpt` is carried for a
+    // later phase to render a preview from, including after the comment is
+    // gone, but is deliberately not read here.
+    case "comment.added":
+      return `${who} commented on ${what}`;
+    case "comment.edited":
+      return `${who} edited a comment on ${what}`;
+    case "comment.deleted":
+      return `${who} deleted a comment on ${what}`;
+    case "attachment.added":
+      return `${who} attached ${what}`;
+    case "attachment.removed":
+      return `${who} removed attachment ${what}`;
     default:
       // Forward compatibility: an unrecognised verb renders, never throws.
       return `${who} updated this record`;

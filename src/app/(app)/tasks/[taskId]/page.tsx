@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getTaskDetail } from "@/lib/task-queries";
+import { listTaskComments } from "@/lib/comment-queries";
+import { CommentThread } from "@/components/comments/comment-thread";
 import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, mergeAssigneeMembers } from "@/lib/task";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +21,15 @@ const CHIP = "text-xs text-[var(--text-3)]";
 
 export default async function TaskDetailPage(props: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await props.params;
+  const session = await auth();
+  // The layout already redirects; repeated because this page reads
+  // session.user directly and TypeScript cannot see a guard in another file.
+  if (!session?.user) redirect("/login");
+
   const task = await getTaskDetail(prisma, taskId);
   if (!task) notFound();
 
-  const [projects, activeMembers] = await Promise.all([
+  const [projects, activeMembers, comments] = await Promise.all([
     // The options list must still include the task's own project even when
     // that project is DONE — otherwise React's <select> reconciliation
     // (updateOptions) falls back to selecting the first non-disabled option
@@ -39,6 +47,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
       select: { id: true, name: true, active: true },
       orderBy: { name: "asc" },
     }),
+    listTaskComments(prisma, taskId),
   ]);
 
   // Only a project task has milestones to offer, and only that project's own.
@@ -159,6 +168,22 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
               projectId={task.projectId}
               clientId={task.clientId}
               items={task.checklist}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-medium text-[var(--text)]">Comments</h2>
+              {comments.length > 0 ? (
+                <span className="text-xs text-[var(--text-3)]">{comments.length}</span>
+              ) : null}
+            </div>
+            <CommentThread
+              comments={comments}
+              scope={{ taskId: task.id, projectId: task.projectId, clientId: task.clientId }}
+              members={activeMembers}
+              viewerId={session.user.id}
+              viewerIsAdmin={session.user.role === "ADMIN"}
             />
           </section>
         </div>

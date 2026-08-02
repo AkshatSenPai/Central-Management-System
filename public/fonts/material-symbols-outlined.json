@@ -1,7 +1,8 @@
 {
-  "signature": "78cdf183926e9013",
+  "signature": "3831ff90c510aa2d",
   "icons": [
     "add",
+    "alternate_email",
     "business_center",
     "calendar_month",
     "call",
@@ -30,5 +31,5 @@
     "settings",
     "space_dashboard"
   ],
-  "bytes": 5000
+  "bytes": 4956
 }

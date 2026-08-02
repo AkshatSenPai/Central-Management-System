@@ -1,8 +1,8 @@
 import type {
+  ComponentPropsWithRef,
   InputHTMLAttributes,
   ReactNode,
   SelectHTMLAttributes,
-  TextareaHTMLAttributes,
 } from "react";
 
 export type FieldSize = "xs" | "sm" | "md";
@@ -105,13 +105,18 @@ export function SelectField({
   );
 }
 
+/** `ComponentPropsWithRef` rather than `TextareaHTMLAttributes`, so callers can
+ * pass a `ref`. React 19 hands `ref` to function components as an ordinary
+ * prop, so the existing `{...props}` spread already forwards it to the
+ * <textarea> — only the type needed widening. The comment composer wants one
+ * to insert an "@" at the cursor. */
 export function TextareaField({
   label,
   error,
   size,
   className,
   ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement> & {
+}: ComponentPropsWithRef<"textarea"> & {
   label?: string;
   error?: string | null;
   size?: FieldSize;
