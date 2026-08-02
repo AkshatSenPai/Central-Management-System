@@ -167,6 +167,19 @@ export async function createTask(
       clientId,
       meta: { name: task.title },
     });
+    // The activity log folds these into task.created, but a notification
+    // cannot: being handed work at creation is the same event, to the person
+    // receiving it, as being handed it a minute later by an edit. Notifying
+    // only on the edit path would mean quick-add — the app's fastest way to
+    // assign someone something — told them nothing.
+    await notify(tx, {
+      recipientIds: assignees.map((a) => a.id),
+      actorId: input.actorId,
+      type: "TASK_ASSIGNED",
+      entityType: "TASK",
+      entityId: task.id,
+      meta: { name: task.title },
+    });
     return task;
   });
   return ok({ id: created.id });

@@ -1002,3 +1002,51 @@ describe("notifications (Phase 4)", () => {
     expect(txW.notificationsCleared).toEqual([]);
   });
 });
+
+describe("notifications on task creation", () => {
+  // The audit that found this gap put it best: the activity log folds initial
+  // assignees into task.created, but a notification cannot. Quick add is the
+  // app's fastest way to hand someone work, and it goes through createTask.
+  it("notifies the initial assignees, inside the transaction", async () => {
+    const { db, txW, dbW } = fakeDb({
+      project: project1,
+      activeUsers: [
+        { id: "u1", name: "Dana Reeve" },
+        { id: "u2", name: "Tom Iversen" },
+      ],
+    });
+    // A distinct actor: baseCreateInput.actorId is "u1", who is also being
+    // assigned here, and notify() would correctly filter them out.
+    await createTask(db, {
+      ...baseCreateInput,
+      actorId: "actor1",
+      projectId: "p1",
+      assigneeIds: ["u1", "u2"],
+    });
+
+    expect(txW.notifications.map((n) => n.recipientId)).toEqual(["u1", "u2"]);
+    expect(txW.notifications[0]).toMatchObject({ type: "TASK_ASSIGNED" });
+    expect(dbW.notifications).toEqual([]);
+  });
+
+  it("writes no notification when a task is created with nobody on it", async () => {
+    const { db, txW } = fakeDb({ project: project1 });
+    await createTask(db, { ...baseCreateInput, projectId: "p1", assigneeIds: [] });
+    expect(txW.notifications).toEqual([]);
+  });
+
+  // Assigning yourself in quick-add is the common case, and it must be silent.
+  it("does not notify someone who assigned the task to themselves", async () => {
+    const { db, txW } = fakeDb({
+      project: project1,
+      activeUsers: [{ id: "actor1", name: "Akshat Singh" }],
+    });
+    await createTask(db, {
+      ...baseCreateInput,
+      actorId: "actor1",
+      projectId: "p1",
+      assigneeIds: ["actor1"],
+    });
+    expect(txW.notifications).toEqual([]);
+  });
+});

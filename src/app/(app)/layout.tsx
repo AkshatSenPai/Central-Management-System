@@ -5,6 +5,7 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
+import { listNotifications, countUnreadNotifications } from "@/lib/notification-queries";
 
 /** The sidebar's collapsed preference. A cookie rather than localStorage
  * because the server has to know it: localStorage is unreadable during a
@@ -25,7 +26,7 @@ export default async function AppLayout({
   // One round trip, not two: the sidebar's My Tasks count and quick-add's
   // member list are both needed on every screen and neither depends on the
   // other.
-  const [members, myTaskCount] = await Promise.all([
+  const [members, myTaskCount, notifications, unreadCount] = await Promise.all([
     prisma.user.findMany({
       where: { active: true },
       select: { id: true, name: true },
@@ -36,6 +37,11 @@ export default async function AppLayout({
     prisma.task.count({
       where: { assignees: { some: { userId: session.user.id } }, status: { not: "DONE" } },
     }),
+    // The bell is in the topbar, so both of these are needed on every screen.
+    // Joining them to the same Promise.all keeps the layout at one round trip
+    // rather than four sequential ones.
+    listNotifications(prisma, { userId: session.user.id }),
+    countUnreadNotifications(prisma, session.user.id),
   ]);
 
   async function signOutAction() {
@@ -72,6 +78,8 @@ export default async function AppLayout({
           userEmail={session.user.email ?? ""}
           signOutAction={signOutAction}
           members={members}
+          notifications={notifications}
+          unreadCount={unreadCount}
         />
         {/* `update`, not `enter`/`exit`. Those two fire when a ViewTransition
             mounts or unmounts; this one lives in the layout and stays mounted

@@ -97,10 +97,11 @@ function CommentComposer({ scope }: { scope: Scope }) {
           >
             <Icon name="alternate_email" size="sm" />
           </Button>
-          {/* Said plainly, because it is not what people expect. §5.7 puts
-              the notification centre in Phase 4. */}
+          {/* This line was "nobody is notified yet" through 3c, and Phase 4
+              made it false. Kept, rather than deleted, because the half that
+              is still missing is the half people assume: email. */}
           <span className="text-[11.5px] text-[var(--text-3)]">
-            Mentions link to a profile — nobody is notified yet
+            Mentions notify in the app — email comes later
           </span>
           <span className="flex-1" />
           <Button type="submit" variant="primary" disabled={pending}>
