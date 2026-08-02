@@ -29,6 +29,11 @@ type Sink = {
   activity: Record<string, unknown>[];
   assigneesCreated: Record<string, unknown>[];
   assigneesDeleted: Record<string, unknown>[];
+  /** Rows handed to notification.createMany, flattened. Phase 4: a
+   * notification must be written in the SAME transaction as the mutation
+   * that caused it, so this sink proves which client it was called on. */
+  notifications: Record<string, unknown>[];
+  notificationsCleared: Record<string, unknown>[];
 };
 
 function emptySink(): Sink {
@@ -39,6 +44,8 @@ function emptySink(): Sink {
     activity: [],
     assigneesCreated: [],
     assigneesDeleted: [],
+    notifications: [],
+    notificationsCleared: [],
   };
 }
 
@@ -128,6 +135,16 @@ function fakeDb(parts: FakeParts) {
         return a.data;
       },
     },
+    notification: {
+      createMany: async (a: { data: Record<string, unknown>[] }) => {
+        sink.notifications.push(...a.data);
+        return { count: a.data.length };
+      },
+      deleteMany: async (a: Record<string, unknown>) => {
+        sink.notificationsCleared.push(a);
+        return { count: 0 };
+      },
+    },
   });
 
   const db = {
@@ -137,6 +154,7 @@ function fakeDb(parts: FakeParts) {
     user: reads.user,
     taskAssignee: { ...reads.taskAssignee, ...writers(dbW).taskAssignee },
     activityLog: writers(dbW).activityLog,
+    notification: writers(dbW).notification,
     // Mirrors real transactional rollback: a thrown error undoes everything
     // this specific call pushed into txW before the error propagates, so a
     // retry that starts a fresh $transaction never inherits a previous
@@ -150,6 +168,8 @@ function fakeDb(parts: FakeParts) {
         activity: txW.activity.length,
         assigneesCreated: txW.assigneesCreated.length,
         assigneesDeleted: txW.assigneesDeleted.length,
+        notifications: txW.notifications.length,
+        notificationsCleared: txW.notificationsCleared.length,
       };
       try {
         return await fn({
@@ -159,6 +179,7 @@ function fakeDb(parts: FakeParts) {
           user: reads.user,
           taskAssignee: { ...reads.taskAssignee, ...writers(txW).taskAssignee },
           activityLog: writers(txW).activityLog,
+          notification: writers(txW).notification,
         });
       } catch (e) {
         txW.created.length = before.created;
@@ -167,6 +188,8 @@ function fakeDb(parts: FakeParts) {
         txW.activity.length = before.activity;
         txW.assigneesCreated.length = before.assigneesCreated;
         txW.assigneesDeleted.length = before.assigneesDeleted;
+        txW.notifications.length = before.notifications;
+        txW.notificationsCleared.length = before.notificationsCleared;
         throw e;
       }
     },
@@ -188,6 +211,9 @@ const taskWithProject = {
   priority: "MEDIUM",
   dueDate: null,
   project: { clientId: "c1" },
+  // Phase 4: setTaskStatus reads these to find who cares about the change.
+  creatorId: "u-creator",
+  assignees: [{ userId: "u-assignee" }],
 };
 
 const personalTask = {
@@ -200,6 +226,8 @@ const personalTask = {
   priority: "LOW",
   dueDate: null,
   project: null,
+  creatorId: "u-creator",
+  assignees: [{ userId: "u-assignee" }],
 };
 
 const baseCreateInput = {
@@ -902,5 +930,75 @@ describe("setTaskAssignees", () => {
     expect(dbW.assigneesDeleted).toHaveLength(0);
     expect(dbW.assigneesCreated).toHaveLength(0);
     expect(dbW.activity).toHaveLength(0);
+  });
+});
+
+describe("notifications (Phase 4)", () => {
+  it("notifies only the newly assigned, and inside the transaction", async () => {
+    const { db, dbW, txW } = fakeDb({
+      task: taskWithProject,
+      currentAssignees: [{ userId: "u1", user: { name: "Dana Reeve" } }],
+      activeUsers: [{ id: "u2", name: "Tom Iversen" }],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: ["u1", "u2"], actorId: "actor" });
+
+    expect(txW.notifications.map((n) => n.recipientId)).toEqual(["u2"]);
+    expect(txW.notifications[0]).toMatchObject({ type: "TASK_ASSIGNED", entityId: "t1" });
+    // A write on the outer client would mean a rolled-back assignment could
+    // still leave someone told they were assigned.
+    expect(dbW.notifications).toEqual([]);
+  });
+
+  it("does not notify someone who was only removed", async () => {
+    const { db, txW } = fakeDb({
+      task: taskWithProject,
+      currentAssignees: [{ userId: "u1", user: { name: "Dana Reeve" } }],
+      activeUsers: [],
+    });
+    await setTaskAssignees(db, { taskId: "t1", userIds: [], actorId: "actor" });
+    expect(txW.notifications).toEqual([]);
+  });
+
+  it("tells the creator and the assignees about a status change, never the actor", async () => {
+    const { db, txW, dbW } = fakeDb({ task: taskWithProject });
+    await setTaskStatus(db, { taskId: "t1", status: "IN_PROGRESS", actorId: "u-assignee" });
+
+    // creatorId u-creator and assignee u-assignee are both interested; the
+    // actor is the assignee, so only the creator is told.
+    expect(txW.notifications.map((n) => n.recipientId)).toEqual(["u-creator"]);
+    expect(txW.notifications[0]).toMatchObject({
+      type: "TASK_STATUS_CHANGED",
+      meta: { name: "Draft brand brief", to: "IN_PROGRESS" },
+    });
+    expect(dbW.notifications).toEqual([]);
+  });
+
+  it("writes no notification when the status did not actually change", async () => {
+    const { db, txW } = fakeDb({ task: taskWithProject });
+    await setTaskStatus(db, { taskId: "t1", status: "TO_DO", actorId: "someone" });
+    expect(txW.notifications).toEqual([]);
+  });
+
+  // entityId carries no foreign key, so nothing cascades — a notification
+  // about a deleted task would be a link to a 404.
+  it("clears a removed task's notifications inside the transaction", async () => {
+    const { db, txW } = fakeDb({ task: taskWithProject });
+    await removeTask(db, { taskId: "t1", actorId: "actor" });
+    expect(txW.notificationsCleared).toEqual([
+      { where: { entityType: "TASK", entityId: "t1" } },
+    ]);
+  });
+
+  it("rolls the notification back with the rest of a failed transaction", async () => {
+    const { db, txW } = fakeDb({
+      task: taskWithProject,
+      taskDeleteError: new Prisma.PrismaClientKnownRequestError("gone", {
+        code: "P2025",
+        clientVersion: "test",
+      }),
+    });
+    const result = await removeTask(db, { taskId: "t1", actorId: "actor" });
+    expect(result.ok).toBe(false);
+    expect(txW.notificationsCleared).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity } from "@/lib/activity";
 import { commentSchema, extractMentionedUserIds, type Mentionable } from "@/lib/rich-text";
+import { notify } from "@/lib/notification-service";
 
 /** Same race class as checklist-service: the scope read succeeded, but the row
  * was gone by the time the transaction ran. */
@@ -31,7 +32,13 @@ async function loadCommentScope(
   | { ok: false }
   | {
       ok: true;
-      comment: { id: string; body: string; authorId: string; taskId: string };
+      comment: {
+        id: string;
+        body: string;
+        authorId: string;
+        taskId: string;
+        mentionedUserIds: string[];
+      };
       taskTitle: string;
       clientId: string | null;
     }
@@ -43,6 +50,7 @@ async function loadCommentScope(
       body: true,
       authorId: true,
       taskId: true,
+      mentionedUserIds: true,
       task: { select: { title: true, project: { select: { clientId: true } } } },
     },
   });
@@ -54,6 +62,7 @@ async function loadCommentScope(
       body: comment.body,
       authorId: comment.authorId,
       taskId: comment.taskId,
+      mentionedUserIds: comment.mentionedUserIds,
     },
     taskTitle: comment.task.title,
     clientId: comment.task.project?.clientId ?? null,
@@ -95,6 +104,17 @@ export async function addComment(
       // `name` is the task, matching every other verb's "what was acted on".
       meta: { name: task.title, excerpt: excerpt(parsed.data.body), mentionedUserIds },
     });
+    // The payoff for storing mentionedUserIds in 3c. Inside the transaction,
+    // so a rolled-back comment cannot leave someone told they were mentioned
+    // in a comment that does not exist.
+    await notify(tx, {
+      recipientIds: mentionedUserIds,
+      actorId: input.actorId,
+      type: "COMMENT_MENTION",
+      entityType: "TASK",
+      entityId: input.taskId,
+      meta: { name: task.title, excerpt: excerpt(parsed.data.body) },
+    });
     return comment;
   });
   return ok({ id: created.id });
@@ -125,12 +145,25 @@ export async function updateComment(
   if (scope.comment.body === parsed.data.body) return ok(undefined);
 
   const mentionedUserIds = extractMentionedUserIds(parsed.data.body, input.members);
+  // Only people the edit *added*. Editing a typo in a comment that already
+  // mentioned three people must not ping all three again — the notification is
+  // for "you were mentioned", and they already were.
+  const previouslyMentioned = new Set(scope.comment.mentionedUserIds);
+  const newlyMentioned = mentionedUserIds.filter((id) => !previouslyMentioned.has(id));
 
   try {
     await db.$transaction(async (tx) => {
       await tx.comment.update({
         where: { id: input.commentId },
         data: { body: parsed.data.body, mentionedUserIds, editedAt: new Date() },
+      });
+      await notify(tx, {
+        recipientIds: newlyMentioned,
+        actorId: input.actorId,
+        type: "COMMENT_MENTION",
+        entityType: "TASK",
+        entityId: scope.comment.taskId,
+        meta: { name: scope.taskTitle, excerpt: excerpt(parsed.data.body) },
       });
       await recordActivity(tx, {
         actorId: input.actorId,

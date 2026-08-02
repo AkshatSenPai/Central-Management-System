@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity, fieldDiff } from "@/lib/activity";
+import { notify, clearNotificationsFor } from "@/lib/notification-service";
 import { nextTaskOrder, type TaskStatus, type TaskPriority } from "@/lib/task";
 
 export type TaskWriteInput = {
@@ -254,6 +255,18 @@ export async function setTaskStatus(
 
   if (scope.task.status === input.status) return ok(undefined);
 
+  // Spec 5.7: "status change on a task you created or are assigned to". Read
+  // before the transaction opens — it is a plain read that does not need to be
+  // inside it, and holding a transaction open across an extra round trip is
+  // the kind of thing that only hurts under load.
+  const interested = await db.task.findUnique({
+    where: { id: input.taskId },
+    select: { creatorId: true, assignees: { select: { userId: true } } },
+  });
+  const interestedIds = interested
+    ? [interested.creatorId, ...interested.assignees.map((a) => a.userId)]
+    : [];
+
   try {
     await db.$transaction(async (tx) => {
       await tx.task.update({ where: { id: input.taskId }, data: { status: input.status } });
@@ -264,6 +277,16 @@ export async function setTaskStatus(
         action: "task.status_changed",
         clientId: scope.clientId,
         meta: { name: scope.task.title, from: scope.task.status, to: input.status },
+      });
+      // `notify` drops the actor and deduplicates, so a creator who is also an
+      // assignee gets one row, and someone moving their own task gets none.
+      await notify(tx, {
+        recipientIds: interestedIds,
+        actorId: input.actorId,
+        type: "TASK_STATUS_CHANGED",
+        entityType: "TASK",
+        entityId: input.taskId,
+        meta: { name: scope.task.title, to: input.status },
       });
     });
   } catch (e) {
@@ -288,6 +311,10 @@ export async function removeTask(
       // Assignees and checklist items are Cascade-deleted by the FK; no
       // manual join-row or checklist cleanup belongs here.
       await tx.task.delete({ where: { id: input.taskId } });
+      // entityId carries no foreign key, so nothing cascades. Unlike the
+      // activity log — which is an audit trail and must outlive its subject —
+      // a notification about a deleted task is only a link to a 404.
+      await clearNotificationsFor(tx, { entityType: "TASK", entityId: input.taskId });
       await recordActivity(tx, {
         actorId: input.actorId,
         entityType: "TASK",
@@ -376,6 +403,20 @@ async function attemptTaskAssigneeDiff(
         meta: { name: scope.task.title, people: removedNames },
       });
     }
+
+    // Only the newly added, and inside the same transaction as the rows
+    // themselves — a rolled-back assignment must not leave someone told they
+    // were assigned. Removal deliberately notifies nobody: being taken off a
+    // task is not urgent, and a bell that fires on every reshuffle is a bell
+    // people learn to ignore.
+    await notify(tx, {
+      recipientIds: addedIds,
+      actorId: input.actorId,
+      type: "TASK_ASSIGNED",
+      entityType: "TASK",
+      entityId: input.taskId,
+      meta: { name: scope.task.title },
+    });
   });
   return ok(undefined);
 }

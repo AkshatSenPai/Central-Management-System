@@ -32,6 +32,8 @@ model User {
   taskAssignments TaskAssignee[]
   comments        Comment[]      @relation("CommentAuthor")
   attachments     Attachment[]   @relation("AttachmentUploader")
+  notifications   Notification[] @relation("NotificationRecipient")
+  notified        Notification[] @relation("NotificationActor")
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -295,6 +297,59 @@ model Comment {
   updatedAt DateTime @updatedAt
 
   @@index([taskId, createdAt])
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  COMMENT_MENTION
+  TASK_STATUS_CHANGED
+  /// Written by the reminder cron, which needs a deployed URL. The type
+  /// exists now so the union is complete and describeNotification stays
+  /// total; nothing writes it yet.
+  TASK_DUE_SOON
+}
+
+/// One row per person per event. Deliberately not shared: two people mentioned
+/// in the same comment get a row each, because read state is personal and a
+/// shared row could not carry it.
+model Notification {
+  id String @id @default(cuid())
+
+  /// The person being told. Cascades: when a member is deleted their unread
+  /// pile is meaningless, unlike the audit trail, which must survive.
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId String
+
+  /// The person who caused it, when a person did. Never equal to recipientId
+  /// — nobody is told about their own action, and the services enforce it.
+  ///
+  /// Nullable because TASK_DUE_SOON has no actor: a deadline arriving is not
+  /// something anybody did. The alternative — inventing a system user, or
+  /// naming the recipient as their own actor — would make every reader of
+  /// this column check for a sentinel instead of a null.
+  actor   User?   @relation("NotificationActor", fields: [actorId], references: [id])
+  actorId String?
+
+  type NotificationType
+
+  /// Where clicking it goes. Plain strings with no relation, the same
+  /// decision as ActivityLog.entityType/entityId: the target may be deleted,
+  /// and a foreign key would either block that delete or silently take the
+  /// notification with it. `removeTask` clears them explicitly instead.
+  entityType String
+  entityId   String
+
+  /// Display data captured at write time — the task title, the comment
+  /// excerpt. Read rather than re-queried, so the panel is one query and a
+  /// since-renamed task still reads as it did when the thing happened.
+  meta Json?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  /// The panel's query is "mine, newest first"; the badge's is "mine, unread".
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
 }
 
 enum AttachmentParent {
