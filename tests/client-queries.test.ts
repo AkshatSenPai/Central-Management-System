@@ -76,13 +76,39 @@ describe("listClients", () => {
           name: "Harlow & Fitch",
           status: "ACTIVE",
           sector: null,
-          contacts: [contact({ id: "ct1", name: "Tom Iversen" }), contact({ id: "ct2", isPrimary: true })],
+          contacts: [
+            contact({ id: "ct1", name: "Tom Iversen" }),
+            contact({ id: "ct2", isPrimary: true, phone: "+44 20 7946 0812" }),
+          ],
           projects: [],
         },
       ],
     });
     const rows = await listClients(db);
-    expect(rows[0].primaryContact).toEqual({ name: "Dana Reeve", email: "dana@harlowfitch.com" });
+    // Phone travels with the row: this studio reaches clients on both, and
+    // the list is where you look someone up before calling them.
+    expect(rows[0].primaryContact).toEqual({
+      name: "Dana Reeve",
+      email: "dana@harlowfitch.com",
+      phone: "+44 20 7946 0812",
+    });
+  });
+
+  it("carries a null phone rather than dropping the field", async () => {
+    const { db } = fakeDb({
+      clients: [
+        {
+          id: "c1",
+          name: "Harlow & Fitch",
+          status: "ACTIVE",
+          sector: null,
+          contacts: [contact({ isPrimary: true, phone: null })],
+          projects: [],
+        },
+      ],
+    });
+    const rows = await listClients(db);
+    expect(rows[0].primaryContact?.phone).toBeNull();
   });
 
   it("reports a null primaryContact when contacts exist but none is primary", async () => {

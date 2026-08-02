@@ -148,6 +148,20 @@ body {
   display: none;
 }
 
+/* The Appearance segmented control on Settings. Both buttons are always
+   visible — unlike the account menu's rows — so what CSS decides here is
+   which one reads as selected. The mockup does this with a [data-seg="on"]
+   attribute set from JavaScript state; driving it off data-theme instead
+   means the control is correct on the first frame and needs no state at all.
+   Same declarations as the mockup's rule. */
+:root:not([data-theme="dark"]) [data-seg="light"],
+[data-theme="dark"] [data-seg="dark"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+}
+
 /* The status filters on My Tasks and the member profile are native
    <form method="get"> submits, so changing one replaces the document rather
    than routing client-side — verified: a marker set on window is gone

@@ -66,11 +66,23 @@ export default async function ClientsPage() {
               {row.primaryContact ? (
                 <div className="min-w-0">
                   <p className="truncate text-sm text-[var(--text-2)]">{row.primaryContact.name}</p>
-                  {row.primaryContact.email ? (
-                    <p className="truncate text-xs text-[var(--text-3)]">
-                      {row.primaryContact.email}
-                    </p>
-                  ) : null}
+                  {/* Email truncates, the phone never does. An email is
+                      arbitrarily long and is copied rather than read; a phone
+                      number is short, fixed-width and is the thing you are
+                      squinting at the row to find. */}
+                  <div className="flex items-baseline gap-1.5 text-xs text-[var(--text-3)]">
+                    {row.primaryContact.email ? (
+                      <span className="truncate">{row.primaryContact.email}</span>
+                    ) : null}
+                    {row.primaryContact.email && row.primaryContact.phone ? (
+                      <span aria-hidden="true" className="flex-none">
+                        ·
+                      </span>
+                    ) : null}
+                    {row.primaryContact.phone ? (
+                      <span className="flex-none">{row.primaryContact.phone}</span>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <span className="text-sm text-[var(--text-3)]">—</span>

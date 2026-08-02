@@ -1,11 +1,13 @@
 {
-  "signature": "a13d9cd45c1d19bf",
+  "signature": "78cdf183926e9013",
   "icons": [
     "add",
     "business_center",
     "calendar_month",
+    "call",
     "campaign",
     "check_circle",
+    "chevron_right",
     "close",
     "dark_mode",
     "delete",
@@ -20,6 +22,7 @@
     "light_mode",
     "lock",
     "logout",
+    "mail",
     "person",
     "person_add",
     "receipt_long",
@@ -27,5 +30,5 @@
     "settings",
     "space_dashboard"
   ],
-  "bytes": 4480
+  "bytes": 5000
 }

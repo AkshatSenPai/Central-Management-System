@@ -5,9 +5,10 @@ import { CLIENT_STATUSES, CLIENT_STATUS_LABEL, type ClientStatus } from "@/lib/c
 import { toDateInputValue } from "@/lib/dates";
 import { createClientAction, updateClientAction } from "@/server/actions/clients";
 import { Button } from "@/components/ui/button";
-import { cardClass } from "@/components/ui/card";
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/form-error";
+import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
 
 type ClientDefaults = {
   id: string;
@@ -92,111 +93,125 @@ export function ClientForm({
     setValues(initialValues(client));
   }
 
-  if (!open) {
-    return (
+  // Stable across the `attempt` remount, and unique per edit target, because
+  // the footer's submit button reaches this form by id from outside it.
+  const formId = client ? `client-form-${client.id}` : "client-form-new";
+
+  return (
+    <>
       <Button
         onClick={() => setOpen(true)}
         variant={client ? "secondary" : "primary"}
         size={client ? "sm" : "md"}
+        className="gap-1.5"
       >
+        <Icon name={client ? "edit" : "add"} size="sm" />
         {client ? "Edit" : "New client"}
       </Button>
-    );
-  }
 
-  return (
-    <form
-      key={attempt}
-      action={formAction}
-      className={cardClass({ className: "w-full max-w-xl space-y-4 p-4" })}
-    >
-      {client ? <input type="hidden" name="clientId" value={client.id} /> : null}
-      {state && !state.ok ? <FormError message={state.error} /> : null}
+      <Modal
+        open={open}
+        onClose={cancel}
+        title={client ? "Edit client" : "New client"}
+        icon="business_center"
+        width={720}
+        footer={
+          <>
+            <span className="flex-1" />
+            <Button onClick={cancel}>Cancel</Button>
+            {/* Outside the <form> it submits, which is what `form` is for.
+                Keeping it here rather than in the body is what lets the fields
+                scroll while the commit stays put. */}
+            <Button type="submit" form={formId} variant="primary" disabled={pending}>
+              {pending ? "Saving…" : client ? "Save changes" : "Create client"}
+            </Button>
+          </>
+        }
+      >
+        <form id={formId} key={attempt} action={formAction} className="space-y-4">
+          {client ? <input type="hidden" name="clientId" value={client.id} /> : null}
+          {state && !state.ok ? <FormError message={state.error} /> : null}
 
-      <Field
-        label="Name"
-        className="w-full"
-        name="name"
-        required
-        value={values.name}
-        onChange={(e) => set("name", e.target.value)}
-      />
+          <Field
+            label="Name"
+            className="w-full"
+            name="name"
+            required
+            value={values.name}
+            onChange={(e) => set("name", e.target.value)}
+          />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField
-          label="Status"
-          className="w-full"
-          name="status"
-          value={values.status}
-          onChange={(e) => set("status", e.target.value as ClientStatus)}
-        >
-          {CLIENT_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {CLIENT_STATUS_LABEL[status]}
-            </option>
-          ))}
-        </SelectField>
-        <Field
-          label="Sector"
-          className="w-full"
-          name="sector"
-          value={values.sector}
-          onChange={(e) => set("sector", e.target.value)}
-        />
-        <Field
-          label="Website"
-          className="w-full"
-          name="website"
-          placeholder="https://"
-          value={values.website}
-          onChange={(e) => set("website", e.target.value)}
-        />
-        <Field
-          label="Engagement type"
-          className="w-full"
-          name="engagementType"
-          value={values.engagementType}
-          onChange={(e) => set("engagementType", e.target.value)}
-        />
-        <Field
-          label="Client since"
-          className="w-full"
-          type="date"
-          name="clientSince"
-          value={values.clientSince}
-          onChange={(e) => set("clientSince", e.target.value)}
-        />
-        <SelectField
-          label="Account lead"
-          className="w-full"
-          name="accountLeadId"
-          value={values.accountLeadId}
-          onChange={(e) => set("accountLeadId", e.target.value)}
-        >
-          <option value="">No account lead</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </SelectField>
-      </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SelectField
+              label="Status"
+              className="w-full"
+              name="status"
+              value={values.status}
+              onChange={(e) => set("status", e.target.value as ClientStatus)}
+            >
+              {CLIENT_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {CLIENT_STATUS_LABEL[status]}
+                </option>
+              ))}
+            </SelectField>
+            <Field
+              label="Sector"
+              className="w-full"
+              name="sector"
+              value={values.sector}
+              onChange={(e) => set("sector", e.target.value)}
+            />
+            <Field
+              label="Website"
+              className="w-full"
+              name="website"
+              placeholder="https://"
+              value={values.website}
+              onChange={(e) => set("website", e.target.value)}
+            />
+            <Field
+              label="Engagement type"
+              className="w-full"
+              name="engagementType"
+              value={values.engagementType}
+              onChange={(e) => set("engagementType", e.target.value)}
+            />
+            <Field
+              label="Client since"
+              className="w-full"
+              type="date"
+              name="clientSince"
+              value={values.clientSince}
+              onChange={(e) => set("clientSince", e.target.value)}
+            />
+            <SelectField
+              label="Account lead"
+              className="w-full"
+              name="accountLeadId"
+              value={values.accountLeadId}
+              onChange={(e) => set("accountLeadId", e.target.value)}
+            >
+              <option value="">No account lead</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </SelectField>
+          </div>
 
-      <TextareaField
-        label="Notes"
-        className="w-full"
-        name="notes"
-        rows={3}
-        value={values.notes}
-        onChange={(e) => set("notes", e.target.value)}
-      />
+          <TextareaField
+            label="Notes"
+            className="w-full"
+            name="notes"
+            rows={3}
+            value={values.notes}
+            onChange={(e) => set("notes", e.target.value)}
+          />
 
-      <div className="flex items-center gap-2">
-        <Button type="submit" variant="primary" size="md" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button onClick={cancel}>Cancel</Button>
-      </div>
-    </form>
+        </form>
+      </Modal>
+    </>
   );
 }

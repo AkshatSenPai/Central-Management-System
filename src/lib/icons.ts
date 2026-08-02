@@ -46,7 +46,10 @@ export const ICON_NAMES = [
   // Content and state.
   "error",
   "event",
+  "chevron_right",
   "drag_indicator",
+  "mail",
+  "call",
 ] as const;
 
 /* Deliberately absent, having been tried and removed rather than overlooked:
@@ -54,9 +57,6 @@ export const ICON_NAMES = [
  *   more_horiz     — the design uses it for row overflow menus. This app has
  *                    no overflow menus; member row actions are two labelled
  *                    buttons, which is better at that count.
- *   chevron_right  — in the mockup this is the calendar's month stepper, not
- *                    a breadcrumb separator. Calendar is a placeholder route,
- *                    and the breadcrumbs read fine with "/".
  *   notifications  — Phase 4.
  *   push_pin, schedule, attach_file — Phases 3c and 6.
  *

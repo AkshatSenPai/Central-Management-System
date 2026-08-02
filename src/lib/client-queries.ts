@@ -10,7 +10,9 @@ export type ClientListRow = {
   status: ClientStatus;
   sector: string | null;
   projectCount: number;
-  primaryContact: { name: string; email: string | null } | null;
+  /** Phone rides alongside email because this studio reaches clients on both,
+   * and the list is where you look someone up before calling them. */
+  primaryContact: { name: string; email: string | null; phone: string | null } | null;
 };
 
 export async function listClients(db: PrismaClient): Promise<ClientListRow[]> {
@@ -21,7 +23,7 @@ export async function listClients(db: PrismaClient): Promise<ClientListRow[]> {
       name: true,
       status: true,
       sector: true,
-      contacts: { select: { name: true, email: true, isPrimary: true } },
+      contacts: { select: { name: true, email: true, phone: true, isPrimary: true } },
       projects: { select: { status: true } },
     },
   });
@@ -35,7 +37,9 @@ export async function listClients(db: PrismaClient): Promise<ClientListRow[]> {
       status: c.status as ClientStatus,
       sector: c.sector,
       projectCount: c.projects.filter((p) => isProjectActive(p.status as ProjectStatus)).length,
-      primaryContact: primary ? { name: primary.name, email: primary.email } : null,
+      primaryContact: primary
+        ? { name: primary.name, email: primary.email, phone: primary.phone }
+        : null,
     };
   });
 }
