@@ -10,6 +10,7 @@ import { monthYear } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { cardClass } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PlainText } from "@/components/ui/plain-text";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { ActivityTimeline } from "@/components/activity/activity-timeline";
 import { ClientForm } from "@/components/clients/client-form";
@@ -105,6 +106,35 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-6">
+          {/* First, above Projects, because it is the standing brief on this
+              client — what they bought, who to ring, what not to say. It was
+              captured from day one and rendered nowhere until Phase 4, which
+              made it a field people wrote into and never saw again.
+
+              Editing goes through the same Edit button in the header as every
+              other client field; a second edit affordance here would be two
+              ways to change one thing. */}
+          <section className="space-y-3">
+            {/* The engagement type is not repeated here — it is already a
+                badge beside the client's name, and saying it twice on one
+                screen makes a reader wonder which one is authoritative. */}
+            <h2 className="text-lg font-medium text-[var(--text)]">Notes</h2>
+            {client.notes ? (
+              <div className={cardClass({ className: "p-4" })}>
+                {/* Links and @mentions render live, so "portal: https://…,
+                    ask @Dana for the login" is clickable rather than
+                    something to copy out by hand. */}
+                <PlainText
+                  body={client.notes}
+                  members={members}
+                  className="text-sm leading-[1.6] text-[var(--text-2)]"
+                />
+              </div>
+            ) : (
+              <EmptyState message="No notes yet. Use Edit to record what this client bought, who to contact, and anything the team should know." />
+            )}
+          </section>
+
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-baseline gap-2">
