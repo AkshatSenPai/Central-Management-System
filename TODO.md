@@ -44,6 +44,12 @@ Roughly in order of value to a fifteen-person studio.
 - [ ] **Time tracking** (Phase 6). Start/stop a timer on a task. Fills the "6h 12m logged this week" slot the dashboard design has and currently leaves empty. New `TimeEntry` model.
 - [ ] **Vault** (Phase 5). The biggest remaining phase and the only genuinely security-critical code in the app: envelope encryption, AES-256-GCM, master key from env (you generate it — no purchase), click-to-reveal, and an access log. Its three item types split — notes and credentials need nothing; only the *files* type needs R2.
 - [ ] **Phase 7**: leave calendar, meeting notes, project/task templates, invoicing, weekly auto-report.
+- [ ] **Searchable project picker.** *(Owner request, 2026-08-03.)* The Project dropdown in the New/Edit task modal is a native `<select>`. Fine at four projects, unusable at fifty — you cannot type to filter, only scroll. Same problem will hit the Client picker in the project form and the Milestone picker.
+
+  This needs a real combobox, and the app has none — **every picker in the codebase is a native `<select>`** (`SelectField` in `src/components/ui/field.tsx`), which is why they have all been free so far: the browser gives keyboard support, mobile behaviour and accessibility for nothing. A combobox has to re-implement all three.
+
+  So build it once as `src/components/ui/combobox.tsx`, not inline in the task form: text input filtering a list, arrow keys and Enter, Escape to close, `role="combobox"` with `aria-expanded`/`aria-activedescendant`, and a hidden input carrying the chosen id so the existing Server Action form contract is untouched. Then swap in the three pickers. Keep `SelectField` for short fixed lists — status, priority, health — where a native select is genuinely better.
+
 - [ ] **Search over comments and client notes.** Today it covers names only, and the empty state says so.
 - [ ] **Deactivated members still receive notifications.** Harmless while they cannot sign in; a one-line `active: true` filter on the recipient set. Do it before anyone actually leaves.
 
