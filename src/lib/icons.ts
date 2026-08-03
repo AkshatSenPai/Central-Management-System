@@ -30,6 +30,7 @@ export const ICON_NAMES = [
   "receipt_long",
   "settings",
   // Shell chrome.
+  "search",
   "notifications",
   "expand_more",
   "light_mode",
@@ -61,11 +62,11 @@ export const ICON_NAMES = [
  *   more_horiz     — the design uses it for row overflow menus. This app has
  *                    no overflow menus; member row actions are two labelled
  *                    buttons, which is better at that count.
- *   search         — went out with the disabled "Search (coming soon)" field
- *                    it labelled. Global search is Phase 6; the icon comes
- *                    back with it.
- *   notifications  — Phase 4.
  *   push_pin, schedule, attach_file — Phases 3c and 6.
+ *
+ * `notifications` and `search` were both on this list and have since earned
+ * their place back, as the features they label were built. The list is a
+ * record of what was considered, not a permanent exclusion.
  *
  * Each was on this list until gate 7 asked where it was rendered and there
  * was no honest answer. That is the gate working, not the gate being

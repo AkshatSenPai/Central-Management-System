@@ -1,5 +1,5 @@
 {
-  "signature": "f02bb63dc7b88b4d",
+  "signature": "12b6e8ad2eed4cf9",
   "icons": [
     "add",
     "alternate_email",
@@ -31,8 +31,9 @@
     "person_add",
     "receipt_long",
     "right_panel_open",
+    "search",
     "settings",
     "space_dashboard"
   ],
-  "bytes": 5196
+  "bytes": 5456
 }
