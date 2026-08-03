@@ -32,6 +32,7 @@ model User {
   taskAssignments TaskAssignee[]
   comments        Comment[]      @relation("CommentAuthor")
   attachments     Attachment[]   @relation("AttachmentUploader")
+  announcements   Announcement[] @relation("AnnouncementAuthor")
   notifications   Notification[] @relation("NotificationRecipient")
   notified        Notification[] @relation("NotificationActor")
   createdAt       DateTime       @default(now())
@@ -299,10 +300,34 @@ model Comment {
   @@index([taskId, createdAt])
 }
 
+/// Company-wide post (spec 6.3). Any member may post; pinning is what puts it
+/// on the dashboard, and it expires on its own so nobody has to remember to
+/// unpin — a board of permanently pinned notices is a board nobody reads.
+model Announcement {
+  id       String @id @default(cuid())
+  author   User   @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  authorId String
+  title    String
+  body     String
+
+  /// Null means never pinned. A date in the past means it was pinned and has
+  /// lapsed — the row keeps the history rather than nulling it, so "this was
+  /// pinned until Friday" stays answerable.
+  pinnedUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([pinnedUntil])
+}
+
 enum NotificationType {
   TASK_ASSIGNED
   COMMENT_MENTION
   TASK_STATUS_CHANGED
+  ANNOUNCEMENT_POSTED
+
   /// Written by the reminder cron, which needs a deployed URL. The type
   /// exists now so the union is complete and describeNotification stays
   /// total; nothing writes it yet.

@@ -46,6 +46,8 @@ export function notificationIcon(type: NotificationType): IconName {
       return "layers";
     case "TASK_DUE_SOON":
       return "event";
+    case "ANNOUNCEMENT_POSTED":
+      return "campaign";
     default:
       return "check_circle";
   }
@@ -72,6 +74,8 @@ export function describeNotification(n: {
     // No actor: a deadline arriving is not something anybody did.
     case "TASK_DUE_SOON":
       return `${what} is due soon`;
+    case "ANNOUNCEMENT_POSTED":
+      return `${who} posted ${what}`;
     default:
       return `${who} updated ${what}`;
   }
@@ -84,6 +88,10 @@ export function notificationHref(n: { entityType: string; entityId: string }): s
   switch (n.entityType) {
     case "TASK":
       return `/tasks/${n.entityId}`;
+    // The board, not a per-announcement page — there is no such page, and the
+    // board is where the thing you were told about is.
+    case "ANNOUNCEMENT":
+      return "/announcements";
     default:
       return "/dashboard";
   }

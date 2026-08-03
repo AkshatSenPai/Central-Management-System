@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getDashboard } from "@/lib/dashboard-queries";
 import { bucketMyTasks, todayLabel, weekStats } from "@/lib/dashboard";
 import { computeProgress } from "@/lib/progress";
+import { relativeTime } from "@/lib/dates";
+import { Icon } from "@/components/ui/icon";
 import { ActivityTimeline } from "@/components/activity/activity-timeline";
 import { DashboardSection, OverdueSection } from "@/components/dashboard/dashboard-section";
 import { DashboardTaskRow } from "@/components/dashboard/dashboard-task-row";
@@ -21,12 +23,13 @@ const SWATCH: Record<number, string> = {
   6: "bg-[var(--pj6)]",
 };
 
-/** The design also carries a pinned announcement banner, a notification bell
- * with a badge, and "6h 12m logged this week" on the in-progress panel. None
- * are built here: announcements and time tracking are Phase 6, notifications
- * Phase 4. A dashboard that renders a zero for a feature that does not exist
- * is worse than one that never mentions it, so this shows only what the
- * schema can actually answer today. */
+/** The design's "6h 12m logged this week" is still absent — time tracking is
+ * Phase 6 and has no data behind it. The pinned announcement banner and the
+ * notification bell, both of which were absent for the same reason, are now
+ * real.
+ *
+ * The rule has not changed: a dashboard that renders a zero for a feature
+ * that does not exist is worse than one that never mentions it. */
 export default async function DashboardPage() {
   const session = await auth();
   // The layout already redirects. Repeated here because this page reads
@@ -38,7 +41,7 @@ export default async function DashboardPage() {
   // let the page cross midnight mid-render and disagree with itself about
   // which tasks are overdue.
   const now = new Date();
-  const { openTasks, inProgress, completedThisWeek, activity } = await getDashboard(
+  const { openTasks, inProgress, completedThisWeek, activity, pinned } = await getDashboard(
     prisma,
     session.user.id,
     now
@@ -49,6 +52,24 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-6 pb-10 pt-5">
+      {/* Above the greeting, because a pinned notice is the one thing on this
+          screen that somebody deliberately put in front of everyone. */}
+      {pinned ? (
+        <Link
+          href="/announcements"
+          className="mb-5 flex items-start gap-3 rounded-[10px] border border-[var(--accent-line)] bg-[var(--accent-soft)] px-3.5 py-3 transition-colors hover:brightness-[0.98]"
+        >
+          <Icon name="campaign" size="sm" className="mt-0.5 flex-none text-[var(--accent)]" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold text-[var(--text)]">{pinned.title}</span>
+            <span className="block text-[12.5px] text-[var(--text-2)]">
+              {pinned.authorName} posted this {relativeTime(pinned.at, now)}
+            </span>
+          </span>
+          <span className="flex-none text-[12.5px] font-semibold text-[var(--accent)]">Read</span>
+        </Link>
+      ) : null}
+
       <h1 className="text-2xl font-semibold tracking-[-0.01em] text-[var(--text)]">
         {firstName ? `Good to see you, ${firstName}` : "Dashboard"}
       </h1>

@@ -3,6 +3,7 @@ import { listAssignedTasks, type TaskListRow } from "@/lib/task-queries";
 import { listRecentActivity, type ActivityEntry } from "@/lib/activity";
 import { projectColorIndex } from "@/lib/project";
 import { addDays, startOfUtcDay } from "@/lib/dashboard";
+import { isPinned } from "@/lib/announcement";
 
 export type InProgressRow = {
   id: string;
@@ -13,11 +14,21 @@ export type InProgressRow = {
   checklistTotal: number;
 };
 
+export type PinnedAnnouncement = {
+  id: string;
+  title: string;
+  authorName: string;
+  at: Date;
+};
+
 export type DashboardData = {
   openTasks: TaskListRow[];
   inProgress: InProgressRow[];
   completedThisWeek: number;
   activity: ActivityEntry[];
+  /** At most one. The design shows a single banner, and a stack of them
+   * would be a second announcements page on the dashboard. */
+  pinned: PinnedAnnouncement | null;
 };
 
 /** Counts tasks this member moved to Done in the last seven days.
@@ -92,12 +103,26 @@ export async function getDashboard(
 ): Promise<DashboardData> {
   const weekAgo = addDays(startOfUtcDay(now), -7);
 
-  const [openTasks, inProgress, completedThisWeek, activity] = await Promise.all([
+  const [openTasks, inProgress, completedThisWeek, activity, pinnedRows] = await Promise.all([
     listAssignedTasks(db, { userId }),
     listInProgress(db, userId),
     countCompletedSince(db, userId, weekAgo),
     listRecentActivity(db, { limit: 6 }),
+    // Filtered in memory rather than by SQL date comparison, so "pinned until
+    // the 5th" means the whole of the 5th — the same day-granular rule the
+    // board uses. A gt(now) clause would drop it at midnight.
+    db.announcement.findMany({
+      where: { pinnedUntil: { not: null } },
+      orderBy: { pinnedUntil: "asc" },
+      take: 5,
+      select: { id: true, title: true, createdAt: true, pinnedUntil: true, author: { select: { name: true } } },
+    }),
   ]);
 
-  return { openTasks, inProgress, completedThisWeek, activity };
+  const live = pinnedRows.find((a) => isPinned(a.pinnedUntil, now));
+  const pinned: PinnedAnnouncement | null = live
+    ? { id: live.id, title: live.title, authorName: live.author.name, at: live.createdAt }
+    : null;
+
+  return { openTasks, inProgress, completedThisWeek, activity, pinned };
 }

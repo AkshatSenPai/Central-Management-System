@@ -9,6 +9,11 @@ export type NotificationDb = Pick<PrismaClient, "notification">;
 
 export type NotificationMeta = Record<string, unknown> | null;
 
+/** What a notification can point at. A union rather than a free string, so
+ * `notificationHref` stays exhaustive and a new kind cannot be added without
+ * deciding where clicking it goes. */
+export type NotificationEntity = "TASK" | "COMMENT" | "ANNOUNCEMENT";
+
 /** Writes one row per recipient.
  *
  * Two rules are enforced here rather than at each of the call sites, because
@@ -32,7 +37,7 @@ export async function notify(
     /** Null only for system-generated notifications (TASK_DUE_SOON). */
     actorId: string | null;
     type: NotificationType;
-    entityType: "TASK" | "COMMENT";
+    entityType: NotificationEntity;
     entityId: string;
     meta?: NotificationMeta;
   }
@@ -61,7 +66,7 @@ export async function notify(
  * task is only a link to a 404. */
 export async function clearNotificationsFor(
   db: NotificationDb,
-  input: { entityType: "TASK" | "COMMENT"; entityId: string }
+  input: { entityType: NotificationEntity; entityId: string }
 ): Promise<void> {
   await db.notification.deleteMany({
     where: { entityType: input.entityType, entityId: input.entityId },
