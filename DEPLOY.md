@@ -28,13 +28,15 @@ Set these in Vercel → Settings → Environment Variables, for **Production**:
 ```
 DATABASE_URL          your Neon pooled connection string
 AUTH_SECRET           a NEW secret, not the local one
-AUTH_URL              https://your-domain.com
-NEXT_PUBLIC_APP_URL   https://your-domain.com
+AUTH_URL              https://cmsforuse.space
+NEXT_PUBLIC_APP_URL   https://cmsforuse.space
 ```
+
+The domain is **cmsforuse.space** (bought 2026-08-03). Both URL variables take the full origin with `https://` and no trailing slash, and both must match the host you actually serve from — pick apex or `www`, redirect one to the other, and use the destination here.
 
 `NEXT_PUBLIC_APP_URL` is not optional in production — `createInviteAction` refuses to generate invite links without it and says so, rather than emitting a broken link.
 
-If you are enabling Google sign-in, add `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`, and add `https://your-domain.com/api/auth/callback/google` to the authorised redirect URIs in the Google Cloud console. Google sign-in is invite-only by design: it only admits an email that already belongs to an active member (`src/lib/google-gate.ts`).
+If you are enabling Google sign-in, add `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`, and add `https://cmsforuse.space/api/auth/callback/google` to the authorised redirect URIs in the Google Cloud console. Google sign-in is invite-only by design: it only admits an email that already belongs to an active member (`src/lib/google-gate.ts`).
 
 ## The build
 
@@ -55,7 +57,7 @@ Use `npm run build:local` when you want to build without touching the database.
 ## First run
 
 1. Deploy.
-2. Visit `https://your-domain.com` — you will be redirected to `/login`.
+2. Visit `https://cmsforuse.space` — you will be redirected to `/login`.
 3. Sign in with your existing account. The database already has your user, your clients, your projects and your eight tasks; deploying does not reset anything.
 4. Invite the team from **Settings → Members**. Invite links are copy-and-paste for now — email is not wired yet, so you will send them yourself via WhatsApp or wherever.
 

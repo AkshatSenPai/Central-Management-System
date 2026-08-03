@@ -12,8 +12,20 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 
 Everything below is in `DEPLOY.md` in full. Short version:
 
-- [ ] **Buy a domain.** If the studio already owns one, use `ops.<domain>` instead of buying — cheaper and clearer.
-- [ ] **Decide the name before there are many tasks.** If it is not "Meridian", three things carry the old one: the sidebar brand block (`src/components/shell/sidebar.tsx`), the page title (`src/app/layout.tsx`), and — the one that matters — the `MER` task-reference prefix in `src/lib/task.ts`. References are permanent and never reused, so changing the prefix later leaves old tasks as `MER-008` and new ones as something else. Decide early or accept the split.
+- [x] **Domain: `cmsforuse.space`** — bought 2026-08-03. Use the exact values below; `AUTH_URL` and `NEXT_PUBLIC_APP_URL` must both be the full origin with `https://` and **no trailing slash**.
+
+  ```
+  AUTH_URL            https://cmsforuse.space
+  NEXT_PUBLIC_APP_URL https://cmsforuse.space
+  ```
+
+  Decide whether the canonical host is the apex or `www` and set both variables to whichever you redirect *to*. A mismatch between the real origin and `AUTH_URL` breaks the sign-in callback, and a wrong `NEXT_PUBLIC_APP_URL` silently produces invite links pointing at the wrong host.
+
+  If you enable Google sign-in, the authorised redirect URI is `https://cmsforuse.space/api/auth/callback/google`.
+
+- [x] **Naming decision — resolved: keep `MER`.** The domain is a host, not a brand, so it no longer forces a rename. The app stays "Meridian Ops" in the sidebar and page title, and task references stay `MER-024`. This was the one item with a deadline, and it is now closed: nothing about the domain requires touching `src/lib/task.ts`.
+
+  If the studio later picks a real product name, the three places carrying the old one are the sidebar brand block (`src/components/shell/sidebar.tsx`), the page title (`src/app/layout.tsx`), and the `TASK_REFERENCE_PREFIX` in `src/lib/task.ts`. Only the third is irreversible — existing references keep their old prefix, because a reference must never point at a different task.
 - [ ] **Vercel Pro**, $20/month, one seat. The free tier is licensed non-commercial and this is a company tool.
 - [ ] **Set the Vercel region to `sin1` (Singapore)** so the app sits beside the Neon database. Neon has no Mumbai region; Singapore is the closest, and leaving Vercel on the US default costs a round trip on every page.
 - [ ] **Env vars** (Production): `DATABASE_URL`, `AUTH_SECRET` (a NEW one, not the local), `AUTH_URL`, `NEXT_PUBLIC_APP_URL`. The last is not optional — invite links refuse to generate without it.
