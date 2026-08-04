@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { listAssignedTasks, type TaskListRow } from "@/lib/task-queries";
 import { listRecentActivity, type ActivityEntry } from "@/lib/activity";
 import { projectColorIndex } from "@/lib/project";
-import { addDays, startOfUtcDay } from "@/lib/dashboard";
+import { addDays, startOfAppDay } from "@/lib/dashboard";
 import { isPinned } from "@/lib/announcement";
 
 export type InProgressRow = {
@@ -101,7 +101,7 @@ export async function getDashboard(
   userId: string,
   now: Date = new Date()
 ): Promise<DashboardData> {
-  const weekAgo = addDays(startOfUtcDay(now), -7);
+  const weekAgo = addDays(startOfAppDay(now), -7);
 
   const [openTasks, inProgress, completedThisWeek, activity, pinnedRows] = await Promise.all([
     listAssignedTasks(db, { userId }),

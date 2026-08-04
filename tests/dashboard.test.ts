@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addDays, bucketMyTasks, startOfUtcDay, todayLabel, weekStats } from "@/lib/dashboard";
+import { addDays, bucketMyTasks, startOfAppDay, todayLabel, weekStats } from "@/lib/dashboard";
 import type { TaskListRow } from "@/lib/task-queries";
 
 /** A fixed Wednesday afternoon. Every assertion below is relative to it, so
@@ -25,17 +25,17 @@ function task(id: string, dueDate: Date | null, extra: Partial<TaskListRow> = {}
   };
 }
 
-describe("startOfUtcDay", () => {
-  it("strips the time, in UTC", () => {
-    expect(startOfUtcDay(NOW).toISOString()).toBe("2026-07-29T00:00:00.000Z");
+describe("startOfAppDay", () => {
+  it("returns app midnight", () => {
+    expect(startOfAppDay(NOW).toISOString()).toBe("2026-07-28T18:30:00.000Z");
   });
 
   // Due dates are stored at UTC midnight by parseDateInput. Truncating in
   // local time would put a task due today into yesterday for anyone west of
   // UTC, which is the overdue bucket.
-  it("does not shift the day for a late-evening UTC time", () => {
-    expect(startOfUtcDay(new Date("2026-07-29T23:59:59.000Z")).toISOString()).toBe(
-      "2026-07-29T00:00:00.000Z"
+  it("does not shift the day for a late-evening IST time", () => {
+    expect(startOfAppDay(new Date("2026-07-29T18:29:59.999Z")).toISOString()).toBe(
+      "2026-07-28T18:30:00.000Z"
     );
   });
 });
@@ -130,8 +130,8 @@ describe("todayLabel", () => {
     expect(todayLabel(NOW)).toBe("Wednesday, 29 July");
   });
 
-  it("is pinned to UTC, so a late evening does not roll to tomorrow", () => {
-    expect(todayLabel(new Date("2026-07-29T23:30:00.000Z"))).toBe("Wednesday, 29 July");
+  it("is pinned to IST, so a late evening does not roll to tomorrow", () => {
+    expect(todayLabel(new Date("2026-07-29T18:29:59.999Z"))).toBe("Wednesday, 29 July");
   });
 });
 

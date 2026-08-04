@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { startOfUtcDay } from "@/lib/dates";
+import { APP_TIMEZONE, startOfAppDay } from "@/lib/dates";
 
 /** Pure announcement rules — no Prisma, no session, so they unit-test without
  * a database. */
@@ -23,7 +23,7 @@ export type AnnouncementInput = z.infer<typeof announcementSchema>;
  */
 export function isPinned(pinnedUntil: Date | null, now: Date): boolean {
   if (!pinnedUntil) return false;
-  return startOfUtcDay(pinnedUntil).getTime() >= startOfUtcDay(now).getTime();
+  return startOfAppDay(pinnedUntil).getTime() >= startOfAppDay(now).getTime();
 }
 
 /** Pinned first, then newest. Within the pinned group, the one pinned to
@@ -50,7 +50,7 @@ export function pinLabel(pinnedUntil: Date | null, now: Date): string | null {
   const date = pinnedUntil.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
-    timeZone: "UTC",
+    timeZone: APP_TIMEZONE,
   });
   return `Pinned until ${date}`;
 }

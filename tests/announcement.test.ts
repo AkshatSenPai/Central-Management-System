@@ -16,7 +16,7 @@ describe("isPinned", () => {
   // failing a day early.
   it("keeps a pin up for the whole of its final day", () => {
     expect(isPinned(d("2026-08-02"), NOW)).toBe(true);
-    expect(isPinned(d("2026-08-02"), new Date("2026-08-02T23:59:59.000Z"))).toBe(true);
+    expect(isPinned(d("2026-08-02"), new Date("2026-08-02T18:29:59.999Z"))).toBe(true);
   });
 
   it("drops a pin the day after", () => {

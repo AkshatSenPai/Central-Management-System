@@ -1,14 +1,14 @@
 import type { TaskListRow } from "@/lib/task-queries";
-import { addDays, startOfUtcDay } from "@/lib/dates";
+import { addDays, appDayOfMonth, APP_TIMEZONE, startOfAppDay } from "@/lib/dates";
 
 /** Everything here is pure and takes `now` explicitly, so the tests can pin a
  * date instead of hoping the suite never runs across midnight. */
 
-// startOfUtcDay and addDays moved to lib/dates.ts in Phase 4, so the calendar
+// startOfAppDay and addDays moved to lib/dates.ts in Phase 4, so the calendar
 // can reach them without importing a dashboard module. Re-exported because
 // dashboard-queries and the dashboard tests already import them from here, and
 // churning those call sites would only obscure the diff.
-export { addDays, startOfUtcDay };
+export { addDays, startOfAppDay };
 
 /** "Wednesday, 29 July" — the design's subtitle for the Today section.
  *
@@ -19,9 +19,9 @@ export { addDays, startOfUtcDay };
  * by runtime means the server and the browser can render it differently.
  * Month and weekday names still come from Intl; only the joining is ours. */
 export function todayLabel(now: Date): string {
-  const weekday = now.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
-  const month = now.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
-  return `${weekday}, ${now.getUTCDate()} ${month}`;
+  const weekday = now.toLocaleDateString("en-GB", { weekday: "long", timeZone: APP_TIMEZONE });
+  const month = now.toLocaleDateString("en-GB", { month: "long", timeZone: APP_TIMEZONE });
+  return `${weekday}, ${appDayOfMonth(now)} ${month}`;
 }
 
 export type DashboardBuckets = {
@@ -40,7 +40,7 @@ export type DashboardBuckets = {
  * contradict the order the same tasks appear in on /my-tasks.
  */
 export function bucketMyTasks(rows: TaskListRow[], now: Date): DashboardBuckets {
-  const today = startOfUtcDay(now);
+  const today = startOfAppDay(now);
   const tomorrow = addDays(today, 1);
 
   return {
@@ -73,7 +73,7 @@ export type WeekStats = {
  * is passed in, counted from the activity log — see countCompletedSince.
  */
 export function weekStats(rows: TaskListRow[], completed: number, now: Date): WeekStats {
-  const today = startOfUtcDay(now);
+  const today = startOfAppDay(now);
   const horizon = addDays(today, 7);
 
   return {
