@@ -100,6 +100,7 @@ export function Combobox({
 
   const listRef = useRef<HTMLSpanElement>(null);
   const listId = useId();
+  const optionId = (index: number) => `${listId}-option-${index}`;
 
   const matches = filterOptions(options, query ?? "");
   const text = query ?? labelForValue(options, value);
@@ -185,6 +186,19 @@ export function Combobox({
           type="text"
           role="combobox"
           autoComplete="off"
+          // Rendered only while the list is open, because the popover is only
+          // in the DOM while it is open — there is no hidden listbox for a
+          // collapsed combobox to point at. aria-expanded="false" carries the
+          // collapsed state on its own.
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
+          // Omitted, never emptied. aria-activedescendant="" and an id
+          // pointing at no element are both IDREF errors, and the failure
+          // mode is a screen reader that announces nothing and gives no sign
+          // why.
+          aria-activedescendant={
+            open && activeIndex >= 0 ? optionId(activeIndex) : undefined
+          }
           className={fieldClass({ size, className })}
           value={text}
           placeholder={placeholder}
@@ -239,6 +253,7 @@ export function Combobox({
               matches.map((option, index) => (
                 <span
                   key={option.value}
+                  id={optionId(index)}
                   data-index={index}
                   role="option"
                   aria-selected={option.value === value}
