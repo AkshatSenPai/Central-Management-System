@@ -601,10 +601,11 @@ export function Combobox({
                   }}
                   onClick={(e) => {
                     // The enclosing <label> forwards a synthetic click to the
-                    // visible input, whose handler toggles the list — so a
-                    // mouse pick would commit, close, and instantly reopen.
-                    // Label forwarding dispatches from click, not mousedown,
-                    // so cancelling the mousedown default does not stop it.
+                    // visible input, whose handler opens the list whenever it
+                    // is closed — so a mouse pick would commit, close, and
+                    // instantly reopen. Label forwarding dispatches from
+                    // click, not mousedown, so cancelling the mousedown
+                    // default does not stop it.
                     e.preventDefault();
                   }}
                   // surface-3 and the hover pairing both match the menu rows
