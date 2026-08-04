@@ -10,6 +10,7 @@ import {
   type TaskPriority,
 } from "@/lib/task";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/form-error";
 import { Icon } from "@/components/ui/icon";
@@ -221,20 +222,17 @@ export function TaskForm({
           {isProjectFixed ? (
             <input type="hidden" name="projectId" value={projectId ?? ""} />
           ) : (
-            <SelectField
+            <Combobox
               label="Project"
-              className="w-full"
               name="projectId"
+              className="w-full"
               value={values.projectId}
-              onChange={(e) => setValues((v) => ({ ...v, projectId: e.target.value, milestoneId: "" }))}
-            >
-                <option value="">No project (personal task)</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-            </SelectField>
+              onChange={(id) => setValues((v) => ({ ...v, projectId: id, milestoneId: "" }))}
+              options={[
+                { value: "", label: "No project (personal task)" },
+                ...projects.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+            />
           )}
 
           {/* Pairing milestone options with the project id they were loaded for
@@ -244,20 +242,17 @@ export function TaskForm({
               swapped away from the one they were loaded for — hides the select
               and forces milestoneId to submit empty. */}
           {milestones !== null && values.projectId === milestones.projectId ? (
-            <SelectField
+            <Combobox
               label="Milestone"
-              className="w-full"
               name="milestoneId"
+              className="w-full"
               value={values.milestoneId}
-              onChange={(e) => set("milestoneId", e.target.value)}
-            >
-                <option value="">No milestone</option>
-                {milestones.options.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.title}
-                  </option>
-                ))}
-            </SelectField>
+              onChange={(id) => set("milestoneId", id)}
+              options={[
+                { value: "", label: "No milestone" },
+                ...milestones.options.map((m) => ({ value: m.id, label: m.title })),
+              ]}
+            />
           ) : (
             <input type="hidden" name="milestoneId" value="" />
           )}

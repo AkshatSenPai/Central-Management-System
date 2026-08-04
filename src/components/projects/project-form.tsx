@@ -12,6 +12,7 @@ import {
 import { toDateInputValue } from "@/lib/dates";
 import { createProjectAction, updateProjectAction } from "@/server/actions/projects";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Field, SelectField, TextareaField } from "@/components/ui/field";
 import { FormError } from "@/components/ui/form-error";
 import { Icon } from "@/components/ui/icon";
@@ -142,23 +143,16 @@ export function ProjectForm({
           {state && !state.ok ? <FormError message={state.error} /> : null}
 
           {!fixedClientId && clients ? (
-            <SelectField
+            <Combobox
               label="Client"
-              className="w-full"
               name="clientId"
+              className="w-full"
               required
+              placeholder="Select a client"
               value={values.clientId}
-              onChange={(e) => set("clientId", e.target.value)}
-            >
-              <option value="" disabled>
-                Select a client
-              </option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </SelectField>
+              onChange={(id) => set("clientId", id)}
+              options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            />
           ) : null}
 
           <Field
