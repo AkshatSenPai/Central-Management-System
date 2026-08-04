@@ -92,7 +92,7 @@ describe("initialActiveIndex", () => {
 
   it("returns -1 when the value matches no option", () => {
     // Two cases at once: D6's absent id, and the Client picker's unselected
-    // "" \u2014 where "" is the placeholder and NOT an option. This is what stops
+    // "" — where "" is the placeholder and NOT an option. This is what stops
     // a bare open-then-Tab writing the alphabetically-first client over
     // whatever was there, with no keystroke that expressed intent.
     expect(initialActiveIndex(PROJECTS, "deleted-id")).toBe(-1);

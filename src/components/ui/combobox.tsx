@@ -79,7 +79,8 @@ export function Combobox({
    * as `query ?? labelForValue(options, value)` and never separately stored,
    * which is what makes the snap back to the selected label a property of not
    * typing rather than of the blur event — so it happens on every route out
-   * of a typed state, including the three that fire no blur. */
+   * of a typed state, including the routes that fire no blur — Escape, a
+   * mouse pick's commit, and an externally reset value. */
   const [query, setQuery] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
 
@@ -116,7 +117,13 @@ export function Combobox({
   }, [open, activeIndex]);
 
   function commit(option: ComboboxOption) {
-    onChange(option.value);
+    // Only when it actually changed. `onChange` means "the value changed",
+    // which is the contract every call site inherited from the <select> this
+    // replaces — a native select fires no change event when you re-pick the
+    // option already selected. task-form's project picker also clears
+    // milestoneId from this callback, so firing it on a no-op pick silently
+    // discards the milestone.
+    if (option.value !== value) onChange(option.value);
     setQuery(null);
     setActiveIndex(-1);
     setOpen(false);
@@ -151,7 +158,8 @@ export function Combobox({
       // form — a silent regression against the <select> being replaced.
       if (!open) return;
       e.preventDefault();
-      if (activeIndex >= 0) commit(matches[activeIndex]);
+      const active = matches[activeIndex];
+      if (active) commit(active);
       else close();
       return;
     }
@@ -174,8 +182,11 @@ export function Combobox({
 
     if (e.key === "Tab") {
       // Never preventDefault()ed; focus must move.
-      if (open && activeIndex >= 0) commit(matches[activeIndex]);
-      else if (open) close();
+      if (open && activeIndex >= 0) {
+        const active = matches[activeIndex];
+        if (active) commit(active);
+        else close();
+      } else if (open) close();
     }
   }
 
@@ -185,6 +196,7 @@ export function Combobox({
         <input
           type="text"
           role="combobox"
+          aria-autocomplete="list"
           autoComplete="off"
           // Rendered only while the list is open, because the popover is only
           // in the DOM while it is open — there is no hidden listbox for a
@@ -199,7 +211,7 @@ export function Combobox({
           aria-activedescendant={
             open && activeIndex >= 0 ? optionId(activeIndex) : undefined
           }
-          className={fieldClass({ size, className })}
+          className={fieldClass({ size, className: `pr-9 ${className ?? ""}`.trim() })}
           value={text}
           placeholder={placeholder}
           required={required}
@@ -226,7 +238,7 @@ export function Combobox({
           aria-hidden="true"
           className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-3)]"
         >
-          <Icon name="expand_more" />
+          <Icon name="expand_more" size="sm" />
         </span>
 
         {open ? (
@@ -234,6 +246,7 @@ export function Combobox({
             ref={listRef}
             id={listId}
             role="listbox"
+            aria-label={label ? `${label} options` : "Options"}
             // Holds focus when the pointer lands on the popover's own
             // scrollbar, which would otherwise blur the input and close the
             // list mid-drag.

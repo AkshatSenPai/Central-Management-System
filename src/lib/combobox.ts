@@ -49,12 +49,12 @@ export function emptyMessage(query: string, hasOptions: boolean): string {
   return `Nothing matches \u201c${query.trim()}\u201d`;
 }
 
-/** Where the highlight sits when the list opens with no keystroke \u2014 a click,
+/** Where the highlight sits when the list opens with no keystroke — a click,
  * or the first arrow. Opening at the current selection is why neither of
  * those can silently replace it.
  *
  * This exists separately from nextActiveIndex because that function takes a
- * count and cannot express "open at the current selection" \u2014 nothing passes
+ * count and cannot express "open at the current selection" — nothing passes
  * it the selected value. Widening its signature was rejected: it would take
  * an options array purely to serve one caller that never moves anything, and
  * the arithmetic function would stop being about arithmetic. */
