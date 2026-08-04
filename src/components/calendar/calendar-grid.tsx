@@ -5,15 +5,15 @@ import { projectColorIndex } from "@/lib/project";
 import { shortDate } from "@/lib/dates";
 import {
   WEEKDAY_LABELS,
-  groupByUtcDay,
-  isInUtcMonth,
+  groupByAppDay,
+  isInAppMonth,
   isOverdueOnDay,
-  isSameUtcDay,
+  isSameAppDay,
   monthGrid,
-  startOfUtcWeek,
+  startOfAppWeek,
   type CalendarView,
 } from "@/lib/calendar";
-import { addDays, startOfUtcDay } from "@/lib/dates";
+import { addDays, appDayOfMonth, startOfAppDay } from "@/lib/dates";
 import type { TaskListRow } from "@/lib/task-queries";
 
 const SWATCH: Record<number, string> = {
@@ -73,8 +73,8 @@ function MonthView({
       <div className="grid grid-cols-7">
         {weeks.flat().map((day) => {
           const tasks = byDay.get(day.getTime()) ?? [];
-          const inMonth = isInUtcMonth(day, anchor);
-          const isToday = isSameUtcDay(day, now);
+          const inMonth = isInAppMonth(day, anchor);
+          const isToday = isSameAppDay(day, now);
           return (
             <div
               key={day.getTime()}
@@ -91,7 +91,7 @@ function MonthView({
                       : "text-[var(--text-3)]"
                 }`}
               >
-                {day.getUTCDate()}
+                {appDayOfMonth(day)}
               </span>
               <div className="flex flex-col gap-0.5">
                 {tasks.slice(0, 3).map((row) => (
@@ -131,7 +131,7 @@ function ColumnsView({
     >
       {days.map((day) => {
         const tasks = byDay.get(day.getTime()) ?? [];
-        const isToday = isSameUtcDay(day, now);
+        const isToday = isSameAppDay(day, now);
         return (
           <section
             key={day.getTime()}
@@ -201,14 +201,14 @@ export function CalendarGrid({
   now: Date;
   rows: TaskListRow[];
 }) {
-  // Bucketed by UTC-midnight epoch, which is what each cell looks itself up
+  // Bucketed by app-midnight epoch, which is what each cell looks itself up
   // by — never by slicing an ISO string, because the dueDate column carries no
   // constraint forcing midnight.
-  const byDay = groupByUtcDay(rows);
+  const byDay = groupByAppDay(rows, (r) => r.dueDate);
 
   if (view === "month") return <MonthView anchor={anchor} now={now} byDay={byDay} />;
   if (view === "week") {
-    const start = startOfUtcWeek(anchor);
+    const start = startOfAppWeek(anchor);
     return (
       <ColumnsView
         days={Array.from({ length: 7 }, (_, i) => addDays(start, i))}
@@ -217,5 +217,5 @@ export function CalendarGrid({
       />
     );
   }
-  return <ColumnsView days={[startOfUtcDay(anchor)]} now={now} byDay={byDay} />;
+  return <ColumnsView days={[startOfAppDay(anchor)]} now={now} byDay={byDay} />;
 }
