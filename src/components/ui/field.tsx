@@ -42,7 +42,7 @@ export function fieldClass(opts: { size?: FieldSize; className?: string } = {}):
  * Everything inside is a <span>, because this wrapper is a <label> and a
  * <label> may not contain block elements like <p> or <div> without breaking
  * its implicit association with the control. */
-function Wrap({
+export function Wrap({
   label,
   error,
   children,
