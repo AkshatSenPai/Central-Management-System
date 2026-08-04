@@ -133,6 +133,13 @@ describe("todayLabel", () => {
   it("is pinned to IST, so a late evening does not roll to tomorrow", () => {
     expect(todayLabel(new Date("2026-07-29T18:29:59.999Z"))).toBe("Wednesday, 29 July");
   });
+
+  it("rolls to the next day once IST has, even though UTC has not", () => {
+    // 20:00Z is 01:30 IST the following morning. This is the only window that
+    // tells the two zones apart — 18:29:59.999Z sits inside both days and so
+    // passes under a silent revert to UTC.
+    expect(todayLabel(new Date("2026-07-29T20:00:00.000Z"))).toBe("Thursday, 30 July");
+  });
 });
 
 describe("addDays", () => {

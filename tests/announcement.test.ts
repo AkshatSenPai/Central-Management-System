@@ -19,6 +19,12 @@ describe("isPinned", () => {
     expect(isPinned(d("2026-08-02"), new Date("2026-08-02T18:29:59.999Z"))).toBe(true);
   });
 
+  it("has lapsed once the IST day has ended, even though the UTC day has not", () => {
+    // Same discriminating window as the dashboard case: 20:00Z is the next
+    // IST day, so a pin through 2026-08-02 is over.
+    expect(isPinned(d("2026-08-02"), new Date("2026-08-02T20:00:00.000Z"))).toBe(false);
+  });
+
   it("drops a pin the day after", () => {
     expect(isPinned(d("2026-08-01"), NOW)).toBe(false);
   });
