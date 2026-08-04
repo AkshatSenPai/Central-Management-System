@@ -243,13 +243,13 @@ describe("calendarTitle", () => {
     expect(calendarTitle("week", new Date("2026-09-30T00:00:00.000Z"))).toBe("28 Sept – 4 Oct 2026");
   });
 
-  it("names both months when a week straddles them", () => {
+  it("keeps the left month when a week ends on the 1st", () => {
     expect(calendarTitle("week", new Date("2026-10-28T00:00:00.000Z"))).toBe(
       "26 Oct – 1 Nov 2026"
     );
   });
 
-  it("names one month when the week does not straddle", () => {
+  it("elides the left month when a week starts on the 1st", () => {
     expect(calendarTitle("week", new Date("2026-06-03T00:00:00.000Z"))).toBe(
       "1 – 7 Jun 2026"
     );
