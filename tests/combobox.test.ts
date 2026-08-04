@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   emptyMessage,
   filterOptions,
+  initialActiveIndex,
   labelForValue,
+  nextActiveIndex,
   type ComboboxOption,
 } from "@/lib/combobox";
 
@@ -75,5 +77,63 @@ describe("emptyMessage", () => {
 
   it("trims the query it echoes", () => {
     expect(emptyMessage("  xyz  ", true)).toBe(`Nothing matches \u201cxyz\u201d`);
+  });
+});
+
+describe("initialActiveIndex", () => {
+  it("returns the index of the selected value", () => {
+    expect(initialActiveIndex(PROJECTS, "p2")).toBe(2);
+  });
+
+  it("returns 0 when the empty-string sentinel is itself an option", () => {
+    // The Project and Milestone pickers, where "" means "No project".
+    expect(initialActiveIndex(PROJECTS, "")).toBe(0);
+  });
+
+  it("returns -1 when the value matches no option", () => {
+    // Two cases at once: D6's absent id, and the Client picker's unselected
+    // "" \u2014 where "" is the placeholder and NOT an option. This is what stops
+    // a bare open-then-Tab writing the alphabetically-first client over
+    // whatever was there, with no keystroke that expressed intent.
+    expect(initialActiveIndex(PROJECTS, "deleted-id")).toBe(-1);
+    expect(initialActiveIndex([{ value: "c1", label: "Acme" }], "")).toBe(-1);
+  });
+
+  it("returns -1 for an empty option list", () => {
+    expect(initialActiveIndex([], "")).toBe(-1);
+  });
+});
+
+describe("nextActiveIndex", () => {
+  it("moves down and up by one", () => {
+    expect(nextActiveIndex(1, 1, 4)).toBe(2);
+    expect(nextActiveIndex(2, -1, 4)).toBe(1);
+  });
+
+  it("moves from nothing-active to the first option on ArrowDown", () => {
+    expect(nextActiveIndex(-1, 1, 4)).toBe(0);
+  });
+
+  it("clamps at the last option without wrapping", () => {
+    expect(nextActiveIndex(3, 1, 4)).toBe(3);
+  });
+
+  it("clamps at the first option without wrapping", () => {
+    expect(nextActiveIndex(0, -1, 4)).toBe(0);
+    expect(nextActiveIndex(-1, -1, 4)).toBe(0);
+  });
+
+  it("returns -1 for an empty list so Enter has nothing to commit", () => {
+    expect(nextActiveIndex(0, 1, 0)).toBe(-1);
+    expect(nextActiveIndex(-1, 1, 0)).toBe(-1);
+  });
+});
+
+describe("typing resets the active index", () => {
+  it("resets to 0 when the filter has hits and -1 when it does not", () => {
+    // Asserted as one test on purpose: these are the two halves of a single
+    // rule in spec section 5, and splitting them is how they drift apart.
+    expect(nextActiveIndex(-1, 1, filterOptions(PROJECTS, "har").length)).toBe(0);
+    expect(nextActiveIndex(-1, 1, filterOptions(PROJECTS, "zzz").length)).toBe(-1);
   });
 });

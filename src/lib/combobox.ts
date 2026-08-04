@@ -48,3 +48,27 @@ export function emptyMessage(query: string, hasOptions: boolean): string {
   if (!hasOptions) return "No options";
   return `Nothing matches \u201c${query.trim()}\u201d`;
 }
+
+/** Where the highlight sits when the list opens with no keystroke \u2014 a click,
+ * or the first arrow. Opening at the current selection is why neither of
+ * those can silently replace it.
+ *
+ * This exists separately from nextActiveIndex because that function takes a
+ * count and cannot express "open at the current selection" \u2014 nothing passes
+ * it the selected value. Widening its signature was rejected: it would take
+ * an options array purely to serve one caller that never moves anything, and
+ * the arithmetic function would stop being about arithmetic. */
+export function initialActiveIndex(options: ComboboxOption[], value: string): number {
+  return options.findIndex((option) => option.value === value);
+}
+
+/** Arrow-key movement. Clamps at both ends rather than wrapping: a list that
+ * jumps from the last row back to the first is one you overshoot. -1 in and
+ * -1 out for an empty list, so Enter has nothing to commit. */
+export function nextActiveIndex(current: number, delta: number, count: number): number {
+  if (count <= 0) return -1;
+  const next = current + delta;
+  if (next < 0) return 0;
+  if (next >= count) return count - 1;
+  return next;
+}
