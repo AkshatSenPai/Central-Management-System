@@ -156,7 +156,7 @@ The filter runs against `query ?? ""`, **not** against the displayed text. That 
 `query` returns to `null` on a commit, on any close, and on **any change to the `value` prop**. That last clause is load-bearing twice over:
 
 - It is what covers `cancel()` (`task-form.tsx:131-134`, `project-form.tsx:99-102`) and the successful-create branch (`task-form.tsx:107-110`, `project-form.tsx:81-84`). Both reset `values` **without** bumping `attempt`, so neither remounts, and `modal.tsx` cannot help — the `<dialog>` at `:69-118` renders `{children}` unconditionally, with no early return on `!open`, so the combobox stays mounted across close and reopen. Without the rule, creating a task with a project and reopening New task would show a box reading "Harlow Website Rebuild" over a hidden input submitting `""`.
-- It is why the restore after a commit reads the **just-committed** id and not a `value` captured before it. There is no blur handler racing the parent's state update: `Tab` commits and then blurs, `Enter` may be followed by `Tab`, and a mousedown pick blurs too — all three land on the same derived render, because the text is a function of the current `value` rather than a string written by whichever handler ran first.
+- It is why the restore after a commit reads the **just-committed** id and not a `value` captured before it. There is no blur handler racing the parent's state update: `Tab` commits and then blurs, `Enter` may be followed by `Tab`, and a mousedown pick fires no blur at all — it holds focus via `mousedown`'s `preventDefault()` — yet all three land on the same derived render, because the text is a function of the current `value` rather than a string written by whichever handler ran first.
 
 **The active index.** `-1` means *nothing is active*: `Enter` and `Tab` commit nothing, and `aria-activedescendant` is omitted. It is set two ways and only two:
 
@@ -258,7 +258,7 @@ There is no `comboboxClass()` to test — the class string comes from `fieldClas
 - [ ] `Enter` with the list **closed** submits the form, the same as it does from the Title field. The picker is not the one place in the app where Enter does nothing.
 - [ ] `Escape` with the list open closes only the list and restores the previously selected label. A second `Escape` closes the modal.
 - [ ] `Tab` commits the highlighted option and moves focus to the next field.
-- [ ] Opening a picker and pressing `Tab` without arrowing or typing leaves the selection unchanged — including the Client picker with nothing selected yet, which must not silently commit the first client. Same by click-then-`Tab`.
+- [ ] Opening a picker and pressing `Tab` without arrowing or typing leaves the selection unchanged — including the Client picker with nothing selected yet, which must not silently commit the first client, and including the Project picker on a task that already has a milestone, where the milestone must also remain unchanged. Same by click-then-`Tab`.
 - [ ] Reopening a picker that already has a selection shows **every** option, not just the row matching the label in the box, and the highlight starts on the current selection.
 - [ ] Typing "Harlo" and clicking elsewhere leaves the box reading the selected client's full name, never "Harlo".
 - [ ] Typing "Harlo" and clicking between two characters in the box repositions the caret and keeps both the query and the open list — it does not close or reset.

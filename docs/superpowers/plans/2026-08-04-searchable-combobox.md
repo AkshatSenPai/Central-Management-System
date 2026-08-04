@@ -475,7 +475,8 @@ export function Combobox({
    * as `query ?? labelForValue(options, value)` and never separately stored,
    * which is what makes the snap back to the selected label a property of not
    * typing rather than of the blur event — so it happens on every route out
-   * of a typed state, including the three that fire no blur. */
+   * of a typed state, including the routes that fire no blur — Escape, a
+   * mouse pick's commit, and an externally reset value. */
   const [query, setQuery] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
 
