@@ -2,7 +2,7 @@
 
 Written 2026-08-03 at the end of the session that built Phases 3c, 4 and part of 6; revised 2026-08-04. Read this first in a new chat; everything below was checked against the repo, not recalled.
 
-**State:** `master`, working tree clean apart from untracked `.superpowers/`. **650 tests, gates 9/9**, `tsc` clean, `lint` clean, production build clean — last verified 2026-08-03, and nothing since has touched `src/`. Not yet deployed.
+**State:** `master`, working tree clean apart from untracked `.superpowers/`. **673 tests, gates 9/9**, `tsc` clean, `lint` clean (0 errors, 0 warnings), production build clean — all verified 2026-08-04 on the merged result. Not yet deployed.
 
 **The team is six people.** Every cost and capacity figure in this file is sized for six. An earlier draft assumed fifteen, and the two specs in §3 still carry that older arithmetic in places — their conclusions hold, the numbers want correcting.
 
@@ -74,13 +74,11 @@ Roughly in order of value to a six-person studio.
 - [ ] **Time tracking** (Phase 6). Start/stop a timer on a task. Fills the "6h 12m logged this week" slot the dashboard design has and currently leaves empty. New `TimeEntry` model.
 - [ ] **Vault** (Phase 5). The biggest remaining phase and the only genuinely security-critical code in the app: envelope encryption, AES-256-GCM, master key from env (you generate it — no purchase), click-to-reveal, and an access log. Its three item types split — notes and credentials need nothing; only the *files* type needs R2.
 - [ ] **Phase 7**: leave calendar, meeting notes, project/task templates, invoicing, weekly auto-report.
-- [ ] **Searchable combobox for entity pickers.** *(Owner request, 2026-08-03. Spec written and adversarially reviewed 2026-08-03.)* **Read `docs/superpowers/specs/2026-08-03-searchable-combobox-design.md`, not this paragraph.** The complaint: the Project dropdown in the New/Edit task modal is a native `<select>` — fine at four projects, unusable at fifty, because you can only scroll, not type.
+- [x] **Searchable combobox for entity pickers — SHIPPED 2026-08-04.** *(Owner request, 2026-08-03.)* `src/components/ui/combobox.tsx` plus its pure half `src/lib/combobox.ts` (23 tests), adopted at Project and Milestone in the task form and Client in the project form. `SelectField` stays on the fourteen fixed-enum pickers. Spec: `docs/superpowers/specs/2026-08-03-searchable-combobox-design.md`; plan: `docs/superpowers/plans/2026-08-04-searchable-combobox.md`. Merged to `master` at `baaffa6`.
 
-  Two things the spec settled that this entry previously got wrong. It is **four** modal-form pickers, not three — Project and Milestone in the task form, Client in the project form, and the account-lead picker in `client-form.tsx`. And the two calendar filters deliberately stay native `<select>`, because they auto-submit on change, so picking there means navigating rather than filling a field.
+  **The account-lead picker in `client-form.tsx` was NOT converted** — the spec scoped it out alongside the two calendar filters, which stay native because they auto-submit on change, so picking there means navigating rather than filling a field. Revisit once these three have been used for a week.
 
-  Review caught four defects before a line was written: `Wrap` is not exported from `field.tsx`; forwarding `disabled` to the hidden input drops the field out of `FormData` entirely; intercepting every `Escape` traps the modal open; and `<form key={attempt}>` remounts only on a *failed* submit, so Cancel and successful-create need a separate derived-text rule or the box shows a stale label while submitting `""`.
-
-  Ships first, blocks nothing, and does not wait on the deploy.
+  Three defects worth remembering, because each was caught at a different layer and the last one is the interesting one. Spec review, pre-code: `Wrap` was not exported; forwarding `disabled` to the hidden input drops the field out of `FormData`; unconditional `Escape` traps the modal open. Task review: the click handler toggled on every click, so clicking to fix a typo mid-search discarded the query — that behaviour was **mandated by the spec** and needed an owner ruling to reverse. Whole-branch review: `commit()` fired `onChange` unconditionally, so re-picking the project you already had **silently wiped the milestone** — a regression against the `<select>`, which fires no change event on re-select. No per-task review could see that one; Task 4 reviewed the keyboard handler with no call sites, Task 6 reviewed the call sites with no view of `commit()`.
 
 - [ ] **In-app chat — DMs and open channels.** *(Spec written and adversarially reviewed 2026-08-03: `docs/superpowers/specs/2026-08-03-in-app-chat-design.md`, 15 sections, 10 numbered rulings.)* Work-context chat that sits **alongside WhatsApp, not instead of it** — the ruling that removes presence, typing indicators, read receipts, push notifications and mobile-first layout in one stroke.
 
