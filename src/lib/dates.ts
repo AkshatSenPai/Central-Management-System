@@ -1,3 +1,11 @@
+export const APP_TIMEZONE = "Asia/Kolkata";
+/** +05:30, and no DST — ever. Asia/Kolkata has had exactly one offset for its
+ * whole modern history, verified across three years of instants in
+ * tests/app-timezone.test.ts. That is what lets every day boundary in this app
+ * be fixed-offset arithmetic instead of an Intl round trip, which is roughly
+ * thirty times slower per cell and returns strings that must be re-parsed. */
+const APP_OFFSET_MS = 330 * 60 * 1000;
+
 /** `<input type="date">` submits "YYYY-MM-DD" and nothing else. Anything that
  * does not match is treated as absent rather than guessed at. */
 const DATE_INPUT = /^\d{4}-\d{2}-\d{2}$/;
@@ -14,30 +22,42 @@ export function parseDateInput(value: string): Date | null {
 /** The only way to repopulate a date input from a stored value. */
 export function toDateInputValue(d: Date | null): string {
   if (!d) return "";
-  return d.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIMEZONE }).format(d);
 }
 
 /** "12 Jun" — locale and timezone pinned so the string is stable everywhere. */
 export function shortDate(d: Date): string {
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: APP_TIMEZONE });
 }
 
 /** "Mar 2024" — same pinning as shortDate. */
 export function monthYear(d: Date): string {
-  return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+  return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: APP_TIMEZONE });
 }
 
-/** Stored due dates are UTC midnight — parseDateInput guarantees it — so every
- * calendar comparison in the app is a UTC calendar-day comparison. Doing it in
- * local time would put a task due "today" into yesterday for anyone west of
- * UTC, which is the overdue bucket.
+/** The first instant of the app day containing `d`.
  *
- * Lived in dashboard.ts until Phase 4; moved here so the calendar does not
- * import a dashboard module to ask what day it is. */
-export function startOfUtcDay(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+ * Its RESULT is an app-midnight instant, which is 18:30Z on the previous
+ * calendar day — surprising the first time, and the reason getUTCDate() and
+ * friends are wrong on anything this returns. Read app-local fields with the
+ * accessors below instead. */
+export function startOfAppDay(d: Date): Date {
+  const DAY = 24 * 60 * 60 * 1000;
+  return new Date(Math.floor((d.getTime() + APP_OFFSET_MS) / DAY) * DAY - APP_OFFSET_MS);
 }
 
+/** App-local calendar fields. Numbers, deliberately: exporting the shifted
+ * Date was rejected because the first person to store one or compare it
+ * against a real timestamp gets a five-and-a-half-hour bug with no symptom. */
+const shifted = (d: Date) => new Date(d.getTime() + APP_OFFSET_MS);
+export const appWeekday = (d: Date) => shifted(d).getUTCDay();
+export const appYear = (d: Date) => shifted(d).getUTCFullYear();
+export const appMonth = (d: Date) => shifted(d).getUTCMonth();
+export const appDayOfMonth = (d: Date) => shifted(d).getUTCDate();
+
+/** Fixed 86 400 000 ms arithmetic — exact here because the app zone has no
+ * DST. In a DST zone this line would be the whole problem; here it is the
+ * whole saving. */
 export function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
 }
