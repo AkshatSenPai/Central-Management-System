@@ -2,18 +2,20 @@ import { describe, it, expect } from "vitest";
 import {
   calendarRange,
   calendarTitle,
-  groupByUtcDay,
-  isInUtcMonth,
+  groupByAppDay,
+  isInAppMonth,
   isOverdueOnDay,
-  isSameUtcDay,
+  isSameAppDay,
   monthGrid,
   parseCalendarView,
-  startOfUtcMonth,
-  startOfUtcWeek,
+  startOfAppMonth,
+  startOfAppWeek,
   stepAnchor,
 } from "@/lib/calendar";
+import { startOfAppDay } from "@/lib/dates";
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(d);
 
 // Wednesday 29 July 2026.
 const WED = new Date("2026-07-29T00:00:00.000Z");
@@ -41,24 +43,24 @@ describe("parseCalendarView", () => {
   });
 });
 
-describe("startOfUtcWeek", () => {
+describe("startOfAppWeek", () => {
   it("starts weeks on Monday", () => {
-    expect(iso(startOfUtcWeek(WED))).toBe("2026-07-27");
+    expect(iso(startOfAppWeek(WED))).toBe("2026-07-27");
   });
 
   // getUTCDay() is 0 on Sunday, so `day - 1` would give -1 and pull the whole
   // grid back a week. Sunday must belong to the week that began six days ago.
   it("puts Sunday at the END of its week, not the start of the next", () => {
-    expect(iso(startOfUtcWeek(SUN))).toBe("2026-07-27");
+    expect(iso(startOfAppWeek(SUN))).toBe("2026-07-27");
   });
 
   it("is idempotent on a Monday", () => {
     const mon = new Date("2026-07-27T00:00:00.000Z");
-    expect(iso(startOfUtcWeek(mon))).toBe("2026-07-27");
+    expect(iso(startOfAppWeek(mon))).toBe("2026-07-27");
   });
 
   it("ignores the time of day", () => {
-    expect(iso(startOfUtcWeek(new Date("2026-07-29T23:59:59.000Z")))).toBe("2026-07-27");
+    expect(iso(startOfAppWeek(new Date("2026-07-29T23:59:59.000Z")))).toBe("2026-07-27");
   });
 });
 
@@ -126,15 +128,15 @@ describe("monthGrid", () => {
   });
 });
 
-describe("isInUtcMonth", () => {
+describe("isInAppMonth", () => {
   it("distinguishes the anchor month from the grid's spill days", () => {
-    expect(isInUtcMonth(new Date("2026-07-01T00:00:00.000Z"), WED)).toBe(true);
-    expect(isInUtcMonth(new Date("2026-06-30T00:00:00.000Z"), WED)).toBe(false);
-    expect(isInUtcMonth(new Date("2026-08-01T00:00:00.000Z"), WED)).toBe(false);
+    expect(isInAppMonth(new Date("2026-07-01T00:00:00.000Z"), WED)).toBe(true);
+    expect(isInAppMonth(new Date("2026-06-30T00:00:00.000Z"), WED)).toBe(false);
+    expect(isInAppMonth(new Date("2026-08-01T00:00:00.000Z"), WED)).toBe(false);
   });
 
   it("does not confuse the same month in a different year", () => {
-    expect(isInUtcMonth(new Date("2025-07-15T00:00:00.000Z"), WED)).toBe(false);
+    expect(isInAppMonth(new Date("2025-07-15T00:00:00.000Z"), WED)).toBe(false);
   });
 });
 
@@ -144,7 +146,7 @@ describe("isOverdueOnDay", () => {
   // red. A calendar asks whether the DAY has passed.
   it("does not call today overdue, at any time of day", () => {
     expect(isOverdueOnDay(WED, new Date("2026-07-29T00:00:00.001Z"))).toBe(false);
-    expect(isOverdueOnDay(WED, new Date("2026-07-29T23:59:59.000Z"))).toBe(false);
+    expect(isOverdueOnDay(WED, new Date("2026-07-29T18:29:59.999Z"))).toBe(false);
   });
 
   it("calls yesterday overdue", () => {
@@ -160,7 +162,7 @@ describe("isOverdueOnDay", () => {
   });
 });
 
-describe("groupByUtcDay", () => {
+describe("groupByAppDay", () => {
   const rows = [
     { id: "a", dueDate: new Date("2026-07-29T00:00:00.000Z") },
     { id: "b", dueDate: new Date("2026-07-29T00:00:00.000Z") },
@@ -168,13 +170,13 @@ describe("groupByUtcDay", () => {
     { id: "d", dueDate: null },
   ];
 
-  it("buckets by UTC day", () => {
-    const map = groupByUtcDay(rows);
-    expect(map.get(WED.getTime())?.map((r) => r.id)).toEqual(["a", "b"]);
+  it("buckets by app day", () => {
+    const map = groupByAppDay(rows, (r) => r.dueDate);
+    expect(map.get(startOfAppDay(WED).getTime())?.map((r) => r.id)).toEqual(["a", "b"]);
   });
 
   it("drops undated rows — they have no cell to sit in", () => {
-    const map = groupByUtcDay(rows);
+    const map = groupByAppDay(rows, (r) => r.dueDate);
     expect([...map.values()].flat().map((r) => r.id)).not.toContain("d");
   });
 
@@ -182,12 +184,12 @@ describe("groupByUtcDay", () => {
   // midnight. Bucketing by string slice would be fine; bucketing by raw
   // getTime() would not. This proves we normalise.
   it("buckets a non-midnight timestamp into the right day", () => {
-    const map = groupByUtcDay([{ id: "x", dueDate: new Date("2026-07-29T16:45:00.000Z") }]);
-    expect(map.get(WED.getTime())?.map((r) => r.id)).toEqual(["x"]);
+    const map = groupByAppDay([{ id: "x", dueDate: new Date("2026-07-29T16:45:00.000Z") }], (r) => r.dueDate);
+    expect(map.get(startOfAppDay(WED).getTime())?.map((r) => r.id)).toEqual(["x"]);
   });
 
   it("returns an empty map for no rows", () => {
-    expect(groupByUtcDay([]).size).toBe(0);
+    expect(groupByAppDay([], (r: { dueDate: Date | null }) => r.dueDate).size).toBe(0);
   });
 });
 
@@ -213,10 +215,10 @@ describe("stepAnchor", () => {
   });
 });
 
-describe("isSameUtcDay", () => {
+describe("isSameAppDay", () => {
   it("ignores the time", () => {
-    expect(isSameUtcDay(WED, new Date("2026-07-29T18:30:00.000Z"))).toBe(true);
-    expect(isSameUtcDay(WED, new Date("2026-07-30T00:00:00.000Z"))).toBe(false);
+    expect(isSameAppDay(WED, new Date("2026-07-29T18:29:59.999Z"))).toBe(true);
+    expect(isSameAppDay(WED, new Date("2026-07-30T00:00:00.000Z"))).toBe(false);
   });
 });
 
@@ -240,10 +242,22 @@ describe("calendarTitle", () => {
     expect(calendarTitle("week", WED)).toBe("27 Jul – 2 Aug 2026");
     expect(calendarTitle("week", new Date("2026-09-30T00:00:00.000Z"))).toBe("28 Sept – 4 Oct 2026");
   });
+
+  it("names both months when a week straddles them", () => {
+    expect(calendarTitle("week", new Date("2026-10-28T00:00:00.000Z"))).toBe(
+      "26 Oct – 1 Nov 2026"
+    );
+  });
+
+  it("names one month when the week does not straddle", () => {
+    expect(calendarTitle("week", new Date("2026-06-03T00:00:00.000Z"))).toBe(
+      "1 – 7 Jun 2026"
+    );
+  });
 });
 
-describe("startOfUtcMonth", () => {
+describe("startOfAppMonth", () => {
   it("returns the first, at midnight", () => {
-    expect(startOfUtcMonth(WED).toISOString()).toBe("2026-07-01T00:00:00.000Z");
+    expect(startOfAppMonth(WED).toISOString()).toBe("2026-06-30T18:30:00.000Z");
   });
 });
