@@ -174,8 +174,10 @@ The filter runs against `query ?? ""`, **not** against the displayed text. That 
 | `Escape`, list closed | **Not intercepted at all** — it falls through to the browser's `<dialog>` close request, which is what `modal.tsx:74-78` depends on. |
 | `Tab` | Commits the active option if the list is open and the active index is not `-1`, closes, and lets focus move on normally. Never `preventDefault()`ed; focus must move. |
 | Blur | Closes. The text is derived, so it reads the selected label again without a handler writing it — D4. |
-| Click on the field | Toggles the list. Closing this way restores the label too, on the same derived rule: no blur fires, so a blur handler would have left "Harlo" on screen under a closed list. |
+| Click on the field | Opens the list if closed; does nothing if already open. It never closes — a click inside an open box is the user placing the caret in their own query, and closing there would discard it. Blur, Escape, commit and outside-click close. |
 | Focus | **Does not open the list.** |
+
+**Click does not close, reversing an earlier draft of this table.** The draft had click toggle, which meant any click inside a typed query discarded it — caret repositioning and dismissal are not the same gesture, and only one of them is what a click inside a focused text input means. Owner ruling, 2026-08-04.
 
 Three of those rows are not arbitrary, and two of them turn on a condition rather than a key.
 
@@ -259,7 +261,7 @@ There is no `comboboxClass()` to test — the class string comes from `fieldClas
 - [ ] Opening a picker and pressing `Tab` without arrowing or typing leaves the selection unchanged — including the Client picker with nothing selected yet, which must not silently commit the first client. Same by click-then-`Tab`.
 - [ ] Reopening a picker that already has a selection shows **every** option, not just the row matching the label in the box, and the highlight starts on the current selection.
 - [ ] Typing "Harlo" and clicking elsewhere leaves the box reading the selected client's full name, never "Harlo".
-- [ ] Typing "Harlo" and clicking the field itself to close leaves the box reading the selected client's full name too — the path that fires no blur.
+- [ ] Typing "Harlo" and clicking between two characters in the box repositions the caret and keeps both the query and the open list — it does not close or reset.
 - [ ] Picking an option with the mouse commits it and closes the list, and the list does not immediately reopen.
 - [ ] Choosing a project clears the milestone, exactly as the `<select>` did.
 - [ ] Saving a task with no project submits `projectId=""` and `createTaskAction` accepts it.

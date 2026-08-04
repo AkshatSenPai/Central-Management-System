@@ -547,14 +547,13 @@ export function Combobox({
             setOpen(true);
           }}
           onClick={(e) => {
-            // Toggles. Closing this way restores the label on the derived
-            // rule: no blur fires, so a blur handler would have left a
-            // half-typed word on screen under a closed list.
-            if (open) close();
-            else {
-              openList();
-              e.currentTarget.select();
-            }
+            // Opens only, never closes. A click inside an already-open box is
+            // the user placing the caret in their own query, not asking to
+            // dismiss the list — closing here would discard what they typed.
+            // Blur, Escape, commit and outside-click all still close it.
+            if (open) return;
+            openList();
+            e.currentTarget.select();
           }}
           onBlur={close}
         />
@@ -941,7 +940,7 @@ All 24 boxes in `docs/superpowers/specs/2026-08-03-searchable-combobox-design.md
 3. Open a picker, press `Tab` without arrowing or typing — selection unchanged. Especially the Client picker with nothing selected, which must not silently commit the first client.
 4. Create a task with a project, save, reopen New task — the box reads "No project (personal task)", not the project just saved. The modal never unmounts, so this tests the derived-text rule rather than the remount.
 5. Edit a task, change its project, Cancel, reopen — the box reads the project the task actually has.
-6. Type "Harlo", click the field itself to close — the box reads the full name. This is the path that fires no blur.
+6. Type "Harlo", click between two characters in the box — the caret repositions and the query and open list are unchanged; it does not close or reset.
 7. Pick with the mouse — commits, closes, and does **not** immediately reopen.
 8. With fifty options, arrow to the last — it stays visible inside the list and the modal body underneath does not scroll.
 

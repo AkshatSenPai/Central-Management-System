@@ -150,14 +150,13 @@ export function Combobox({
             setOpen(true);
           }}
           onClick={(e) => {
-            // Toggles. Closing this way restores the label on the derived
-            // rule: no blur fires, so a blur handler would have left a
-            // half-typed word on screen under a closed list.
-            if (open) close();
-            else {
-              openList();
-              e.currentTarget.select();
-            }
+            // Opens only, never closes. A click inside an already-open box is
+            // the user placing the caret in their own query, not asking to
+            // dismiss the list — closing here would discard what they typed.
+            // Blur, Escape, commit and outside-click all still close it.
+            if (open) return;
+            openList();
+            e.currentTarget.select();
           }}
           onBlur={close}
         />
