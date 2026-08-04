@@ -4,6 +4,7 @@ import {
   filterOptions,
   initialActiveIndex,
   labelForValue,
+  nextActiveIndex,
   type ComboboxOption,
 } from "@/lib/combobox";
 import { fieldClass, Wrap, type FieldSize } from "./field";
@@ -132,6 +133,51 @@ export function Combobox({
     setOpen(true);
   }
 
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) {
+        openList();
+        return;
+      }
+      setActiveIndex(nextActiveIndex(activeIndex, e.key === "ArrowDown" ? 1 : -1, matches.length));
+      return;
+    }
+
+    if (e.key === "Enter") {
+      // Only while the list is open. Closed, suppressing Enter would make
+      // these the three fields in the app where Enter does not submit the
+      // form — a silent regression against the <select> being replaced.
+      if (!open) return;
+      e.preventDefault();
+      if (activeIndex >= 0) commit(matches[activeIndex]);
+      else close();
+      return;
+    }
+
+    if (e.key === "Escape") {
+      // Only while the list is open. Focus does not leave the combobox when
+      // the list closes, so the second Escape arrives at this same handler —
+      // and a rule stated for "Escape" as such would swallow that one too,
+      // leaving a modal that cannot be dismissed by keyboard whenever the
+      // caret sits in a picker.
+      if (!open) return;
+      e.preventDefault();
+      // Belt-and-braces against the document-level Escape listeners in
+      // quick-add, account-menu and notification-bell, which wrap no combobox
+      // today and would each swallow one silently if they ever did.
+      e.stopPropagation();
+      close();
+      return;
+    }
+
+    if (e.key === "Tab") {
+      // Never preventDefault()ed; focus must move.
+      if (open && activeIndex >= 0) commit(matches[activeIndex]);
+      else if (open) close();
+    }
+  }
+
   return (
     <Wrap label={label} error={error}>
       <span className="relative block">
@@ -158,6 +204,7 @@ export function Combobox({
             openList();
             e.currentTarget.select();
           }}
+          onKeyDown={onKeyDown}
           onBlur={close}
         />
 
