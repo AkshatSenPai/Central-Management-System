@@ -1,5 +1,6 @@
 import type { NotificationType } from "@prisma/client";
 import type { IconName } from "@/lib/icons";
+import { parseDateInput } from "@/lib/dates";
 
 /** Pure rendering for the notification panel — no Prisma, no session, so it
  * unit-tests without a database. Mirrors `describeActivity`, including its
@@ -48,6 +49,8 @@ export function notificationIcon(type: NotificationType): IconName {
       return "event";
     case "ANNOUNCEMENT_POSTED":
       return "campaign";
+    case "EVENT_SCHEDULED":
+      return "event";
     default:
       return "check_circle";
   }
@@ -76,6 +79,18 @@ export function describeNotification(n: {
       return `${what} is due soon`;
     case "ANNOUNCEMENT_POSTED":
       return `${who} posted ${what}`;
+    // Not the shared `what` above: its fallback is "a task", a lie here — an
+    // EVENT_SCHEDULED row missing meta.name would read "Priya scheduled a
+    // task", leaking the wrong noun into the surface §13 locks hardest.
+    // Local const, not a per-type default map: that hoist is worth doing the
+    // moment a third type needs a noun of its own, not at two.
+    case "EVENT_SCHEDULED": {
+      const eventWhat = metaString(n.meta, "name") ?? "an event";
+      const when = metaString(n.meta, "when") ?? "";
+      return metaString(n.meta, "movedFrom")
+        ? `${who} moved ${eventWhat} to ${when}`
+        : `${who} scheduled ${eventWhat} — ${when}`;
+    }
     default:
       return `${who} updated ${what}`;
   }
@@ -84,7 +99,11 @@ export function describeNotification(n: {
 /** Where the row goes when clicked. Task and comment notifications both land
  * on the task, because a comment has no page of its own — the thread lives on
  * the task it belongs to. */
-export function notificationHref(n: { entityType: string; entityId: string }): string {
+export function notificationHref(n: {
+  entityType: string;
+  entityId: string;
+  meta?: Record<string, unknown> | null;
+}): string {
   switch (n.entityType) {
     case "TASK":
       return `/tasks/${n.entityId}`;
@@ -92,6 +111,17 @@ export function notificationHref(n: { entityType: string; entityId: string }): s
     // board is where the thing you were told about is.
     case "ANNOUNCEMENT":
       return "/announcements";
+    // The day the event is on, not an event page — there isn't one (§9).
+    // `meta.date` is frozen at write time, so an old notification always
+    // lands on the day it announced rather than wherever the event moved to
+    // since. Validated with parseDateInput rather than interpolated
+    // straight through: only a hand-edited row can fail that check, and the
+    // fallback is what keeps such a row from building a link that looks
+    // right and 404s.
+    case "CALENDAR_EVENT": {
+      const date = metaString(n.meta ?? null, "date");
+      return date && parseDateInput(date) ? `/calendar?view=day&date=${date}` : "/calendar";
+    }
     default:
       return "/dashboard";
   }

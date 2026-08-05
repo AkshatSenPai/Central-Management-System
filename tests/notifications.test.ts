@@ -153,6 +153,39 @@ describe("describeNotification", () => {
       describeNotification({ type: "TASK_ASSIGNED", actorName: "Dana", meta: { name: { x: 1 } } })
     ).toBe("Dana assigned you a task");
   });
+
+  it("describes a newly scheduled event", () => {
+    expect(
+      describeNotification({
+        type: "EVENT_SCHEDULED",
+        actorName: "Priya",
+        meta: { name: "Team sync", when: "15:00 – 16:00" },
+      })
+    ).toBe("Priya scheduled Team sync — 15:00 – 16:00");
+  });
+
+  it("describes a moved event", () => {
+    expect(
+      describeNotification({
+        type: "EVENT_SCHEDULED",
+        actorName: "Priya",
+        meta: { name: "Team sync", when: "15:00 – 16:00", movedFrom: "10:00 – 11:00" },
+      })
+    ).toBe("Priya moved Team sync to 15:00 – 16:00");
+  });
+
+  // The shared `what` binding a few lines up falls back to "a task" — a lie
+  // for an event. This is the trap case: it must read "an event" and must
+  // never leak "a task" into the vocabulary-locked surface (§13).
+  it("falls back to \"an event\", never the shared \"a task\", when meta.name is missing", () => {
+    const result = describeNotification({
+      type: "EVENT_SCHEDULED",
+      actorName: "Priya",
+      meta: { when: "15:00 – 16:00" },
+    });
+    expect(result).toBe("Priya scheduled an event — 15:00 – 16:00");
+    expect(result).not.toContain("a task");
+  });
 });
 
 describe("notificationHref", () => {
@@ -163,12 +196,31 @@ describe("notificationHref", () => {
   it("falls back rather than building a broken URL", () => {
     expect(notificationHref({ entityType: "MYSTERY", entityId: "x" })).toBe("/dashboard");
   });
+
+  it("points a calendar event notification at its day", () => {
+    expect(
+      notificationHref({ entityType: "CALENDAR_EVENT", entityId: "e1", meta: { date: "2026-08-05" } })
+    ).toBe("/calendar?view=day&date=2026-08-05");
+  });
+
+  it("falls back to /calendar when meta.date is missing", () => {
+    expect(notificationHref({ entityType: "CALENDAR_EVENT", entityId: "e1", meta: null })).toBe(
+      "/calendar"
+    );
+  });
+
+  it("falls back to /calendar when meta.date is malformed", () => {
+    expect(
+      notificationHref({ entityType: "CALENDAR_EVENT", entityId: "e1", meta: { date: "not-a-date" } })
+    ).toBe("/calendar");
+  });
 });
 
 describe("notificationIcon", () => {
   it("gives each type its own glyph", () => {
     expect(notificationIcon("COMMENT_MENTION")).toBe("alternate_email");
     expect(notificationIcon("TASK_DUE_SOON")).toBe("event");
+    expect(notificationIcon("EVENT_SCHEDULED")).toBe("event");
   });
 
   it("is total", () => {

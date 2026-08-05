@@ -12,7 +12,7 @@ export type NotificationMeta = Record<string, unknown> | null;
 /** What a notification can point at. A union rather than a free string, so
  * `notificationHref` stays exhaustive and a new kind cannot be added without
  * deciding where clicking it goes. */
-export type NotificationEntity = "TASK" | "COMMENT" | "ANNOUNCEMENT";
+export type NotificationEntity = "TASK" | "COMMENT" | "ANNOUNCEMENT" | "CALENDAR_EVENT";
 
 /** Writes one row per recipient.
  *
