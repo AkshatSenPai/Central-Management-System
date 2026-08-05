@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listTasksInRange } from "@/lib/task-queries";
 import { listCalendarEventsInRange } from "@/lib/calendar-event-queries";
@@ -9,6 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CalendarFilters } from "@/components/calendar/calendar-filters";
 import { CalendarGrid } from "@/components/calendar/calendar-grid";
+import { EventForm } from "@/components/calendar/event-form";
 
 /** Spec 5.5's calendar. Reads `dueDate`, so it needed no migration — which is
  * what made it the natural first slice of Phase 4 after the notification
@@ -25,6 +28,13 @@ export default async function CalendarPage(props: {
     status?: string | string[];
   }>;
 }) {
+  const session = await auth();
+  // The layout already redirects. Repeated here because this page reads
+  // session.user.id directly (the New event trigger pre-checks its creator
+  // as an attendee), and TypeScript cannot see a guard that lives in
+  // another file.
+  if (!session?.user) redirect("/login");
+
   const raw = await props.searchParams;
   const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -44,7 +54,7 @@ export default async function CalendarPage(props: {
 
   const { from, to } = calendarRange(view, anchor);
 
-  const [rows, events, members, projects] = await Promise.all([
+  const [rows, events, members, projects, clients] = await Promise.all([
     listTasksInRange(prisma, { from, to, userId, projectId, status }),
     // No status: events have no status column, so passing one would not
     // compile — status=DONE shows completed tasks and every event (spec §6).
@@ -59,12 +69,9 @@ export default async function CalendarPage(props: {
       select: { id: true, name: true, clientId: true },
       orderBy: { name: "asc" },
     }),
-    // Deliberately not a fifth query here: step 4's Client Combobox will need
-    // prisma.client.findMany({ select: { id: true, name: true }, orderBy: {
-    // name: "asc" } }) added to this Promise.all, but nothing on this page
-    // renders it yet, and an unread query is a real round trip on every
-    // calendar load (steps ship separately — step 3 may reach production
-    // before <EventForm> exists). Add it when step 4 adds its first reader.
+    // <EventForm>'s Client Combobox (step 4) is now a real reader, so this is
+    // no longer the deferred fifth query it was in step 3 — it reads here.
+    prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -74,26 +81,45 @@ export default async function CalendarPage(props: {
         subtitle={calendarPeriodSummary(rows.length, events.length)}
       />
 
-      <CalendarFilters
-        view={view}
-        prevAnchor={stepAnchor(view, anchor, -1)}
-        nextAnchor={stepAnchor(view, anchor, 1)}
-        today={now}
-        userId={userId}
-        projectId={projectId}
-        status={status}
-        members={members}
-        projects={projects}
-      />
+      {/* The New event trigger sits beside the filters, not beside the title
+          (spec §6:270) — this row, not <PageHeader>'s action slot. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <CalendarFilters
+          view={view}
+          prevAnchor={stepAnchor(view, anchor, -1)}
+          nextAnchor={stepAnchor(view, anchor, 1)}
+          today={now}
+          userId={userId}
+          projectId={projectId}
+          status={status}
+          members={members}
+          projects={projects}
+        />
+        <EventForm
+          projects={projects}
+          clients={clients}
+          members={members}
+          selectedAttendeeIds={[session.user.id]}
+        />
+      </div>
 
-      <CalendarGrid view={view} anchor={anchor} now={now} rows={rows} events={events} />
+      <CalendarGrid
+        view={view}
+        anchor={anchor}
+        now={now}
+        rows={rows}
+        events={events}
+        projects={projects}
+        clients={clients}
+        members={members}
+      />
 
       {/* Said once, under the grid, rather than in every empty cell. Undated
           work is invisible here by design — a task with no due date has no
           cell to sit in — and /my-tasks is where it lives. */}
-      {rows.length === 0 ? (
+      {rows.length === 0 && events.length === 0 ? (
         <EmptyState
-          message="Nothing due in this period. Tasks with no due date never appear here —"
+          message="Nothing due or scheduled in this period. Tasks with no due date never appear here —"
           actionLabel="see all your tasks."
           actionHref="/my-tasks"
         />

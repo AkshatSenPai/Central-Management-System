@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { parseTimeInput, toDateInputValue, toTimeInputValue } from "@/lib/dates";
 import { createCalendarEventAction, updateCalendarEventAction } from "@/server/actions/calendar-events";
 import { AssigneePicker } from "@/components/tasks/assignee-picker";
+import { EventRemoveControl } from "@/components/calendar/event-remove-control";
 
 /** `<EventForm>` copies `<TaskForm>`'s contract clause by clause (spec
  * §8:329-352) — every comment below that says so is naming the clause it is
@@ -200,6 +201,11 @@ export function EventForm({
         icon="event"
         footer={
           <>
+            {/* A sibling of the edit <form> below, not a descendant —
+                modal.tsx:110/:113 render the body and the footer as separate
+                <div>s, so a <form> placed here nests inside nothing. Edit
+                mode only: there is no event to remove yet in create mode. */}
+            {event ? <EventRemoveControl eventId={event.id} onDone={cancel} /> : null}
             <span className="flex-1" />
             <Button onClick={cancel}>Cancel</Button>
             {/* Outside the <form> it submits, which is what `form` is for.

@@ -24,6 +24,14 @@ import {
 import { addDays, appDayOfMonth, startOfAppDay } from "@/lib/dates";
 import type { TaskListRow } from "@/lib/task-queries";
 import type { CalendarEventRow } from "@/lib/calendar-event-queries";
+import { EventForm } from "@/components/calendar/event-form";
+
+/** `<EventForm>`'s own prop shapes, structurally — it does not export its
+ * `ProjectOption`/`ClientOption`/`MemberOption` types (spec §8 names no
+ * reason to), and this file needs nothing from them but the shape. */
+type ProjectOption = { id: string; name: string; clientId: string };
+type ClientOption = { id: string; name: string };
+type MemberOption = { id: string; name: string; active: boolean };
 
 const SWATCH: Record<number, string> = {
   1: "bg-[var(--pj1)]",
@@ -204,22 +212,37 @@ const HOUR_ROW_HEIGHT_PX = 44;
  * would read as broken (§10) — and never receives an all-day event or a due
  * task; those belong to the untimed band above it, not here.
  *
- * Each box is a `<Link>`, not a `<button>` — gate 2 forbids a raw one, and
- * the box is an absolutely positioned element carrying `topPct`/`heightPct`,
- * a lane width, a time label and a title, none of which a default trigger
- * knows about (spec §7:325). Positioning and sizing live on the outer
- * element via `style`, with the clickable label/title as its content, so a
- * later step can swap this `<Link>` for `<EventForm>`'s trigger slot without
- * touching the box's layout. `min-h-[22px]` is a CSS class, not part of the
- * `heightPct` arithmetic above it — `eventPosition` deliberately returns a
- * 15-minute event's true, tiny percentage, and the click target is kept
- * usable here instead. */
+ * Each box carries `topPct`/`heightPct`, a lane width, a time label and a
+ * title via `style` on its own outer element — none of which a default
+ * trigger knows about (spec §7:325), which is why gate 2's Button primitive
+ * cannot simply wrap the label. `min-h-[22px]` is a CSS class, not part of
+ * the `heightPct` arithmetic above it — `eventPosition` deliberately returns
+ * a 15-minute event's true, tiny percentage, and the click target is kept
+ * usable here instead.
+ *
+ * **Only in the day view** (`isDayView`, i.e. exactly one column on screen)
+ * does the box become `<EventForm>`'s edit trigger — the whole positioned
+ * node passed in as `trigger` rather than splitting position and visuals
+ * across two elements, per the task-7 brief's ⚠️. In week view (and the
+ * month chips, unchanged) the box stays a `<Link>` to that day's day view:
+ * per-column edit triggers there would mean threading `projects`/`clients`/
+ * `members` seven times over for a click a reader can already reach in one
+ * more hop, and spec §7:325 names only "the day view" as the edit entry
+ * point. */
 function DayTimeline({
   events,
   window,
+  isDayView,
+  projects,
+  clients,
+  members,
 }: {
   events: CalendarEventRow[];
   window: { startHour: number; endHour: number };
+  isDayView: boolean;
+  projects: ProjectOption[];
+  clients: ClientOption[];
+  members: MemberOption[];
 }) {
   const hours = Array.from(
     { length: window.endHour - window.startHour },
@@ -248,20 +271,16 @@ function DayTimeline({
         const dotClass = event.projectId
           ? SWATCH[projectColorIndex(event.projectId)]
           : "bg-[var(--accent)]";
-        return (
-          <Link
-            key={event.id}
-            href={`/calendar?view=day&date=${toDateInputValue(event.startsAt)}`}
-            transitionTypes={["nav-forward"]}
-            title={event.title}
-            className="absolute min-h-[22px] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] shadow-[var(--shadow)] transition-colors hover:bg-[var(--surface-3)]"
-            style={{
-              top: `${topPct}%`,
-              height: `${heightPct}%`,
-              left: `calc(${leftPct}% + 2px)`,
-              width: `calc(${widthPct}% - 4px)`,
-            }}
-          >
+        const boxClassName =
+          "absolute min-h-[22px] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] shadow-[var(--shadow)] transition-colors hover:bg-[var(--surface-3)]";
+        const boxStyle = {
+          top: `${topPct}%`,
+          height: `${heightPct}%`,
+          left: `calc(${leftPct}% + 2px)`,
+          width: `calc(${widthPct}% - 4px)`,
+        };
+        const boxContent = (
+          <>
             <span className="flex items-center gap-1">
               <span aria-hidden="true" className={`h-1.5 w-1.5 flex-none rounded-full ${dotClass}`} />
               <span className="mono truncate text-[10px] text-[var(--text-3)]">
@@ -271,7 +290,53 @@ function DayTimeline({
             <span className="block truncate text-[11px] font-medium text-[var(--text)]">
               {event.title}
             </span>
-          </Link>
+          </>
+        );
+
+        if (!isDayView) {
+          return (
+            <Link
+              key={event.id}
+              href={`/calendar?view=day&date=${toDateInputValue(event.startsAt)}`}
+              transitionTypes={["nav-forward"]}
+              title={event.title}
+              className={boxClassName}
+              style={boxStyle}
+            >
+              {boxContent}
+            </Link>
+          );
+        }
+
+        return (
+          <EventForm
+            key={event.id}
+            event={{
+              id: event.id,
+              title: event.title,
+              // CalendarEventRow (spec §6) carries no `description` — it is
+              // the grid's row contract, and the grid never displays one.
+              // <EventForm>'s edit mode needs the full row and has nothing
+              // else to read it from here; see task-7-report.md for why this
+              // is flagged rather than silently patched by widening that
+              // query's select.
+              description: null,
+              startsAt: event.startsAt,
+              endsAt: event.endsAt,
+              allDay: event.allDay,
+              projectId: event.projectId,
+              clientId: event.clientId,
+            }}
+            projects={projects}
+            clients={clients}
+            members={members}
+            selectedAttendeeIds={event.attendees.map((a) => a.id)}
+            trigger={
+              <div title={event.title} className={boxClassName} style={boxStyle}>
+                {boxContent}
+              </div>
+            }
+          />
         );
       })}
     </div>
@@ -291,22 +356,31 @@ function ColumnsView({
   byDay,
   events,
   eventsByDay,
+  projects,
+  clients,
+  members,
 }: {
   days: Date[];
   now: Date;
   byDay: Map<number, TaskListRow[]>;
   events: CalendarEventRow[];
   eventsByDay: Map<number, CalendarEventRow[]>;
+  projects: ProjectOption[];
+  clients: ClientOption[];
+  members: MemberOption[];
 }) {
   // Fed the timed rows only, never the raw `events` array: an all-day event
   // runs app-midnight to app-midnight, so a single "Priya on leave" left in
   // would drag this window to 00:00–24:00 for every column on screen (D5,
   // §7) — for a row the timeline does not even carry.
   const window = timelineWindow(splitDayEvents(events).timed);
+  // The same invariant the grid className below already keys off: day view
+  // is always exactly one column, week view is always seven. Reused rather
+  // than re-derived so there is one definition of "is this the day view" —
+  // the one place spec §7:325 names as the edit trigger's home.
+  const isDayView = days.length === 1;
   return (
-    <div
-      className={`grid gap-3 ${days.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-7"}`}
-    >
+    <div className={`grid gap-3 ${isDayView ? "grid-cols-1" : "grid-cols-1 md:grid-cols-7"}`}>
       {days.map((day) => {
         const tasks = byDay.get(day.getTime()) ?? [];
         const dayEvents = eventsByDay.get(day.getTime()) ?? [];
@@ -377,7 +451,14 @@ function ColumnsView({
             {/* The hour timeline: timed events only, positioned within the
                 window shared by every column on screen. */}
             <div className="p-2">
-              <DayTimeline events={timedEvents} window={window} />
+              <DayTimeline
+                events={timedEvents}
+                window={window}
+                isDayView={isDayView}
+                projects={projects}
+                clients={clients}
+                members={members}
+              />
             </div>
           </section>
         );
@@ -392,12 +473,20 @@ export function CalendarGrid({
   now,
   rows,
   events,
+  projects,
+  clients,
+  members,
 }: {
   view: CalendarView;
   anchor: Date;
   now: Date;
   rows: TaskListRow[];
   events: CalendarEventRow[];
+  /** Only read by the day view's `<EventForm>` edit trigger (below) — month
+   * and week never open the form, so `MonthView` takes none of these three. */
+  projects: ProjectOption[];
+  clients: ClientOption[];
+  members: MemberOption[];
 }) {
   // Bucketed by app-midnight epoch, which is what each cell looks itself up
   // by — never by slicing an ISO string, because the dueDate column carries no
@@ -417,6 +506,9 @@ export function CalendarGrid({
         byDay={byDay}
         events={events}
         eventsByDay={eventsByDay}
+        projects={projects}
+        clients={clients}
+        members={members}
       />
     );
   }
@@ -427,6 +519,9 @@ export function CalendarGrid({
       byDay={byDay}
       events={events}
       eventsByDay={eventsByDay}
+      projects={projects}
+      clients={clients}
+      members={members}
     />
   );
 }
