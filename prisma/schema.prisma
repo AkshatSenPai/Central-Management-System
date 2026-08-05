@@ -12,12 +12,12 @@ enum Role {
 }
 
 model User {
-  id              String         @id @default(cuid())
-  email           String         @unique
+  id              String                  @id @default(cuid())
+  email           String                  @unique
   name            String
   passwordHash    String?
-  role            Role           @default(MEMBER)
-  active          Boolean        @default(true)
+  role            Role                    @default(MEMBER)
+  active          Boolean                 @default(true)
   title           String?
   phone           String?
   avatarUrl       String?
@@ -25,18 +25,20 @@ model User {
   image           String?
   accounts        Account[]
   sessions        Session[]
-  invitesCreated  Invite[]       @relation("InviteCreator")
-  activity        ActivityLog[]  @relation("ActivityActor")
-  clientsLed      Client[]       @relation("ClientAccountLead")
-  tasksCreated    Task[]         @relation("TaskCreator")
+  invitesCreated  Invite[]                @relation("InviteCreator")
+  activity        ActivityLog[]           @relation("ActivityActor")
+  clientsLed      Client[]                @relation("ClientAccountLead")
+  tasksCreated    Task[]                  @relation("TaskCreator")
   taskAssignments TaskAssignee[]
-  comments        Comment[]      @relation("CommentAuthor")
-  attachments     Attachment[]   @relation("AttachmentUploader")
-  announcements   Announcement[] @relation("AnnouncementAuthor")
-  notifications   Notification[] @relation("NotificationRecipient")
-  notified        Notification[] @relation("NotificationActor")
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  eventsCreated   CalendarEvent[]         @relation("CalendarEventCreator")
+  eventAttendance CalendarEventAttendee[]
+  comments        Comment[]               @relation("CommentAuthor")
+  attachments     Attachment[]            @relation("AttachmentUploader")
+  announcements   Announcement[]          @relation("AnnouncementAuthor")
+  notifications   Notification[]          @relation("NotificationRecipient")
+  notified        Notification[]          @relation("NotificationActor")
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 }
 
 model Invite {
@@ -122,6 +124,7 @@ model Client {
   accountLeadId  String?
   contacts       ClientContact[]
   projects       Project[]
+  calendarEvents CalendarEvent[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -144,21 +147,22 @@ model ClientContact {
 }
 
 model Project {
-  id             String        @id @default(cuid())
-  client         Client        @relation(fields: [clientId], references: [id])
+  id             String          @id @default(cuid())
+  client         Client          @relation(fields: [clientId], references: [id])
   clientId       String
   name           String
   description    String?
-  status         ProjectStatus @default(PLANNING)
-  health         ProjectHealth @default(ON_TRACK)
-  progressMode   ProgressMode  @default(AUTO)
+  status         ProjectStatus   @default(PLANNING)
+  health         ProjectHealth   @default(ON_TRACK)
+  progressMode   ProgressMode    @default(AUTO)
   manualProgress Int?
   startDate      DateTime?
   dueDate        DateTime?
   milestones     Milestone[]
   tasks          Task[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  calendarEvents CalendarEvent[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@unique([clientId, name])
   @@index([clientId])
@@ -322,6 +326,78 @@ model Announcement {
   @@index([pinnedUntil])
 }
 
+model CalendarEvent {
+  id String @id @default(cuid())
+
+  title       String
+  description String?
+
+  /// The instant it starts, stored UTC like every other DateTime here.
+  /// Grouping and display resolve it in APP_TIMEZONE (src/lib/dates.ts) and
+  /// never here. Storing wall-clock time instead was rejected: it needs a
+  /// second column naming the zone that clock belongs to, and six people in
+  /// one city do not have a second zone to name.
+  startsAt DateTime
+
+  /// The instant it ends, exclusive: the event covers [startsAt, endsAt),
+  /// half-open like calendarRange. A timed event ends later on the same app
+  /// day it started. An all-day event ends at the NEXT app midnight — that is
+  /// the exclusive bound, not a second day. Nullable was rejected: the day
+  /// timeline draws a box, a box has a height, and "no end" would mean
+  /// inventing one at render time. Postgres cannot express any of this
+  /// without a CHECK constraint this schema has no precedent for, so the form
+  /// shape and validateEventTimes own it — the same trade the polymorphic
+  /// parents make at ActivityLog and Attachment.
+  endsAt DateTime
+
+  /// True for "Priya on leave" and anything else that owns a day rather than
+  /// a slot. It is a real column, not startsAt-is-midnight: an event that
+  /// genuinely starts at 00:00 exists, and inferring the flag from the clock
+  /// would make it undrawable.
+  allDay Boolean @default(false)
+
+  /// Who arranged it. Never cascades — the same rule as Task.creator: a
+  /// deactivated member's meetings are still on the calendar, and members are
+  /// deactivated rather than deleted precisely so history keeps its people.
+  creator   User   @relation("CalendarEventCreator", fields: [creatorId], references: [id])
+  creatorId String
+
+  /// Optional, and independent of each other. A project pins the client too
+  /// (the service copies it, and disagreement is impossible because the form
+  /// derives it); a client with no project is the sales pitch to a prospect,
+  /// which has nowhere else to hang. Deriving clientId through projectId
+  /// alone — the way Task does — was rejected for exactly that case.
+  project   Project? @relation(fields: [projectId], references: [id])
+  projectId String?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  clientId  String?
+
+  attendees CalendarEventAttendee[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The calendar's only query is a half-open window on startsAt, so the
+  /// window column is the one that earns an index. projectId and clientId get
+  /// theirs by the same house rule every other FK follows.
+  @@index([startsAt])
+  @@index([projectId])
+  @@index([clientId])
+}
+
+/// One row per person per event, the shape TaskAssignee already proved. Not a
+/// String[] on CalendarEvent: an array cannot be indexed by user, and "what is
+/// on my plate this week" is the query this table exists for.
+model CalendarEventAttendee {
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId String
+  user    User          @relation(fields: [userId], references: [id])
+  userId  String
+
+  @@id([eventId, userId])
+  @@index([userId])
+}
+
 enum NotificationType {
   TASK_ASSIGNED
   COMMENT_MENTION
@@ -332,6 +408,15 @@ enum NotificationType {
   /// exists now so the union is complete and describeNotification stays
   /// total; nothing writes it yet.
   TASK_DUE_SOON
+
+  /// Attendees only, on create and when the time moves — never on a title or
+  /// description edit, and never to the actor (notification-service.ts:45
+  /// enforces that centrally). One type rather than two: describeNotification
+  /// already branches on meta, so meta.movedFrom carries "scheduled" versus
+  /// "moved" without widening this enum. meta carries { name, when, date }
+  /// and optionally movedFrom; `date` is the YYYY-MM-DD app-zone day the link
+  /// needs, and without it notificationHref has nowhere to point.
+  EVENT_SCHEDULED
 }
 
 /// One row per person per event. Deliberately not shared: two people mentioned
