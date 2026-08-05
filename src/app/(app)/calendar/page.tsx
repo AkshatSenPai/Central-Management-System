@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { listTasksInRange } from "@/lib/task-queries";
+import { listCalendarEventsInRange } from "@/lib/calendar-event-queries";
 import { parseDateInput } from "@/lib/dates";
 import { parseTaskStatusFilter } from "@/lib/task";
+import { calendarPeriodSummary } from "@/lib/calendar-event";
 import { calendarRange, calendarTitle, parseCalendarView, stepAnchor } from "@/lib/calendar";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -42,27 +44,37 @@ export default async function CalendarPage(props: {
 
   const { from, to } = calendarRange(view, anchor);
 
-  const [rows, members, projects] = await Promise.all([
+  const [rows, events, members, projects, clients] = await Promise.all([
     listTasksInRange(prisma, { from, to, userId, projectId, status }),
+    // No status: events have no status column, so passing one would not
+    // compile — status=DONE shows completed tasks and every event (spec §6).
+    listCalendarEventsInRange(prisma, { from, to, userId, projectId }),
     prisma.user.findMany({
       where: { active: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, active: true },
       orderBy: { name: "asc" },
     }),
     prisma.project.findMany({
       where: { status: { not: "DONE" } },
+      select: { id: true, name: true, clientId: true },
+      orderBy: { name: "asc" },
+    }),
+    // Step 4's Client Combobox has nothing to render without this — there is
+    // no client query on this page today.
+    prisma.client.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
   ]);
+  // Fetched here because this task owns the page's query block, but not yet
+  // rendered — step 4's <EventForm> Client Combobox is the first consumer.
+  void clients;
 
   return (
     <div className="space-y-5 px-6 pb-10 pt-5">
       <PageHeader
         title={calendarTitle(view, anchor)}
-        subtitle={
-          rows.length === 1 ? "1 task due in this period" : `${rows.length} tasks due in this period`
-        }
+        subtitle={calendarPeriodSummary(rows.length, events.length)}
       />
 
       <CalendarFilters
@@ -77,7 +89,7 @@ export default async function CalendarPage(props: {
         projects={projects}
       />
 
-      <CalendarGrid view={view} anchor={anchor} now={now} rows={rows} />
+      <CalendarGrid view={view} anchor={anchor} now={now} rows={rows} events={events} />
 
       {/* Said once, under the grid, rather than in every empty cell. Undated
           work is invisible here by design — a task with no due date has no

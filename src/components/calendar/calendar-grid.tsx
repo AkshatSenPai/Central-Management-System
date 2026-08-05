@@ -15,6 +15,7 @@ import {
 } from "@/lib/calendar";
 import { addDays, appDayOfMonth, startOfAppDay } from "@/lib/dates";
 import type { TaskListRow } from "@/lib/task-queries";
+import type { CalendarEventRow } from "@/lib/calendar-event-queries";
 
 const SWATCH: Record<number, string> = {
   1: "bg-[var(--pj1)]",
@@ -200,6 +201,10 @@ export function CalendarGrid({
   anchor: Date;
   now: Date;
   rows: TaskListRow[];
+  // Accepted but not yet rendered — wiring the grid to draw these is Task 5.
+  // Left out of the destructure (rather than bound and unused) so the prop
+  // is part of the contract without tripping @typescript-eslint/no-unused-vars.
+  events: CalendarEventRow[];
 }) {
   // Bucketed by app-midnight epoch, which is what each cell looks itself up
   // by — never by slicing an ISO string, because the dueDate column carries no
