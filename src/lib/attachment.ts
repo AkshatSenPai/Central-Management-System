@@ -109,11 +109,31 @@ export function formatFileSize(bytes: number): string {
  * client-side check alone is advice." The presigned URL's own
  * content-length condition (Task 3) is the enforcement; this is the early,
  * friendly rejection before a request is even made, so a user finds out
- * before waiting on a network round trip. Returns an error string naming
- * the file and the limit, or null when the upload may proceed. */
+ * before waiting on a network round trip.
+ *
+ * The over-limit message states the limit but deliberately not the file's
+ * own size. `formatFileSize` rounds to one decimal place, so a file one
+ * byte over `MAX_UPLOAD_BYTES` prints identically to the limit itself
+ * ("25.0 MB" on both sides of the message) — the one case where the
+ * message matters most would read as the app contradicting itself
+ * ("it says 25 MB and the limit is 25 MB — why won't it upload?"). Dropping
+ * the actual size removes that collision by construction, rather than
+ * chasing more decimal places that only push the same problem to a smaller
+ * gap, and costs little: the user already knows roughly how big their own
+ * file is from the picker they just used it in.
+ *
+ * Also rejects a zero-byte (and, defensively, negative) size on its own.
+ * The spec is silent on this; the ruling is to reject. An accepted
+ * zero-byte upload produces a row pointing at an empty object — nothing a
+ * "download" (§2: "a file is a name, a size and a download") does anything
+ * useful with — and zero is also the shape an unrelated form bug (nothing
+ * chosen yet, size defaulting to 0) would produce, so rejecting turns that
+ * into a clear message instead of a silent phantom attachment. Revisit only
+ * if a real workflow needs a deliberate placeholder file — none does today. */
 export function validateUpload(fileName: string, sizeBytes: number): string | null {
+  if (sizeBytes <= 0) return `${fileName} is empty`;
   if (sizeBytes > MAX_UPLOAD_BYTES) {
-    return `${fileName} is ${formatFileSize(sizeBytes)} — the limit is ${formatFileSize(MAX_UPLOAD_BYTES)}`;
+    return `${fileName} is too large — the limit is ${formatFileSize(MAX_UPLOAD_BYTES)}`;
   }
   return null;
 }

@@ -133,6 +133,35 @@ describe("validateUpload", () => {
     expect(error).toContain("huge-video.mov");
     expect(error).toContain("25.0 MB");
   });
+
+  // Fix round 1: formatFileSize rounds to one decimal place, so
+  // MAX_UPLOAD_BYTES + 1 formats identically to MAX_UPLOAD_BYTES itself
+  // ("25.0 MB" both sides). The old message ("X is 25.0 MB — the limit is
+  // 25.0 MB") printed the limit text twice and read as the app
+  // contradicting itself right at the boundary that matters most. This is
+  // the regression test for that: the limit string must appear at most
+  // once, which only holds because the message no longer states the file's
+  // own (rounded) size at all.
+  it("never prints the limit text twice at the one-byte-over boundary", () => {
+    const error = validateUpload("a.pdf", MAX_UPLOAD_BYTES + 1);
+    expect(error).not.toBeNull();
+    const limitText = formatFileSize(MAX_UPLOAD_BYTES);
+    const occurrences = error!.split(limitText).length - 1;
+    expect(occurrences).toBe(1);
+  });
+
+  // Fix round 1, zero-byte ruling: reject. Recorded and tested at both
+  // sides of the boundary per the brief — see the doc comment on
+  // validateUpload in src/lib/attachment.ts for the reasoning.
+  it("rejects a zero-byte upload", () => {
+    const error = validateUpload("empty.txt", 0);
+    expect(error).not.toBeNull();
+    expect(error).toContain("empty.txt");
+  });
+
+  it("accepts a one-byte upload", () => {
+    expect(validateUpload("tiny.txt", 1)).toBeNull();
+  });
 });
 
 describe("formatFileSize", () => {
