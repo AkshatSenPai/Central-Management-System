@@ -87,26 +87,35 @@ function isRowGoneRace(e: unknown): boolean {
 const ALREADY_CONFIRMED = "This upload was already confirmed";
 
 /**
- * Step one of spec §6:108's two-step write: validate, mint the presigned
- * PUT, hand back the key — **and write no row**. The browser PUTs the bytes
- * directly to R2 next; only `confirmUpload`, after that PUT succeeds, ever
- * touches the `Attachment` table. An abandoned upload (the browser never
- * PUTs, or the PUT fails) therefore leaves nothing here at all: no row, and
- * whatever R2 does or does not have at `fileKey` is invisible to every other
- * query in this app, which all read the row, never the bucket. §6:108 spells
- * out why that is the safe direction to fail: the reverse — a row written
- * before the object exists — would show a user a download button for a file
- * that was never actually PUT.
+ * Step one of spec §6:108's two-step write: validate, confirm the parent is
+ * real, mint the presigned PUT, hand back the key — **and write no row**.
+ * The browser PUTs the bytes directly to R2 next; only `confirmUpload`,
+ * after that PUT succeeds, ever touches the `Attachment` table. An abandoned
+ * upload (the browser never PUTs, or the PUT fails) therefore leaves
+ * nothing here at all: no row, and whatever R2 does or does not have at
+ * `fileKey` is invisible to every other query in this app, which all read
+ * the row, never the bucket. §6:108 spells out why that is the safe
+ * direction to fail: the reverse — a row written before the object exists —
+ * would show a user a download button for a file that was never actually
+ * PUT.
  *
- * Takes `db` for signature parity with the other three functions below (a
- * future caller should be able to treat all four uniformly), even though
- * today's implementation reads nothing through it: unlike `confirmUpload`
- * and `removeAttachment`, this function writes no row and needs no
- * `clientId` for an activity log it never calls, so there is nothing here
- * for a parent lookup to protect. A `parentId` that names nothing real still
- * mints a working presigned URL, and the worst case is exactly the orphan
- * object §6:108 already accepts as the safe failure direction — never a
- * lying row, since this function is the one guaranteed never to write one.
+ * The parent lookup (`resolveParentScope`) is the one read this function
+ * performs, and it exists to close a leak that is avoidable, unlike the one
+ * §6:108 accepts: without it, a request naming a `parentId` that names
+ * nothing real still mints a perfectly valid presigned URL, the browser
+ * still PUTs, and `confirmUpload` then fails on the parent check — leaving
+ * an object in R2 that no row will ever reference and no UI will ever show.
+ * That is a *guaranteed* orphan, not the merely-possible one §6:108 accepts
+ * for a genuinely abandoned upload, and one read before minting turns it
+ * into a clean `"Task not found"` / `"Project not found"` /
+ * `"Client not found"` instead — the same call `createCalendarEvent` makes
+ * for its own project lookup (`calendar-event-service.ts`): a plain read up
+ * front rather than letting a foreign-key failure surface later, in a
+ * different function, with no way back to which step actually caused it.
+ * `clientId` on the resolved scope goes unused here — this function writes
+ * no activity row to scope — but reusing `resolveParentScope` rather than a
+ * second, existence-only lookup keeps one parent-walk implementation
+ * instead of two that could drift apart.
  *
  * The cuid segment of the key (§6:109) is minted with `crypto.randomUUID()`,
  * not Prisma's own `cuid()`. The two are not the same value by construction
@@ -130,10 +139,11 @@ export async function requestUpload(
     actorId: string;
   }
 ): Promise<ActionResult<{ uploadUrl: string; fileKey: string }>> {
-  void db;
-
   const validationError = validateUpload(input.fileName, input.sizeBytes);
   if (validationError) return err(validationError);
+
+  const scope = await resolveParentScope(db, input.parentType, input.parentId);
+  if (!scope) return err(PARENT_NOT_FOUND[input.parentType]);
 
   const fileKey = buildFileKey(input.parentType, input.parentId, randomUUID(), input.fileName);
   const uploadUrl = await presignPut({
@@ -224,7 +234,25 @@ export async function confirmUpload(
   }
 }
 
+const PERMISSION_DENIED = "You can only remove attachments you uploaded";
+
 /**
+ * **Permission gate: the uploader, or an admin.** Neither the brief nor
+ * spec §6/§7 rules on who may remove an attachment — this is a deliberate
+ * extension of the spec, not a requirement it states, applying the one
+ * pattern this codebase already uses for every other destructive,
+ * non-owner-restricted-by-default action: comments (spec 3c **D3** —
+ * "the author may edit their own comment; the author or an admin may
+ * delete", `comment-service.ts:184-195`), announcements
+ * (`announcement-service.ts:82`), and calendar events (**D10**,
+ * `calendar-event-service.ts`'s `PERMISSION_DENIED`). Without this gate,
+ * any signed-in member could delete any other member's uploaded file —
+ * visibility being studio-wide by design (no per-resource ACLs anywhere in
+ * this app) is not the same claim as destruction being unrestricted, and
+ * every one of the three precedents above draws exactly that line.
+ * `isAdmin` is passed in rather than read here, matching `removeComment`'s
+ * own reasoning for the same split: this layer never touches the session.
+ *
  * Removes one attachment: the row, its activity entry, and the R2 object.
  * The three cannot be one atomic write — Postgres and R2 are two systems —
  * so this function has to pick an order, and the choice made here is
@@ -271,13 +299,17 @@ export async function confirmUpload(
  */
 export async function removeAttachment(
   db: PrismaClient,
-  input: { attachmentId: string; actorId: string }
+  input: { attachmentId: string; actorId: string; isAdmin: boolean }
 ): Promise<ActionResult> {
   const attachment = await db.attachment.findUnique({
     where: { id: input.attachmentId },
-    select: { id: true, parentType: true, parentId: true, fileKey: true, fileName: true },
+    select: { id: true, parentType: true, parentId: true, fileKey: true, fileName: true, uploadedById: true },
   });
   if (!attachment) return err("Attachment not found");
+
+  if (attachment.uploadedById !== input.actorId && !input.isAdmin) {
+    return err(PERMISSION_DENIED);
+  }
 
   // Unlike confirmUpload, a missing parent is not an error here: removing an
   // attachment is a cleanup operation on a row that already exists, and a

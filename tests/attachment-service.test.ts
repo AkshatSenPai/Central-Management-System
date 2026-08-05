@@ -170,6 +170,9 @@ const baseRequestInput = {
   actorId: "u1",
 };
 
+const taskWithProject = { project: { clientId: "c1" } };
+const personalTask = { project: null };
+
 describe("requestUpload", () => {
   it("rejects a zero-byte file via validateUpload, before minting a URL", async () => {
     const { db } = fakeDb({});
@@ -185,14 +188,29 @@ describe("requestUpload", () => {
     expect(mockPresignPut).not.toHaveBeenCalled();
   });
 
+  // The size check runs before any read, so it needs no parent fixture at
+  // all — this is what proves that ordering rather than assuming it.
+  it("the size check needs no parent lookup — a task fixture is not even supplied here", async () => {
+    const { db } = fakeDb({ task: null });
+    const result = await requestUpload(db, { ...baseRequestInput, sizeBytes: 0 });
+    expect(result.ok).toBe(false);
+  });
+
+  it("errors when the parent does not exist, without minting a URL", async () => {
+    const { db } = fakeDb({ task: null });
+    const result = await requestUpload(db, baseRequestInput);
+    expect(result).toEqual({ ok: false, error: "Task not found" });
+    expect(mockPresignPut).not.toHaveBeenCalled();
+  });
+
   it("accepts a file exactly at the limit", async () => {
-    const { db } = fakeDb({});
+    const { db } = fakeDb({ task: taskWithProject });
     const result = await requestUpload(db, { ...baseRequestInput, sizeBytes: MAX_UPLOAD_BYTES });
     expect(result.ok).toBe(true);
   });
 
   it("writes no row on either sink, and returns a key built through buildFileKey", async () => {
-    const { db, dbW, txW } = fakeDb({});
+    const { db, dbW, txW } = fakeDb({ task: taskWithProject });
     const result = await requestUpload(db, baseRequestInput);
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -211,7 +229,7 @@ describe("requestUpload", () => {
   });
 
   it("uses the sanitised filename in the key, never the raw one", async () => {
-    const { db } = fakeDb({});
+    const { db } = fakeDb({ task: taskWithProject });
     const result = await requestUpload(db, { ...baseRequestInput, fileName: "../../etc/passwd" });
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -221,7 +239,7 @@ describe("requestUpload", () => {
   });
 
   it("mints a fresh key per call — the unguessability property, not just a shared shape", async () => {
-    const { db } = fakeDb({});
+    const { db } = fakeDb({ task: taskWithProject });
     const first = await requestUpload(db, baseRequestInput);
     const second = await requestUpload(db, baseRequestInput);
     expect(first.ok && second.ok).toBe(true);
@@ -231,12 +249,30 @@ describe("requestUpload", () => {
   });
 
   it("passes the declared content-type and size through to presignPut's content-length condition", async () => {
-    const { db } = fakeDb({});
+    const { db } = fakeDb({ task: taskWithProject });
     await requestUpload(db, { ...baseRequestInput, contentType: "image/png", sizeBytes: 2048 });
     expect(mockPresignPut).toHaveBeenCalledTimes(1);
     expect(mockPresignPut).toHaveBeenCalledWith(
       expect.objectContaining({ contentType: "image/png", contentLength: 2048 })
     );
+  });
+
+  it("works the same for a PROJECT or CLIENT parent — the existence check has no TASK-specific branching", async () => {
+    const { db: projectDb } = fakeDb({ project: { clientId: "c9" } });
+    const projectResult = await requestUpload(projectDb, {
+      ...baseRequestInput,
+      parentType: "PROJECT",
+      parentId: "p1",
+    });
+    expect(projectResult.ok).toBe(true);
+
+    const { db: clientDb } = fakeDb({ client: { id: "c1" } });
+    const clientResult = await requestUpload(clientDb, {
+      ...baseRequestInput,
+      parentType: "CLIENT",
+      parentId: "c1",
+    });
+    expect(clientResult.ok).toBe(true);
   });
 });
 
@@ -249,9 +285,6 @@ const baseConfirmInput = {
   sizeBytes: 51200,
   actorId: "u1",
 };
-
-const taskWithProject = { project: { clientId: "c1" } };
-const personalTask = { project: null };
 
 describe("confirmUpload", () => {
   it("errors when the parent task does not exist, with nothing written", async () => {
@@ -341,24 +374,63 @@ describe("confirmUpload", () => {
 });
 
 describe("removeAttachment", () => {
+  // uploadedById "u1" — most tests below act as this same uploader ("u1",
+  // isAdmin: false) to prove the ordinary path still works once the gate
+  // exists; the permission tests further down act as someone else instead.
   const storedAttachment = {
     id: "att1",
     parentType: "TASK",
     parentId: "t1",
     fileKey: "TASK/t1/cuid1/brief.pdf",
     fileName: "brief.pdf",
+    uploadedById: "u1",
   };
 
   it("errors when the attachment does not exist", async () => {
     const { db } = fakeDb({ attachment: null });
-    const result = await removeAttachment(db, { attachmentId: "ghost", actorId: "u1" });
+    const result = await removeAttachment(db, { attachmentId: "ghost", actorId: "u1", isAdmin: false });
     expect(result).toEqual({ ok: false, error: "Attachment not found" });
     expect(mockDeleteObjects).not.toHaveBeenCalled();
   });
 
+  // Deliberate extension of the spec (§6/§7 do not rule on this) applying
+  // the house pattern D3/announcement/calendar-event already set: uploader
+  // or admin, nobody else. Nothing written, R2 never touched.
+  it("refuses a non-uploader, non-admin removal, with nothing written and no R2 call", async () => {
+    const { db, dbW, txW } = fakeDb({ attachment: storedAttachment, task: taskWithProject });
+    const result = await removeAttachment(db, {
+      attachmentId: "att1",
+      actorId: "someone-else",
+      isAdmin: false,
+    });
+    expect(result).toEqual({ ok: false, error: "You can only remove attachments you uploaded" });
+    expect(txW.deleted).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+    expect(dbW.deleted).toHaveLength(0);
+    expect(mockDeleteObjects).not.toHaveBeenCalled();
+  });
+
+  it("an admin who did not upload the file may still remove it", async () => {
+    const { db, txW } = fakeDb({ attachment: storedAttachment, task: taskWithProject });
+    const result = await removeAttachment(db, {
+      attachmentId: "att1",
+      actorId: "someone-else",
+      isAdmin: true,
+    });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.deleted).toHaveLength(1);
+  });
+
+  it("the uploader may remove their own attachment without being an admin", async () => {
+    const { db, txW } = fakeDb({ attachment: storedAttachment, task: taskWithProject });
+    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(txW.deleted).toHaveLength(1);
+  });
+
   it("deletes the row and records attachment.removed in one transaction, both on tx, never on the outer db", async () => {
     const { db, dbW, txW } = fakeDb({ attachment: storedAttachment, task: taskWithProject });
-    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1" });
+    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
     expect(result).toEqual({ ok: true, data: undefined });
     expect(txW.deleted).toHaveLength(1);
     expect(txW.activity).toHaveLength(1);
@@ -374,7 +446,7 @@ describe("removeAttachment", () => {
 
   it("deletes the R2 object at the attachment's own fileKey", async () => {
     const { db } = fakeDb({ attachment: storedAttachment, task: taskWithProject });
-    await removeAttachment(db, { attachmentId: "att1", actorId: "u1" });
+    await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
     expect(mockDeleteObjects).toHaveBeenCalledWith(["TASK/t1/cuid1/brief.pdf"]);
   });
 
@@ -389,7 +461,7 @@ describe("removeAttachment", () => {
       sequence.push("r2.deleteObjects");
     });
     const { db } = fakeDb({ attachment: storedAttachment, task: taskWithProject, sequence });
-    await removeAttachment(db, { attachmentId: "att1", actorId: "u1" });
+    await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
     expect(sequence).toEqual(["tx.attachment.delete", "tx.activityLog.create", "r2.deleteObjects"]);
   });
 
@@ -400,9 +472,9 @@ describe("removeAttachment", () => {
   it("a failed object-delete does not leave the row claiming a file that is gone — the row is already gone by then", async () => {
     mockDeleteObjects.mockRejectedValue(new Error("R2 unreachable"));
     const { db, txW } = fakeDb({ attachment: storedAttachment, task: taskWithProject });
-    await expect(removeAttachment(db, { attachmentId: "att1", actorId: "u1" })).rejects.toThrow(
-      "R2 unreachable"
-    );
+    await expect(
+      removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false })
+    ).rejects.toThrow("R2 unreachable");
     // The DB half of the operation is durably done — nothing here is
     // "the row still exists, still claiming the file is there": there is no
     // row left to claim anything, in either direction.
@@ -416,7 +488,7 @@ describe("removeAttachment", () => {
       clientVersion: "test",
     });
     const { db, txW } = fakeDb({ attachment: storedAttachment, task: taskWithProject, deleteError: race });
-    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1" });
+    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
     expect(result).toEqual({ ok: false, error: "Attachment not found" });
     expect(txW.activity).toEqual([]);
     expect(mockDeleteObjects).not.toHaveBeenCalled();
@@ -424,7 +496,7 @@ describe("removeAttachment", () => {
 
   it("still removes the attachment when its parent no longer exists, logging clientId as null", async () => {
     const { db, txW } = fakeDb({ attachment: storedAttachment, task: null });
-    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1" });
+    const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
     expect(result).toEqual({ ok: true, data: undefined });
     expect(txW.activity[0]).toMatchObject({ clientId: null });
   });
