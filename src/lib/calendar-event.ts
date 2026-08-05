@@ -19,24 +19,21 @@ export function calendarPeriodSummary(taskCount: number, eventCount: number): st
   return `${taskCount} ${taskWord} due · ${eventCount} ${eventWord} in this period`;
 }
 
-/** A start time for a timed event, and nothing with a clock face at all for
- * an all-day one. An all-day event's stored bounds are app-midnight to
- * app-midnight — a fact about how the row is stored, not a time anyone
- * chose — so printing "00:00" next to "Priya on leave" would report the
- * storage artefact as if it were the event. `endsAt` is accepted but not yet
- * used: a later surface renders a full "start – end" range, and taking the
- * whole row now means this signature will not need to change shape when that
- * lands. */
+/** "15:00 – 16:00" for a timed event — the same en-dash `calendarTitle` uses
+ * (`calendar.ts:129`) rendering both ends in the app zone — and the literal
+ * string "All day" for an all-day one. An all-day event's stored bounds are
+ * app-midnight to app-midnight — a fact about how the row is stored, not a
+ * time anyone chose — so printing "00:00 – 00:00" next to "Priya on leave"
+ * would report the storage artefact as if it were the event. */
 export function eventTimeLabel(event: { startsAt: Date; endsAt: Date; allDay: boolean }): string {
   if (event.allDay) return "All day";
-  return appTimeLabel(event.startsAt);
+  return `${appTimeLabel(event.startsAt)} – ${appTimeLabel(event.endsAt)}`;
 }
 
 /** Splits a day's events into the two regions the day/week view renders
- * separately: the untimed band and the hour timeline. Named `timed` /
- * `allDay` after the flag each bucket is keyed on, rather than `untimed`,
- * so a reader matching a bucket to the test that produced it never has to
- * cross-reference — `allDay` here is exactly `row.allDay === true`. Order is
+ * separately: `untimed` for the band under the column header — which will
+ * later carry due tasks too, things with no clock, of which an all-day event
+ * is only one kind — and `timed` for the hour timeline below it. Order is
  * preserved within each half rather than re-sorted, because the query that
  * built the input already carries its own order (§6: `[allDay desc, startsAt
  * asc, createdAt asc]`) and this function's job is to partition, not rank.
@@ -45,13 +42,13 @@ export function eventTimeLabel(event: { startsAt: Date; endsAt: Date; allDay: bo
  * bare test fixture. */
 export function splitDayEvents<T extends { allDay: boolean }>(
   events: T[]
-): { timed: T[]; allDay: T[] } {
+): { untimed: T[]; timed: T[] } {
   const timed: T[] = [];
-  const allDay: T[] = [];
+  const untimed: T[] = [];
   for (const event of events) {
-    (event.allDay ? allDay : timed).push(event);
+    (event.allDay ? untimed : timed).push(event);
   }
-  return { timed, allDay };
+  return { untimed, timed };
 }
 
 /** Caps a month cell at `limit` rows TOTAL across both kinds — not `limit`

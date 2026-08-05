@@ -46,8 +46,8 @@
 
 - `appTimeLabel` renders 24-hour app-zone time: an instant at `2026-08-04T09:30:00.000Z` is `15:00` in IST. **Derive the expected string rather than copying it** — 09:30Z + 05:30 = 15:00.
 - `calendarPeriodSummary(0, 0)`, `(1, 0)`, `(0, 1)`, `(2, 3)` — singular and plural in both halves, and the both-zero case.
-- `eventTimeLabel` returns `""` (or the agreed all-day marker) for an all-day event and a start time for a timed one. **An all-day event must never print a clock**, because its stored bounds are app-midnight to app-midnight and "00:00" would be an artefact of storage, not a fact about the event.
-- `splitDayEvents` partitions into `{ timed, allDay }` and preserves the input order within each.
+- `eventTimeLabel` returns `"All day"` for an all-day event and a `"15:00 – 16:00"`-style range (en-dash, space either side) for a timed one, rendered in `Asia/Kolkata` from a UTC instant. **An all-day event must never print a clock**, because its stored bounds are app-midnight to app-midnight and "00:00" would be an artefact of storage, not a fact about the event.
+- `splitDayEvents` partitions into `{ untimed, timed }` and preserves the input order within each.
 - `monthCellRows(events, tasks, 3)` returns `{ events, tasks, overflow }`: events first, the two lists already capped to three **rows total across both**, and `overflow` counted across both kinds. Test 2 events + 5 tasks → 2 events, 1 task, overflow 4. Test 5 events + 0 tasks → 3 events, 0 tasks, overflow 2. Test 1 + 1 → no overflow, `overflow` is 0.
 - `attendeeInitialsLabel` — its contract per spec §6/§7.
 

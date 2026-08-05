@@ -61,32 +61,36 @@ describe("eventTimeLabel", () => {
     expect(label).toBe("All day");
   });
 
-  it("renders the start time for a timed event", () => {
-    // 11:00Z + 05:30 = 16:30 IST.
+  it("renders a start – end range for a timed event, from a UTC instant that differs from its IST rendering", () => {
+    // 11:00Z + 05:30 = 16:30 IST; 12:00Z + 05:30 = 17:30 IST. Neither UTC
+    // hour matches its IST rendering, so this is the case spec §12 calls
+    // "the one test that would have caught a display-only timezone fix" —
+    // a fixture that happened to read the same in both zones would pass
+    // even if the function silently formatted in UTC.
     const label = eventTimeLabel({
       startsAt: new Date("2026-08-04T11:00:00.000Z"),
       endsAt: new Date("2026-08-04T12:00:00.000Z"),
       allDay: false,
     });
-    expect(label).toBe("16:30");
+    expect(label).toBe("16:30 – 17:30");
   });
 });
 
 describe("splitDayEvents", () => {
-  it("partitions into timed and allDay, preserving order within each", () => {
+  it("partitions into untimed and timed, preserving order within each", () => {
     const events = [
       { id: "a", allDay: false },
       { id: "b", allDay: true },
       { id: "c", allDay: false },
       { id: "d", allDay: true },
     ];
-    const { timed, allDay } = splitDayEvents(events);
+    const { timed, untimed } = splitDayEvents(events);
     expect(timed.map((e) => e.id)).toEqual(["a", "c"]);
-    expect(allDay.map((e) => e.id)).toEqual(["b", "d"]);
+    expect(untimed.map((e) => e.id)).toEqual(["b", "d"]);
   });
 
   it("returns empty arrays for no events", () => {
-    expect(splitDayEvents([])).toEqual({ timed: [], allDay: [] });
+    expect(splitDayEvents([])).toEqual({ untimed: [], timed: [] });
   });
 });
 
