@@ -10,6 +10,37 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 
 ---
 
+## 0. In flight — `feat/r2-attachments`, paused 2026-08-05
+
+**Read this before starting anything.** The R2 attachment pipeline is half built on a branch, not on `master`. `master` is at `237ca63` and is clean, deployable, and unaffected by any of it.
+
+**Branch state:** 11 commits ahead of `master`. **896 tests, gates 9/9, tsc clean, lint clean.** Working tree clean. Nothing is half-written — the branch ends on a completed and reviewed task.
+
+**Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md`. **Design:** §6 and §7 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — this needed a plan, not a new spec, because Phase 3c already designed it and parked it.
+
+| Task | State |
+|---|---|
+| 1 — pure layer (`attachment.ts`) | done, 2 fix rounds, re-review clean |
+| 2 — SDK install | done |
+| 3 — R2 client and presigners (`r2.ts`) | done, 1 fix round |
+| 4 — service and query | done, 2 fix rounds, re-review clean |
+| **5 — actions, UI, and the two icons** | **not started — resume here** |
+| 6 — parent-delete hooks and page wiring | not started |
+| 7 — browser QA | not started |
+
+**Four rulings a fresh session would otherwise re-litigate:**
+
+- **`attach_file` and `download` must be added in task 5, not earlier.** Gate 7 is "every icon in `icons.ts` is used somewhere" and fails on an icon nothing renders. The plan originally had them in task 2 and was wrong; it is corrected, but the reasoning is easy to lose.
+- **`deleteAttachmentObjectsFor` deletes every row regardless and never aborts the parent delete on an R2 failure.** Leak, do not lie — spec §6:108. It cannot selectively commit because task 6 nests it inside `removeTask`/`deleteClient`'s transaction. This was a real bug found by review: task 3's fix made `deleteObjects` non-atomic, and task 4 assumed a throw meant nothing was deleted. Neither was wrong alone.
+- **`removeAttachment` gates on uploader-or-admin.** A deliberate extension of the spec, which is silent on attachment permissions — it matches 3c's D3 for comments and the same rule in announcements and calendar events.
+- **`requestChecksumCalculation: "WHEN_REQUIRED"` in `r2.ts` is load-bearing.** Without it the SDK bakes a checksum of an *empty* body into every presigned PUT and all uploads fail. Two reviewers confirmed it by generating URLs both ways. It is not stray config.
+
+**Still open on this branch:** `deleteAttachmentObjectsFor` has no call site until task 6, so its nested-transaction reasoning is unverified. Task 7 must delete a parent that has attachments and then **list the bucket prefix directly** — that is the only way to prove the leak is closed.
+
+**After R2:** chat (spec written and reviewed, four sequenced steps, zero code), then deploy, then time tracking, then invoices.
+
+---
+
 ## 1. Deploy — the next thing to do
 
 Everything below is in `DEPLOY.md` in full. Short version:
