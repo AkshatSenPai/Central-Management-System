@@ -228,12 +228,18 @@ export async function updateCalendarEvent(
   const changes = fieldDiff(existing, candidate, [...UPDATABLE_FIELDS]);
 
   // The attendee set is a true diff, the attemptTaskAssigneeDiff shape
-  // (task-service.ts:357-435): only added ids are ever validated, removed
-  // ones read their names off rows already loaded, and a resubmission of the
-  // current set lands in neither list.
+  // (task-service.ts:357-435): only added ids are ever validated. Removed
+  // ids need no re-validation at all — full stop, not "read their names off
+  // rows already loaded": event.updated's meta carries only the title
+  // (below), never a people list, because this model has no
+  // task.assigned/task.unassigned twin for the diff to feed. attemptTask
+  // AssigneeDiff's own snapshot joins `user` for exactly that name; this one
+  // selects userId alone, since paying for a join whose result nothing here
+  // reads would be the same crime this codebase writes to `Task` in the
+  // other direction — a query shaped for data nobody consumes.
   const current = await db.calendarEventAttendee.findMany({
     where: { eventId: input.eventId },
-    select: { userId: true, user: { select: { name: true } } },
+    select: { userId: true },
   });
   const currentIds = current.map((row) => row.userId);
   const requestedIds = Array.from(new Set(input.attendeeIds));

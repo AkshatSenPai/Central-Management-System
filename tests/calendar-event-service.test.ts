@@ -370,6 +370,16 @@ describe("createCalendarEvent notifications", () => {
 const movedStartsAt = new Date("2026-08-10T11:00:00.000Z"); // 16:30 IST
 const movedEndsAt = new Date("2026-08-10T12:00:00.000Z"); // 17:30 IST
 
+// A move that crosses an app-day boundary — existingEvent.startsAt (below)
+// is 2026-08-10T09:00:00Z, 14:30 IST, app-day 2026-08-10; this pair is
+// 2026-08-11, a full app-day later. movedStartsAt above does NOT exercise
+// this: 09:00Z and 11:00Z on the 10th both fall on the same IST day, so a
+// test built only from that pair cannot tell toDateInputValue(candidate.
+// startsAt) apart from toDateInputValue(existing.startsAt) — a mutant
+// swapping one for the other would still pass. This pair can.
+const crossDayMovedStartsAt = new Date("2026-08-11T09:00:00.000Z"); // 14:30 IST, Aug 11
+const crossDayMovedEndsAt = new Date("2026-08-11T10:00:00.000Z"); // 15:30 IST, Aug 11
+
 const existingEvent = {
   id: "event1",
   title: "Verity kickoff call",
@@ -442,16 +452,26 @@ describe("updateCalendarEvent", () => {
     expect(txW.updated[0]).toMatchObject({ title: "Renamed" });
   });
 
-  // fieldDiff's normalize compares dates by value (activity.ts:97), so
+  // fieldDiff's normalize compares dates BY VALUE (activity.ts:97), so
   // re-submitting the identical instants and the identical attendee set logs
   // nothing and rings nothing — this is the case a naive "always write" or an
-  // object-identity comparison would get wrong.
+  // object-identity comparison would get wrong. startsAt/endsAt are rebuilt
+  // as NEW Date objects with the same getTime() here rather than reusing the
+  // shared `startsAt`/`endsAt` consts (which baseUpdateInput and
+  // existingEvent both already point at, the same reference either way) —
+  // otherwise this test would pass under a normalize that compared by
+  // reference too, and prove nothing about value comparison at all.
   it("writes nothing at all when nothing changed, including an unchanged attendee set", async () => {
     const { db, dbW, txW } = fakeDb({
       event: existingEvent,
       currentAttendees: [{ userId: "u2", user: { name: "Riley" } }],
     });
-    const result = await updateCalendarEvent(db, { ...baseUpdateInput, attendeeIds: ["u2"] });
+    const result = await updateCalendarEvent(db, {
+      ...baseUpdateInput,
+      startsAt: new Date(startsAt.getTime()),
+      endsAt: new Date(endsAt.getTime()),
+      attendeeIds: ["u2"],
+    });
     expect(result).toEqual({ ok: true, data: undefined });
     expect(txW.updated).toHaveLength(0);
     expect(txW.attendeesCreated).toHaveLength(0);
@@ -543,6 +563,28 @@ describe("updateCalendarEvent", () => {
     expect(dbW.notifications).toEqual([]);
   });
 
+  // Discriminates candidate.startsAt from existing.startsAt at the call site:
+  // startsAt and movedStartsAt above share an app-day, so meta.date would
+  // read correctly even if the wrong instant were formatted. This pair does
+  // not share one, so the assertion can only pass against the NEW day.
+  it("meta.date is the NEW day when the move crosses an app-day boundary, not the old one", async () => {
+    const { db, txW } = fakeDb({
+      event: existingEvent,
+      currentAttendees: [{ userId: "u2", user: { name: "Riley" } }],
+    });
+    const oldDay = toDateInputValue(existingEvent.startsAt);
+    const newDay = toDateInputValue(crossDayMovedStartsAt);
+    expect(newDay).not.toBe(oldDay);
+
+    await updateCalendarEvent(db, {
+      ...baseUpdateInput,
+      startsAt: crossDayMovedStartsAt,
+      endsAt: crossDayMovedEndsAt,
+      attendeeIds: ["u2"],
+    });
+    expect(txW.notifications[0].meta).toMatchObject({ date: newDay });
+  });
+
   it("moving endsAt alone (start unchanged) still fires the notification", async () => {
     const { db, txW } = fakeDb({
       event: existingEvent,
@@ -622,7 +664,12 @@ describe("updateCalendarEvent", () => {
     expect(dbW.updated).toHaveLength(0);
   });
 
-  it("a removed attendee's name is read off the rows already loaded, with no active-user lookup", async () => {
+  // Not "reads the removed attendee's name off rows already loaded" — this
+  // model logs no people list for a removal at all (see the comment above
+  // `current` in calendar-event-service.ts), so there is no name to read.
+  // What's actually true, and what this pins: a removal needs no
+  // re-validation and triggers no active-user lookup, full stop.
+  it("removing an attendee needs no re-validation and issues no active-user lookup", async () => {
     const { db, calls, txW } = fakeDb({
       event: existingEvent,
       currentAttendees: [{ userId: "u2", user: { name: "Riley" } }],
