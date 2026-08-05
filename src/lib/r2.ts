@@ -170,33 +170,87 @@ const DELETE_BATCH_LIMIT = 1000;
  * `DeleteObjects` call with zero `Objects`, which is a wasted round trip
  * for a request that has nothing to do.
  *
- * Batches are sent one at a time, not via `Promise.all`: a parent-delete
- * sweep that fails partway through should fail with one clear error about
- * one batch, not several concurrent rejections racing each other into an
- * unhelpful combined message.
+ * Batches are sent one at a time, not via `Promise.all`, but — this is the
+ * point a prior version of this function got wrong — every batch is still
+ * attempted. Throwing out of the loop as soon as one batch reported a
+ * per-key failure meant a 2,500-key sweep with two bad keys in batch 1
+ * never even tried batches 2 and 3: the caller learned "something failed"
+ * while 1,500 deletable objects sat untouched and unretried. §6:111 calls
+ * this exact path "the one place where a missed code path silently leaks
+ * storage" — stopping early was itself a missed code path, just one this
+ * file introduced instead of a caller. Failures are now collected across
+ * every batch and reported once at the end, so the thrown message can say
+ * how many of the total actually failed rather than how many were merely
+ * never tried.
  *
  * `Quiet: true` asks R2 to report only failures. The default (`false`)
  * returns a `Deleted` entry for every key that succeeded — a list this
- * function has no reader for, since a delete sweep either fully succeeds
- * (nothing to report) or it doesn't (the part worth throwing on). A
- * partial failure — R2 accepts the request but refuses some keys — is not
- * silently swallowed: `Errors` is still populated in quiet mode, and a
- * non-empty `Errors` array is treated as this function's own failure,
- * because a caller sweeping a deleted parent's attachments needs to know
- * some objects were left behind, not just that the request round-tripped. */
+ * function has no reader for, since success is the silent case and failure
+ * is the one worth collecting. A partial failure — R2 accepts the request
+ * but refuses some keys — is not silently swallowed: `Errors` is still
+ * populated in quiet mode, and every key named there is added to a running
+ * list rather than causing an immediate throw, so the batch after it still
+ * gets its turn.
+ *
+ * A batch whose `send()` call itself throws (a network failure, a timeout,
+ * an unreachable R2) is handled differently from a per-key `Errors` entry,
+ * deliberately: it aborts the whole sweep immediately rather than
+ * continuing to the next batch. Reasoning:
+ * - A per-key error is a *known, bounded* outcome — R2 responded, named
+ *   exactly which keys it refused, and every other key in that batch is
+ *   confirmed gone. The next batch is an independent request against the
+ *   same still-reachable service and has every reason to succeed on its
+ *   own merits.
+ * - A thrown `send()` is an *unknown* outcome for that entire batch — the
+ *   request may have failed before R2 saw it, or R2 may have processed it
+ *   and the response never arrived; this function cannot tell which keys
+ *   in that batch, if any, were actually deleted. Folding that ambiguity
+ *   into the same "confirmed failed" list as a real per-key `Errors` entry
+ *   would misreport it.
+ * - If the cause is systemic (R2 unreachable, credentials rejected), every
+ *   later batch is likely to fail the same way for the same reason, so
+ *   attempting them buys nothing but N more multi-second timeouts stacked
+ *   in sequence — and this function is called synchronously from a Server
+ *   Action sweeping a deleted task/project/client (§6:111), which has its
+ *   own execution-time budget. Running out that budget mid-loop fails the
+ *   whole request anyway, just without a clean thrown `Error` the caller
+ *   could have caught — worse than failing fast with one. */
 export async function deleteObjects(keys: string[]): Promise<void> {
   if (keys.length === 0) return;
+
+  const failedKeys: string[] = [];
+  let attempted = 0;
+
   for (let start = 0; start < keys.length; start += DELETE_BATCH_LIMIT) {
     const batch = keys.slice(start, start + DELETE_BATCH_LIMIT);
-    const result = await r2.client.send(
-      new DeleteObjectsCommand({
-        Bucket: r2.bucket,
-        Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
-      })
-    );
-    if (result.Errors && result.Errors.length > 0) {
-      const failedKeys = result.Errors.map((error) => error.Key ?? "(unknown key)").join(", ");
-      throw new Error(`deleteObjects: R2 refused to delete ${result.Errors.length} object(s): ${failedKeys}`);
+    let result;
+    try {
+      result = await r2.client.send(
+        new DeleteObjectsCommand({
+          Bucket: r2.bucket,
+          Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+        })
+      );
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      const remaining = keys.length - attempted - batch.length;
+      throw new Error(
+        `deleteObjects: request to R2 failed before it responded (${reason}). ` +
+          `${attempted} of ${keys.length} object(s) were attempted before this batch ` +
+          `(${failedKeys.length} confirmed failed so far); this batch's ${batch.length} ` +
+          `object(s) have an unknown outcome, and ${remaining} were never attempted.`,
+        { cause }
+      );
     }
+    attempted += batch.length;
+    if (result.Errors && result.Errors.length > 0) {
+      for (const error of result.Errors) failedKeys.push(error.Key ?? "(unknown key)");
+    }
+  }
+
+  if (failedKeys.length > 0) {
+    throw new Error(
+      `deleteObjects: R2 refused to delete ${failedKeys.length} of ${keys.length} requested object(s): ${failedKeys.join(", ")}`
+    );
   }
 }
