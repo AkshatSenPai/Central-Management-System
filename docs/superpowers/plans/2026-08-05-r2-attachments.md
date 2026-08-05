@@ -74,14 +74,16 @@ No Prisma, no React, no AWS import in this file — it is the only unit-testable
 
 ---
 
-### Task 2: icons and dependencies
+### Task 2: dependencies only
 
-**Files:** `package.json`, `src/lib/icons.ts`, the committed font
+**Files:** `package.json`, `package-lock.json`
 
 - [ ] **Step 1:** `npm i @aws-sdk/client-s3 @aws-sdk/s3-request-presigner`. Both are approved with the phase (spec §6:104).
-- [ ] **Step 2:** Add `attach_file` and `download` to `ICON_NAMES`, in the section their meaning fits — read the file's own grouping comments first.
-- [ ] **Step 3: Regenerate the font.** `scripts/fetch-icon-font.mjs` owns this; read it and `scripts/gates.mjs` gates 7 and 8 before running anything. **Gate 8 compares the committed font to `icons.ts` and fails if they disagree** — that is the check, not a formality.
-- [ ] **Step 4:** `npm run gates` **9/9**. If gate 7 or 8 fails, the font and the list disagree; fix that rather than editing the gate. `npm test`, `npx tsc --noEmit`. Commit the font binary with the list.
+- [ ] **Step 2:** `npm run gates` 9/9, `npm test` **853**, `npx tsc --noEmit` clean. Commit the lockfile with the manifest.
+
+⚠️ **The icons are NOT added here, and that is deliberate.** `attach_file` and `download` belong to **Task 5**, in the same commit as the components that render them.
+
+**Gate 7** is *"every icon in `src/lib/icons.ts` is used somewhere"*, and its comment records why: "`--ico` was added, never consumed, and later deleted for being unused. An icon nobody renders is dead weight in the font subset and a lie in the vocabulary. **Listing one is now a commitment to using it.**" Adding the icons before the UI exists would fail that gate — the plan originally sequenced it that way and was wrong.
 
 ---
 
@@ -117,6 +119,9 @@ No Prisma, no React, no AWS import in this file — it is the only unit-testable
 **Files:** create `src/server/actions/attachments.ts`, `src/components/attachments/`
 
 - [ ] **Step 1:** Actions behind `requireUser()`, opening with the revalidation-map block comment both existing action files carry.
+
+- [ ] **Step 1b: Add `attach_file` and `download` to `ICON_NAMES` and regenerate the font — in THIS task, not earlier.** `scripts/fetch-icon-font.mjs` owns the font; read it and gates 7 and 8 first. **Gate 7 fails on any icon nothing renders**, so the icons and the components that use them must land together. **Gate 8** runs `fetch-icon-font.mjs --check` and fails if the committed font and `icons.ts` disagree. Commit the font binary alongside the list. If either gate fails, reconcile the font and the list — never edit the gate.
+
 - [ ] **Step 2:** An upload control. ⚠️ **Gate 3 forbids a raw `<input>` outside `src/components/ui/`.** A file input is a raw input. **Decide: add a `FileField` primitive to `src/components/ui/`, or justify an exemption — and say which in the report.** Do not disable the gate.
 - [ ] **Step 3:** The list — filename, size via `formatFileSize`, uploader, a download button that mints a presigned GET on click, and a remove control. Follow the existing comment-list components for shape.
 - [ ] **Step 4:** Client-side size check **before** requesting a URL, with the same 25 MB constant. Both checks exist; neither replaces the other.
