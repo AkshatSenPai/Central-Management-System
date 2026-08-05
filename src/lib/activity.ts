@@ -51,10 +51,9 @@ export type ActivityAction =
   | "announcement.posted"
   | "announcement.updated"
   | "announcement.removed"
-  // event.updated and event.removed are added alongside updateCalendarEvent
-  // and removeCalendarEvent — this verb is the only one createCalendarEvent
-  // needs.
-  | "event.created";
+  | "event.created"
+  | "event.updated"
+  | "event.removed";
 
 export type ActivityMeta = Record<string, unknown> | null;
 
@@ -248,6 +247,13 @@ export function describeActivity(entry: {
       return `${who} removed the announcement ${what}`;
     case "event.created":
       return `${who} scheduled ${what}`;
+    case "event.updated":
+      return `${who} updated the event ${what}`;
+    // Stored as .removed, matching the file's own verb convention, while the
+    // rendered sentence says "cancelled" — the column is a key, the sentence
+    // is English, and cancelling a meeting is what actually happened (spec §13).
+    case "event.removed":
+      return `${who} cancelled ${what}`;
     default:
       // Forward compatibility: an unrecognised verb renders, never throws.
       return `${who} updated this record`;

@@ -1,9 +1,21 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
-import { recordActivity } from "@/lib/activity";
-import { notify } from "@/lib/notification-service";
+import { recordActivity, fieldDiff } from "@/lib/activity";
+import { notify, clearNotificationsFor } from "@/lib/notification-service";
 import { eventTimeLabel } from "@/lib/calendar-event";
 import { toDateInputValue } from "@/lib/dates";
+
+const UPDATABLE_FIELDS = [
+  "title",
+  "description",
+  "startsAt",
+  "endsAt",
+  "allDay",
+  "projectId",
+  "clientId",
+] as const;
+
+const PERMISSION_DENIED = "You can only edit events you created";
 
 /** The fields `createCalendarEvent` and Task 4's `updateCalendarEvent` both
  * write. No `attendeeIds` here — create resolves the whole set up front,
@@ -45,6 +57,22 @@ async function resolveAttendees(
     select: { id: true, name: true },
   });
   return users.length < uniqueIds.length ? null : users;
+}
+
+function pick<T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+  const out = {} as Pick<T, K>;
+  for (const key of keys) out[key] = obj[key];
+  return out;
+}
+
+/** True when `e` is the row-vanished error a concurrent delete can race a
+ * later update or delete into. Duplicated rather than imported —
+ * `announcement-service.ts:8-10` sets the precedent, copying this same
+ * three-liner rather than reaching into `task-service.ts` for its unexported
+ * copy. `createCalendarEvent` never needed this: nothing in a create can
+ * throw P2025. Update and remove both load-then-write, so they can. */
+function isRowGoneRace(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025";
 }
 
 export async function createCalendarEvent(
@@ -125,4 +153,222 @@ export async function createCalendarEvent(
     return event;
   });
   return ok({ id: created.id });
+}
+
+export async function updateCalendarEvent(
+  db: PrismaClient,
+  input: CalendarEventWriteInput & {
+    eventId: string;
+    attendeeIds: string[];
+    actorId: string;
+    isAdmin: boolean;
+  }
+): Promise<ActionResult> {
+  const title = input.title.trim();
+  if (!title) return err("Give the event a title");
+
+  const existing = await db.calendarEvent.findUnique({
+    where: { id: input.eventId },
+    select: {
+      title: true,
+      description: true,
+      startsAt: true,
+      endsAt: true,
+      allDay: true,
+      projectId: true,
+      clientId: true,
+      creatorId: true,
+    },
+  });
+  if (!existing) return err("Event not found");
+
+  // D10: creator or admin, the announcement-service.ts:82 check, applied to
+  // the other studio-wide writable object. Attendance grants no write.
+  if (existing.creatorId !== input.actorId && !input.isAdmin) {
+    return err(PERMISSION_DENIED);
+  }
+
+  // Mirrors createCalendarEvent's own resolution, except only when the
+  // project actually moved (updateTask's own guard, task-service.ts:207): an
+  // unchanged project's clientId cannot have silently diverged from the row's
+  // stored value, since nothing else ever writes CalendarEvent.clientId, so
+  // re-deriving it here would be a lookup that only ever confirms what is
+  // already known.
+  //
+  // A direct-supplied clientId (no project chosen) is left unchecked against
+  // a real Client row here, same as createCalendarEvent — a known gap Task
+  // 3's review flagged (spec §8:359-364 only mandates checking the
+  // project-derived clientId) and inherited rather than fixed in this task.
+  // Fixing only the update path would leave create still exposed to the same
+  // tampered-id P2003 while widening what this task has to test; the
+  // consistent call is to leave both sides of the gap exactly as wide as
+  // Task 3 left them, recorded here rather than silently closed or silently
+  // left in only one of the two places it appears.
+  let clientId = input.clientId;
+  if (input.projectId && input.projectId !== existing.projectId) {
+    const project = await db.project.findUnique({
+      where: { id: input.projectId },
+      select: { clientId: true },
+    });
+    if (!project) return err("Project not found");
+    clientId = project.clientId;
+  } else if (input.projectId) {
+    clientId = existing.clientId;
+  }
+
+  const candidate = {
+    title,
+    description: input.description,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    allDay: input.allDay,
+    projectId: input.projectId,
+    clientId,
+  };
+  const changes = fieldDiff(existing, candidate, [...UPDATABLE_FIELDS]);
+
+  // The attendee set is a true diff, the attemptTaskAssigneeDiff shape
+  // (task-service.ts:357-435): only added ids are ever validated, removed
+  // ones read their names off rows already loaded, and a resubmission of the
+  // current set lands in neither list.
+  const current = await db.calendarEventAttendee.findMany({
+    where: { eventId: input.eventId },
+    select: { userId: true, user: { select: { name: true } } },
+  });
+  const currentIds = current.map((row) => row.userId);
+  const requestedIds = Array.from(new Set(input.attendeeIds));
+  const addedIds = requestedIds.filter((id) => !currentIds.includes(id));
+  const removedIds = currentIds.filter((id) => !requestedIds.includes(id));
+
+  // fieldDiff's normalize compares dates BY VALUE (activity.ts:97), so
+  // re-saving an unchanged time lands here too — nothing is logged and
+  // nothing rings.
+  if (!changes && addedIds.length === 0 && removedIds.length === 0) return ok(undefined);
+
+  const added = addedIds.length > 0 ? await resolveAttendees(db, addedIds) : [];
+  if (added === null) return err("Invalid input");
+
+  const data = changes ? pick(candidate, Object.keys(changes) as (keyof typeof candidate)[]) : null;
+
+  // The bell fires ONLY when the clock moved (D7/§9) — not a title edit, not
+  // a description edit, not an attendee change on its own. Checked against
+  // fieldDiff's own result rather than re-comparing the raw values, so this
+  // can never drift from what actually got written.
+  const timeMoved = changes !== null && ["startsAt", "endsAt", "allDay"].some((field) => field in changes);
+
+  try {
+    await db.$transaction(async (tx) => {
+      if (data) {
+        await tx.calendarEvent.update({ where: { id: input.eventId }, data });
+      }
+      // Scoped to exactly the departed/added ids — a true diff, never a
+      // blanket rewrite of the whole set.
+      if (removedIds.length > 0) {
+        await tx.calendarEventAttendee.deleteMany({
+          where: { eventId: input.eventId, userId: { in: removedIds } },
+        });
+      }
+      if (addedIds.length > 0) {
+        await tx.calendarEventAttendee.createMany({
+          data: addedIds.map((userId) => ({ eventId: input.eventId, userId })),
+          skipDuplicates: true,
+        });
+      }
+      // Exactly one row per call (task-service.ts:160-161's rule, reused):
+      // unlike Task, this model has no task.assigned/unassigned twin, so a
+      // field change and an attendee change on the same submit still fold
+      // into the one verb this vocabulary lock defines for "something about
+      // this event changed" (spec §13).
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "CALENDAR_EVENT",
+        entityId: input.eventId,
+        action: "event.updated",
+        clientId,
+        meta: { name: title },
+      });
+      if (timeMoved) {
+        // The attendees AFTER the diff — someone just dropped from the
+        // event must not be told it moved out from under them, and someone
+        // just added to it should hear where it landed.
+        const recipientIds = [...currentIds.filter((id) => !removedIds.includes(id)), ...addedIds];
+        await notify(tx, {
+          recipientIds,
+          actorId: input.actorId,
+          type: "EVENT_SCHEDULED",
+          entityType: "CALENDAR_EVENT",
+          entityId: input.eventId,
+          meta: {
+            name: title,
+            when: eventTimeLabel({
+              startsAt: candidate.startsAt,
+              endsAt: candidate.endsAt,
+              allDay: candidate.allDay,
+            }),
+            // The frozen string saying where the event WAS, computed from
+            // the row as loaded before this write touched it.
+            movedFrom: eventTimeLabel({
+              startsAt: existing.startsAt,
+              endsAt: existing.endsAt,
+              allDay: existing.allDay,
+            }),
+            // Not optional: without it every "moved" row takes
+            // notificationHref's /calendar fallback instead of landing on
+            // the day the event is now on.
+            date: toDateInputValue(candidate.startsAt),
+          },
+        });
+      }
+    });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Event not found");
+    throw e;
+  }
+  return ok(undefined);
+}
+
+export async function removeCalendarEvent(
+  db: PrismaClient,
+  input: { eventId: string; actorId: string; isAdmin: boolean }
+): Promise<ActionResult> {
+  const existing = await db.calendarEvent.findUnique({
+    where: { id: input.eventId },
+    select: { title: true, creatorId: true, clientId: true },
+  });
+  if (!existing) return err("Event not found");
+  if (existing.creatorId !== input.actorId && !input.isAdmin) {
+    return err(PERMISSION_DENIED);
+  }
+
+  // Captured before the delete — afterwards there is nothing left to read.
+  const title = existing.title;
+
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.calendarEvent.delete({ where: { id: input.eventId } });
+      // Attendee rows are Cascade-deleted by the FK (schema.prisma:392); no
+      // manual join-row cleanup belongs here.
+      //
+      // entityId carries no foreign key, so nothing cascades to it — the
+      // same reason removeTask clears its own (task-service.ts:330).
+      await clearNotificationsFor(tx, { entityType: "CALENDAR_EVENT", entityId: input.eventId });
+      // Left alone, never cleared: the activity log is an audit trail and
+      // must outlive its subject (task-service.ts:327-329), unlike a
+      // notification, which is only a link to a 404 once the row is gone.
+      // This call ADDS a row rather than removing one — the event's own
+      // cancellation is itself part of the story the feed tells.
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "CALENDAR_EVENT",
+        entityId: input.eventId,
+        action: "event.removed",
+        clientId: existing.clientId,
+        meta: { name: title },
+      });
+    });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Event not found");
+    throw e;
+  }
+  return ok(undefined);
 }
