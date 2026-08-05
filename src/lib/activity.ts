@@ -9,7 +9,8 @@ export type ActivityEntityType =
   | "CHECKLIST_ITEM"
   | "COMMENT"
   | "ATTACHMENT"
-  | "ANNOUNCEMENT";
+  | "ANNOUNCEMENT"
+  | "CALENDAR_EVENT";
 
 /** Stored as a plain String column, never a Prisma enum, so later phases add
  * verbs without a migration. describeActivity must stay total. */
@@ -49,7 +50,11 @@ export type ActivityAction =
   | "attachment.removed"
   | "announcement.posted"
   | "announcement.updated"
-  | "announcement.removed";
+  | "announcement.removed"
+  // event.updated and event.removed are added alongside updateCalendarEvent
+  // and removeCalendarEvent — this verb is the only one createCalendarEvent
+  // needs.
+  | "event.created";
 
 export type ActivityMeta = Record<string, unknown> | null;
 
@@ -241,6 +246,8 @@ export function describeActivity(entry: {
       return `${who} updated the announcement ${what}`;
     case "announcement.removed":
       return `${who} removed the announcement ${what}`;
+    case "event.created":
+      return `${who} scheduled ${what}`;
     default:
       // Forward compatibility: an unrecognised verb renders, never throws.
       return `${who} updated this record`;
