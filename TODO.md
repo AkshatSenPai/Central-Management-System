@@ -2,7 +2,7 @@
 
 Written 2026-08-03 at the end of the session that built Phases 3c, 4 and part of 6; revised 2026-08-04. Read this first in a new chat; everything below was checked against the repo, not recalled.
 
-**State:** `master`, working tree clean apart from untracked `.superpowers/`. **673 tests, gates 9/9**, `tsc` clean, `lint` clean (0 errors, 0 warnings), production build clean — all verified 2026-08-04 on the merged result. Not yet deployed.
+**State:** `master`, working tree clean apart from untracked `.superpowers/`. **814 tests, gates 9/9**, `tsc` clean, `lint` clean (0 errors, 0 warnings), production build clean — all verified 2026-08-05 on the merged result. Not yet deployed.
 
 **The team is six people.** Every cost and capacity figure in this file is sized for six. An earlier draft assumed fifteen, and the two specs in §3 still carry that older arithmetic in places — their conclusions hold, the numbers want correcting.
 
@@ -61,15 +61,15 @@ The build already handles Prisma: `postinstall: prisma generate` and `build: pri
 Roughly in order of value to a six-person studio.
 
 - [ ] **File attachments / the R2 upload pipeline.** *(Unblocked 2026-08-03 — the bucket and credentials now exist.)* Nothing in `src/` reads or writes `Attachment` yet: there is no R2 client, no presign, no upload UI. The design is already written — §6 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — and must not be re-invented. Build it against tasks, projects and clients first; chat attachments extend it later.
-- [ ] **Calendar events for meetings.** *(Owner request, 2026-08-03.)* Someone books a meeting — a client call, a sales pitch — and the whole team can see it on the shared calendar: "Priya has a client call Thursday 3pm."
+- [x] **Calendar events for meetings — SHIPPED 2026-08-05.** *(Owner request, 2026-08-03.)* Create, edit and delete events on the calendar beside task deadlines; attendees get a bell row when one is scheduled or moved. Spec: `docs/superpowers/specs/2026-08-04-calendar-events-design.md`. Plans: the four in `docs/superpowers/plans/` dated 2026-08-04 and 2026-08-05.
 
-  **This is a new model, not a calendar tweak.** The calendar today is a view over `Task.dueDate` and nothing else: `listTasksInRange` (`src/lib/task-queries.ts:129`) returns tasks, `CalendarGrid` renders task rows, and `src/app/(app)/calendar/page.tsx:15` states outright that no second date column exists or should be invented. An event is a different shape — title, attendees, and a start *time*.
+  **It shipped in four separately-merged steps, and the first one was not the feature.** Every date in this app was day-granular and pinned to UTC, deliberately. A 3pm meeting was the first thing that needed a clock, so step 1 moved every day boundary to a single app timezone (`APP_TIMEZONE = "Asia/Kolkata"`, `startOfAppDay`, and the four app-field accessors in `src/lib/dates.ts`) with **no new tables and no feature**, so a red suite could only be blamed on one half. Stored dates kept their day because every one is a UTC-midnight instant, which always falls inside the matching IST day — verified over 55,152 instants across 150 years.
 
-  **The time is the hard part, and it is worth knowing before planning.** Every date in this app is day-granular and UTC-pinned deliberately: `groupByUtcDay`, `startOfUtcDay`, and `isOverdueOnDay` (`src/lib/calendar.ts:80`) exists precisely because comparing instants was wrong for a calendar cell. A meeting at 3pm is the first thing in the app that needs a clock, and it turns the UTC/IST +5:30 offset from a harmless 3am curiosity into "the meeting displays at the wrong time". Settle the timezone story before writing the model, not after.
+  **That step fixed a live bug you had.** `stepAnchor`'s month arithmetic read UTC fields off a value that had become an app-midnight instant: stepping back from 31 March skipped February entirely, and the forward arrow from the 31st did nothing. Three tests already in the repo caught it.
 
-  For the brainstorm: all-day vs timed; who counts as an attendee vs who can merely see it; whether RSVP exists at all (probably not at six people); whether the bell notifies attendees (probably yes, reusing the Phase 4 path); and recurring meetings, which need the same cron and RRULE work as recurring tasks and are likely out of the first version.
+  **What is deliberately not there:** recurring events (needs the same cron and RRULE work as recurring tasks — revisit together), RSVP, per-user timezones, external calendar sync, and any conflict detection. Overlapping events render side by side; nothing warns you are double-booked.
 
-  Neighbour, not duplicate: Phase 7 below already carries "meeting notes" as its own line.
+  Neighbour, not duplicate: Phase 7 below still carries "meeting notes" as its own line.
 
 - [ ] **Time tracking** (Phase 6). Start/stop a timer on a task. Fills the "6h 12m logged this week" slot the dashboard design has and currently leaves empty. New `TimeEntry` model.
 - [ ] **Vault** (Phase 5). The biggest remaining phase and the only genuinely security-critical code in the app: envelope encryption, AES-256-GCM, master key from env (you generate it — no purchase), click-to-reveal, and an access log. Its three item types split — notes and credentials need nothing; only the *files* type needs R2.
