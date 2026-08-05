@@ -10,12 +10,39 @@ import { MAX_UPLOAD_BYTES } from "@/lib/attachment";
 // *which keys* `deleteObjects` was called with — the property that proves
 // a sweep targets the right prefix and nothing else — without needing a
 // live bucket or a hand-rolled fake that would just re-implement the SDK.
-vi.mock("@/lib/r2", () => ({
-  presignPut: vi.fn(async () => "https://example.r2.cloudflarestorage.com/signed-put"),
-  deleteObjects: vi.fn(async () => undefined),
-}));
+//
+// `R2DeleteObjectsError` is reimplemented here, structurally identical to
+// `r2.ts`'s real class, rather than imported via `vi.importActual` — the
+// real module reads `R2_ACCOUNT_ID`/etc. and constructs an `S3Client` at
+// *module scope* (`r2.ts:83-97`), so actually importing it here would throw
+// the moment this test file loaded, in an environment with no R2
+// credentials. Declared *inside* the factory, not as an outer `const`/
+// `class` referenced from it — `vi.mock` factories are hoisted above every
+// other statement in this file, so a class declared outside and referenced
+// inside throws "Cannot access ... before initialization" the moment this
+// file loads; Vitest's own docs call this out as the one thing a factory
+// may not do. `attachment-service.ts`'s own `import ... from "@/lib/r2"`
+// resolves to this same mocked module under Vitest, so its
+// `e instanceof R2DeleteObjectsError` check is checking against the exact
+// class returned below — the two are the same reference, not just the same
+// shape, once both sides import it from here.
+vi.mock("@/lib/r2", () => {
+  class R2DeleteObjectsError extends Error {
+    readonly failedKeys?: string[];
+    constructor(message: string, failedKeys?: string[], options?: ErrorOptions) {
+      super(message, options);
+      this.name = "R2DeleteObjectsError";
+      this.failedKeys = failedKeys;
+    }
+  }
+  return {
+    presignPut: vi.fn(async () => "https://example.r2.cloudflarestorage.com/signed-put"),
+    deleteObjects: vi.fn(async () => undefined),
+    R2DeleteObjectsError,
+  };
+});
 
-import { presignPut, deleteObjects } from "@/lib/r2";
+import { presignPut, deleteObjects, R2DeleteObjectsError } from "@/lib/r2";
 import {
   requestUpload,
   confirmUpload,
@@ -78,6 +105,7 @@ function fakeDb(parts: FakeParts) {
   const dbW = emptySink();
   const txW = emptySink();
   const push = (label: string) => parts.sequence?.push(label);
+  const args: { attachmentFindManyWhere?: unknown } = {};
 
   const reads = {
     task: {
@@ -91,7 +119,19 @@ function fakeDb(parts: FakeParts) {
     },
     attachment: {
       findUnique: async () => parts.attachment ?? null,
-      findMany: async () => parts.attachments ?? [],
+      // The fixture is returned regardless of `where` — same as
+      // `tests/attachment-queries.test.ts`'s own fake — so the *query scope*
+      // has to be proven by asserting `args.attachmentFindManyWhere`
+      // separately, never inferred from what rows came back. A fake that
+      // filtered by `where` itself would hide the exact bug a reviewer once
+      // found here: a mutated sweep dropping `parentId` from the filter
+      // still returns the fixture, still passes every assertion on *which
+      // keys* reached `deleteObjects`, and only a direct assertion on the
+      // captured `where` catches it.
+      findMany: async (a: { where: unknown }) => {
+        args.attachmentFindManyWhere = a.where;
+        return parts.attachments ?? [];
+      },
     },
   };
 
@@ -158,7 +198,7 @@ function fakeDb(parts: FakeParts) {
     },
   } as unknown as PrismaClient;
 
-  return { db, dbW, txW };
+  return { db, dbW, txW, args };
 }
 
 const baseRequestInput = {
@@ -523,6 +563,22 @@ describe("deleteAttachmentObjectsFor", () => {
     expect(dbW.deletedMany[0]).toEqual({ where: { id: { in: ["att1", "att2"] } } });
   });
 
+  // Fix round 2, FINDING 2: the shared fakeDb's attachment.findMany used to
+  // ignore its `where` entirely and always return the fixture — a mutated
+  // sweep that dropped `parentId` from the filter (deleting every
+  // attachment of that type across the whole database in production) still
+  // passed every other test here, because every other test only checks
+  // which keys reached deleteObjects, which proves the keys derive from
+  // whatever findMany returned, never that findMany asked for the right
+  // rows. This is the test that actually pins the query's scope, mirroring
+  // tests/attachment-queries.test.ts's own captured-where assertion.
+  it("scopes the read to exactly this parentType and parentId — the property a wrong scope would silently pass without", async () => {
+    const rows = [{ id: "att1", fileKey: "TASK/t1/c1/brief.pdf" }];
+    const { db, args } = fakeDb({ attachments: rows });
+    await deleteAttachmentObjectsFor(db, { parentType: "TASK", parentId: "t1" });
+    expect(args.attachmentFindManyWhere).toEqual({ parentType: "TASK", parentId: "t1" });
+  });
+
   // The order this function is specified to use (§6:111, task-4-brief.md):
   // objects first, rows second — proven the same way removeAttachment's
   // opposite order is proven, by a shared sequence array.
@@ -537,23 +593,95 @@ describe("deleteAttachmentObjectsFor", () => {
     expect(sequence).toEqual(["r2.deleteObjects", "db.attachment.deleteMany"]);
   });
 
-  it("propagates a deleteObjects failure and deletes no rows at all", async () => {
-    mockDeleteObjects.mockRejectedValue(new Error("R2 refused to delete 1 of 2 requested object(s)"));
+  // Fix round 2, FINDING 1 — the enshrined bug this test used to assert as
+  // correct. `deleteObjects` is non-atomic (Task 3's own fix: it attempts
+  // every batch and only aggregates failures into one throw at the end), so
+  // a throw does NOT mean nothing was deleted — it can mean 4 of 5 objects
+  // are already gone. The old assertion here ("deletes no rows at all") was
+  // exactly backwards: aborting left all 4 successfully-deleted objects'
+  // rows in place, each now a broken download — the "lie" spec §6:108
+  // explicitly ranks worse than a leak. The correct contract, asserted
+  // below: every row is deleted regardless, the sweep does not throw, and
+  // the failure is logged instead of silently dropped.
+  it("still deletes every row when the object-delete reports a confirmed partial failure — the leak, not the lie", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockDeleteObjects.mockRejectedValue(
+      new R2DeleteObjectsError(
+        "deleteObjects: R2 refused to delete 1 of 2 requested object(s): TASK/t1/c2/photo.png",
+        ["TASK/t1/c2/photo.png"]
+      )
+    );
     const rows = [
       { id: "att1", fileKey: "TASK/t1/c1/brief.pdf" },
       { id: "att2", fileKey: "TASK/t1/c2/photo.png" },
     ];
     const { db, dbW } = fakeDb({ attachments: rows });
-    await expect(deleteAttachmentObjectsFor(db, { parentType: "TASK", parentId: "t1" })).rejects.toThrow(
-      "R2 refused to delete"
+
+    await expect(
+      deleteAttachmentObjectsFor(db, { parentType: "TASK", parentId: "t1" })
+    ).resolves.toBeUndefined();
+
+    // BOTH rows are gone — including att1, whose object was actually
+    // deleted, and att2, whose object is now an orphan the row no longer
+    // claims to be able to serve.
+    expect(dbW.deletedMany).toHaveLength(1);
+    expect(dbW.deletedMany[0]).toEqual({ where: { id: { in: ["att1", "att2"] } } });
+
+    // Logged, not silent — §6:111's own warning about a missed code path
+    // here — and the confirmed-failed key is named, not just a generic
+    // "something went wrong".
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = consoleErrorSpy.mock.calls[0];
+    expect(logMessage).toContain("TASK/t1");
+    expect(logMessage).toContain("TASK/t1/c2/photo.png");
+    consoleErrorSpy.mockRestore();
+  });
+
+  // The ambiguous failure shape — R2 never responded at all, so no key can
+  // be named as confirmed-failed (`R2DeleteObjectsError.failedKeys` is
+  // `undefined` for exactly this case, per r2.ts's own doc comment). Same
+  // ruling applies regardless: proceed and delete every row, log what's
+  // known.
+  it("still deletes every row when the object-delete's outcome is entirely unknown (no confirmed failedKeys)", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockDeleteObjects.mockRejectedValue(
+      new R2DeleteObjectsError("deleteObjects: request to R2 failed before it responded (ECONNRESET).")
     );
-    expect(dbW.deletedMany).toHaveLength(0);
+    const rows = [{ id: "att1", fileKey: "TASK/t1/c1/brief.pdf" }];
+    const { db, dbW } = fakeDb({ attachments: rows });
+
+    await expect(
+      deleteAttachmentObjectsFor(db, { parentType: "TASK", parentId: "t1" })
+    ).resolves.toBeUndefined();
+
+    expect(dbW.deletedMany).toHaveLength(1);
+    expect(dbW.deletedMany[0]).toEqual({ where: { id: { in: ["att1"] } } });
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    consoleErrorSpy.mockRestore();
+  });
+
+  // A non-R2DeleteObjectsError thrown by the mock (any other exception
+  // shape) must be handled the same way — the catch is not typed narrowly
+  // enough to only work for the one error class this file happens to throw
+  // today.
+  it("still deletes every row and does not throw even for a plain, unstructured error", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockDeleteObjects.mockRejectedValue(new Error("boom"));
+    const rows = [{ id: "att1", fileKey: "TASK/t1/c1/brief.pdf" }];
+    const { db, dbW } = fakeDb({ attachments: rows });
+
+    await expect(
+      deleteAttachmentObjectsFor(db, { parentType: "TASK", parentId: "t1" })
+    ).resolves.toBeUndefined();
+    expect(dbW.deletedMany).toHaveLength(1);
+    consoleErrorSpy.mockRestore();
   });
 
   it("works identically for a CLIENT parent — no TASK-specific branching", async () => {
     const rows = [{ id: "att1", fileKey: "CLIENT/c1/cuid1/logo.png" }];
-    const { db } = fakeDb({ attachments: rows });
+    const { db, args } = fakeDb({ attachments: rows });
     await deleteAttachmentObjectsFor(db, { parentType: "CLIENT", parentId: "c1" });
     expect(mockDeleteObjects).toHaveBeenCalledWith(["CLIENT/c1/cuid1/logo.png"]);
+    expect(args.attachmentFindManyWhere).toEqual({ parentType: "CLIENT", parentId: "c1" });
   });
 });

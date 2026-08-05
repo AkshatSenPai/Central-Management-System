@@ -165,6 +165,32 @@ export async function presignGet(input: { key: string }): Promise<string> {
  * assuming a small N because it usually is one. */
 const DELETE_BATCH_LIMIT = 1000;
 
+/** Thrown by `deleteObjects` on any failure. A plain `Error` subclass, not a
+ * new shape — every existing catch (`instanceof Error`, `.message`) keeps
+ * working unchanged — but it adds `failedKeys`, added for
+ * `deleteAttachmentObjectsFor` (`attachment-service.ts`), which needs to log
+ * exactly which objects survived a partial sweep failure rather than
+ * parsing them back out of a human-readable message string.
+ *
+ * `failedKeys` is populated only for a *confirmed* per-key refusal — R2
+ * responded and named exactly which keys it would not delete. It is
+ * `undefined` for the other throw below, where a batch's `send()` call
+ * itself failed: in that case R2's own response, the only source of truth
+ * for which keys in that batch actually committed, never arrived at all,
+ * and inventing a list would misreport an unknown outcome as a known one —
+ * the same distinction this function's own doc comment already draws
+ * between the two failure shapes, now carried on the error instead of only
+ * in prose. */
+export class R2DeleteObjectsError extends Error {
+  readonly failedKeys?: string[];
+
+  constructor(message: string, failedKeys?: string[], options?: ErrorOptions) {
+    super(message, options);
+    this.name = "R2DeleteObjectsError";
+    this.failedKeys = failedKeys;
+  }
+}
+
 /** Deletes every object at `keys`. Returns early on an empty array — the
  * common case for a task with no attachments — rather than sending R2 a
  * `DeleteObjects` call with zero `Objects`, which is a wasted round trip
@@ -234,11 +260,14 @@ export async function deleteObjects(keys: string[]): Promise<void> {
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : String(cause);
       const remaining = keys.length - attempted - batch.length;
-      throw new Error(
+      // No `failedKeys` here, deliberately — see the class's own doc
+      // comment. This batch's outcome is unknown, not confirmed-failed.
+      throw new R2DeleteObjectsError(
         `deleteObjects: request to R2 failed before it responded (${reason}). ` +
           `${attempted} of ${keys.length} object(s) were attempted before this batch ` +
           `(${failedKeys.length} confirmed failed so far); this batch's ${batch.length} ` +
           `object(s) have an unknown outcome, and ${remaining} were never attempted.`,
+        undefined,
         { cause }
       );
     }
@@ -249,8 +278,9 @@ export async function deleteObjects(keys: string[]): Promise<void> {
   }
 
   if (failedKeys.length > 0) {
-    throw new Error(
-      `deleteObjects: R2 refused to delete ${failedKeys.length} of ${keys.length} requested object(s): ${failedKeys.join(", ")}`
+    throw new R2DeleteObjectsError(
+      `deleteObjects: R2 refused to delete ${failedKeys.length} of ${keys.length} requested object(s): ${failedKeys.join(", ")}`,
+      failedKeys
     );
   }
 }

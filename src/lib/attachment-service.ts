@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity } from "@/lib/activity";
 import { buildFileKey, validateUpload, type AttachmentParentType } from "@/lib/attachment";
-import { presignPut, deleteObjects } from "@/lib/r2";
+import { presignPut, deleteObjects, R2DeleteObjectsError } from "@/lib/r2";
 
 /** `requestUpload`, `confirmUpload`, `removeAttachment` and
  * `deleteAttachmentObjectsFor` — spec §6's two-step write, its deletion
@@ -358,25 +358,58 @@ export type AttachmentDb = Pick<PrismaClient, "attachment">;
  * The sweep Task 6 calls when a task or client is deleted (spec §6:111: "the
  * database cannot cascade to R2, so `removeTask` / `deleteClient` … gain
  * that call"). Reads every attachment row under `(parentType, parentId)`,
- * deletes their R2 objects, then deletes the rows — **objects first,
- * deliberately the opposite order from `removeAttachment` above**, for a
- * reason specific to how this function is actually called rather than a
- * different opinion about which failure direction is worse in general:
+ * attempts to delete their R2 objects, then **unconditionally** deletes the
+ * rows — whether or not the R2 attempt fully succeeded.
  *
- * Task 6 nests this call **inside** `removeTask`'s own `db.$transaction`, so
- * by design the row-deletion step here is never durably committed on its
- * own — it is staged inside a transaction someone else owns, which only
- * actually commits once every other step in that outer transaction (the
- * task delete itself, notification cleanup, the activity row) also
- * succeeds. `removeAttachment`'s row-first reasoning — "the row is durably
- * gone before the risky external call even runs" — does not hold here,
- * because there is no independent commit point to make it durable before
- * the R2 call happens. What *does* hold: if the object-delete is attempted
- * first and throws, this function returns control to its caller before
- * touching a single row, so the enclosing `removeTask` transaction rolls
- * back cleanly with every attachment row exactly as it was — no partial
- * sweep, no row deleted for an object that was never actually confirmed
- * gone.
+ * **Fix round 2, and why the first version of this function was wrong.**
+ * The original implementation aborted before touching any row whenever
+ * `deleteObjects` threw, on the theory that this function runs nested
+ * inside `removeTask`'s own `db.$transaction`, so an early return would let
+ * the enclosing transaction roll back cleanly. That reasoning had a hole:
+ * `deleteObjects` (`r2.ts`) is deliberately non-atomic — Task 3's own fix
+ * made it attempt every batch and aggregate failures into a single throw at
+ * the end, specifically so a few bad keys in one batch could not stop a
+ * large sweep from trying the rest. Non-atomic means a throw no longer
+ * implies nothing was deleted: `deleteObjects` can genuinely delete 4 of 5
+ * objects and still throw for the fifth. Aborting on that throw left every
+ * one of those 4 rows in place, each now pointing at an object that is
+ * confirmed gone — exactly the "lie" spec §6:108 says is the failure
+ * direction to avoid ("the reverse [row without object] would show a
+ * broken download"), produced for every key that *did* succeed, by code
+ * that existed specifically to prevent it.
+ *
+ * The fix is not "delete rows only for the keys that succeeded, then
+ * re-throw for the rest" — that fails for the same nested-transaction
+ * reason the original design leaned on: throwing here rolls back the
+ * *entire* enclosing `removeTask`/`deleteClient` transaction, undoing the
+ * very row deletions just made, and there is no way to selectively commit
+ * part of a transaction owned by a different function. Once nested inside
+ * someone else's transaction, the only two outcomes reachable at all are
+ * "every row survives" (abort) or "every row goes" (proceed) — a per-key
+ * split is not on the table.
+ *
+ * So: **the R2 attempt's failure is caught, logged, and swallowed — it does
+ * not abort the sweep, and it does not roll back the parent's own
+ * deletion.** Every attachment row under this parent is deleted regardless
+ * of what `deleteObjects` reported. This is deliberately the "leak" side of
+ * §6:108's own tradeoff, chosen a second time: any object that failed to
+ * delete becomes an orphan (invisible, costing storage, reapable later) —
+ * never a row surviving to claim a file that is actually gone. A task or
+ * client delete must not fail, or leave attachment rows dangling under a
+ * parent that no longer exists, because R2 had a hiccup.
+ *
+ * **The failure is not silent, though** — `console.error` names the parent
+ * and, when `deleteObjects` threw an `R2DeleteObjectsError` with a
+ * confirmed `failedKeys` list (a real per-key refusal, not merely-ambiguous
+ * `send()` failure — see that class's own doc comment in `r2.ts`), names
+ * the exact keys now orphaned. §6:111 calls a missed code path here "the
+ * one place [that] silently leaks storage"; logging every occurrence is
+ * what keeps this leak *diagnosable* rather than the unbounded, invisible
+ * kind that warning describes. `console.error` rather than a thrown/returned
+ * report because this function's contract is `Promise<void>` precisely so
+ * it can be called unconditionally mid-transaction — a caller that wants
+ * more than "check the logs" is a Task 6+ decision, not one to invent here
+ * against a caller that does not exist yet.
  *
  * Deletes by the exact `id` list read in the same call, not by re-issuing
  * the `(parentType, parentId)` filter a second time. The gap between the
@@ -385,7 +418,7 @@ export type AttachmentDb = Pick<PrismaClient, "attachment">;
  * delete to the precise snapshot this function actually swept for R2
  * closes that window: a row that did not exist when `deleteObjects` ran is
  * never caught by a broader same-parent filter that would delete it anyway
- * without ever having deleted (or even known about) its object.
+ * without ever having attempted (or even known about) its object.
  *
  * A parent with nothing attached returns immediately after the read — no
  * pointless `DeleteObjects` call with zero keys (`r2.ts:168-171` already
@@ -402,7 +435,24 @@ export async function deleteAttachmentObjectsFor(
   });
   if (rows.length === 0) return;
 
-  await deleteObjects(rows.map((row) => row.fileKey));
+  try {
+    await deleteObjects(rows.map((row) => row.fileKey));
+  } catch (e) {
+    const failedKeys = e instanceof R2DeleteObjectsError ? e.failedKeys : undefined;
+    const detail = failedKeys
+      ? `confirmed still present: ${failedKeys.join(", ")}`
+      : "outcome unknown for one or more objects (R2 request failed before responding)";
+    // Deliberately not re-thrown — see this function's own doc comment for
+    // why proceeding to delete every row anyway is the correct response to
+    // an R2 failure here, not a workaround for one.
+    console.error(
+      `deleteAttachmentObjectsFor: R2 object delete failed for ${input.parentType}/${input.parentId} ` +
+        `(${rows.length} attachment row(s) in this sweep) — ${detail}. Proceeding to delete the ` +
+        `row(s) regardless (spec §6: leak an orphan object rather than leave a row pointing at ` +
+        `nothing); any object still present in R2 above is now orphaned and needs manual reaping.`,
+      e
+    );
+  }
 
   await db.attachment.deleteMany({
     where: { id: { in: rows.map((row) => row.id) } },
