@@ -10,7 +10,7 @@ import {
   splitDayEvents,
   timelineWindow,
 } from "@/lib/calendar-event";
-import type { CalendarEventRow } from "@/lib/calendar-event";
+import type { CalendarEventRow } from "@/lib/calendar-event-queries";
 
 /** Minimal CalendarEventRow builder for the timeline-geometry tests below.
  * They only ever vary id/startsAt/endsAt/allDay, and spelling out project,

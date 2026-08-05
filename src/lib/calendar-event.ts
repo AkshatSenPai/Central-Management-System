@@ -1,4 +1,5 @@
 import { appTimeLabel, startOfAppDay } from "@/lib/dates";
+import type { CalendarEventRow } from "@/lib/calendar-event-queries";
 
 /** Pure calendar-event formatting and layout helpers. This is the only
  * unit-testable surface calendar events have — components cannot be rendered
@@ -83,28 +84,6 @@ export function attendeeInitialsLabel(attendees: { initials: string }[]): string
   const extra = attendees.length - MAX_SHOWN;
   return extra > 0 ? `${shown.join(", ")} +${extra}` : shown.join(", ");
 }
-
-/** The grid's per-event contract (spec §6). Declared here rather than in
- * `calendar-event-queries.ts` — which is where the spec assigns it — because
- * that file does not exist yet in this step's task order and the three
- * timeline functions below need the exact shape spec `:429-431` types them
- * against. When the queries file lands it should import this type rather
- * than redeclare it: duplicating the field list in two places is the
- * alternative, and the one a later edit to either copy would silently drift
- * out of sync with. */
-export type CalendarEventRow = {
-  id: string;
-  title: string;
-  startsAt: Date;
-  endsAt: Date;
-  allDay: boolean;
-  creatorId: string;
-  projectId: string | null;
-  projectName: string | null;
-  clientId: string | null;
-  clientName: string | null;
-  attendees: Array<{ id: string; name: string; initials: string }>;
-};
 
 const MINUTES_PER_HOUR = 60;
 const DEFAULT_TIMELINE_START_HOUR = 8;
