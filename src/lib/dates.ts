@@ -35,6 +35,19 @@ export function monthYear(d: Date): string {
   return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: APP_TIMEZONE });
 }
 
+/** "15:00" — 24-hour, en-GB, matching every other pinned formatter above.
+ * `hour12: false` was chosen over picking a convention and a locale that
+ * spells out am/pm: 24-hour sidesteps the question rather than answering it,
+ * which is what every other timestamp in this file already does. */
+export function appTimeLabel(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
 /** The first instant of the app day containing `d`.
  *
  * Its RESULT is an app-midnight instant, which is 18:30Z on the previous
