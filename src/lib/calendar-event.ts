@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { appTimeLabel, startOfAppDay } from "@/lib/dates";
 import type { CalendarEventRow } from "@/lib/calendar-event-queries";
 
@@ -8,6 +9,53 @@ import type { CalendarEventRow } from "@/lib/calendar-event-queries";
  * here, not in a `.tsx`. No Prisma import, no React import: everything below
  * takes plain objects so a test fixture never needs a fake Prisma client to
  * exercise it. */
+
+/** Backs create and edit, matching taskSchema's shape (task.ts:65-72): trim
+ * and cap the free-text fields, and leave everything a picker or a parser
+ * owns out of it entirely. No `startsAt`/`endsAt`/`allDay` here — those
+ * three go through parseTimeInput, appDateTime and validateEventTimes
+ * instead, the same way taskSchema excludes `status` because a select
+ * value has its own resolution path (task.ts:59-64); zod's job is a
+ * blank-or-not check, and a `"25:00"` should be rejected as unparseable,
+ * not accepted as a non-empty string. No `attendees` either — the picker
+ * submits a repeated `userId` field, not a scalar, resolved server-side the
+ * way `resolveAssignees` already is for tasks. */
+export const calendarEventSchema = z.object({
+  title: z.string().trim().min(1, "Give the event a title").max(200),
+  description: z.string().trim().max(4000).optional().or(z.literal("")),
+  projectId: z.string().trim().optional().or(z.literal("")),
+  clientId: z.string().trim().optional().or(z.literal("")),
+});
+
+export type CalendarEventInput = z.infer<typeof calendarEventSchema>;
+
+/** The only place event start/end ordering is checked. Takes minutes since
+ * app-midnight — parseTimeInput's unit, not a Date — rather than the
+ * stored instants themselves, and that choice is D5's rule that an event
+ * cannot span more than a day, written as a type instead of a runtime
+ * check: with no date in either argument, "the end lands on a different
+ * calendar day than the start" is not a sentence this function can even
+ * construct, so it needs no case for it and none is added here.
+ *
+ * Four distinct rejections rather than one generic message, so a user is
+ * told which field is wrong: a null start (the field did not parse), a
+ * null end (same, for the other field), an end equal to the start, and an
+ * end strictly before it. `allDay` short-circuits everything before any of
+ * those run — an all-day event's bounds are a storage artefact,
+ * app-midnight to app-midnight (see eventTimeLabel's comment below), never
+ * a value a user set, so there is nothing here to validate against. */
+export function validateEventTimes(
+  start: number | null,
+  end: number | null,
+  allDay: boolean
+): string | null {
+  if (allDay) return null;
+  if (start === null) return "An event needs a start time";
+  if (end === null) return "An event needs an end time";
+  if (end === start) return "The end time can't be the same as the start time";
+  if (end < start) return "The end time must be after the start time";
+  return null;
+}
 
 /** The calendar page's subtitle: `N tasks due · M events in this period`,
  * each side pluralised on its own. Replaces two nested ternaries that used

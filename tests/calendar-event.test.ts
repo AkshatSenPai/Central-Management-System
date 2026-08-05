@@ -3,12 +3,14 @@ import { appTimeLabel } from "@/lib/dates";
 import {
   assignLanes,
   attendeeInitialsLabel,
+  calendarEventSchema,
   calendarPeriodSummary,
   eventPosition,
   eventTimeLabel,
   monthCellRows,
   splitDayEvents,
   timelineWindow,
+  validateEventTimes,
 } from "@/lib/calendar-event";
 import type { CalendarEventRow } from "@/lib/calendar-event-queries";
 
@@ -339,6 +341,93 @@ describe("eventPosition", () => {
       endsAt: new Date("2026-08-04T03:45:00.000Z"), // 09:15 IST
     });
     expect(eventPosition(event, window).heightPct).toBeCloseTo((15 / 660) * 100, 10);
+  });
+});
+
+describe("validateEventTimes", () => {
+  it("returns null outright for an all-day event, even with both times null", () => {
+    expect(validateEventTimes(null, null, true)).toBeNull();
+  });
+
+  it("returns null outright for an all-day event, even with an end before the start", () => {
+    // allDay short-circuits before any ordering check runs — an all-day
+    // event's bounds are a storage artefact (app-midnight to app-midnight),
+    // never a value a user set, so there is nothing here to validate.
+    expect(validateEventTimes(600, 500, true)).toBeNull();
+  });
+
+  it("rejects a null start", () => {
+    expect(validateEventTimes(null, 600, false)).toBe("An event needs a start time");
+  });
+
+  it("rejects a null end", () => {
+    expect(validateEventTimes(540, null, false)).toBe("An event needs an end time");
+  });
+
+  it("rejects an end equal to the start", () => {
+    expect(validateEventTimes(600, 600, false)).toBe("The end time can't be the same as the start time");
+  });
+
+  it("rejects an end before the start", () => {
+    expect(validateEventTimes(600, 540, false)).toBe("The end time must be after the start time");
+  });
+
+  it("accepts any pair in order", () => {
+    expect(validateEventTimes(540, 600, false)).toBeNull();
+    expect(validateEventTimes(0, 1439, false)).toBeNull();
+  });
+
+  // The point of "each with its own string" (spec §12:438): a user is told
+  // which thing is wrong, not handed one generic message four different
+  // ways. Four distinct rejections in, four distinct strings out.
+  it("gives each of the four rejections its own distinct string", () => {
+    const messages = [
+      validateEventTimes(null, 600, false),
+      validateEventTimes(540, null, false),
+      validateEventTimes(600, 600, false),
+      validateEventTimes(600, 540, false),
+    ];
+    expect(new Set(messages).size).toBe(4);
+  });
+});
+
+describe("calendarEventSchema", () => {
+  const validEvent = {
+    title: "Kickoff call",
+    description: "",
+    projectId: "",
+    clientId: "",
+  };
+
+  it("rejects a blank title", () => {
+    const parsed = calendarEventSchema.safeParse({ ...validEvent, title: "   " });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toBe("Give the event a title");
+  });
+
+  it("trims the title", () => {
+    const parsed = calendarEventSchema.safeParse({ ...validEvent, title: "  Kickoff call  " });
+    expect(parsed.data?.title).toBe("Kickoff call");
+  });
+
+  it("rejects a title over 200 characters", () => {
+    const parsed = calendarEventSchema.safeParse({ ...validEvent, title: "a".repeat(201) });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts an empty description, project and client", () => {
+    const parsed = calendarEventSchema.safeParse(validEvent);
+    expect(parsed.success).toBe(true);
+  });
+
+  // Same distinction taskSchema pins for its own optional fields: omitted
+  // is a field the form never rendered, "" is a sentinel the picker
+  // submitted on purpose, and null is neither — a tampered submission.
+  it("rejects a null description, project or client — omitted is not empty", () => {
+    for (const field of ["description", "projectId", "clientId"] as const) {
+      const parsed = calendarEventSchema.safeParse({ ...validEvent, [field]: null });
+      expect(parsed.success, `${field}: null should not parse`).toBe(false);
+    }
   });
 });
 
