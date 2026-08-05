@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL } from "@/lib/task";
 import { projectColorIndex } from "@/lib/project";
-import { shortDate } from "@/lib/dates";
+import { monthCellRows } from "@/lib/calendar-event";
+import { appTimeLabel, shortDate, toDateInputValue } from "@/lib/dates";
 import {
   WEEKDAY_LABELS,
   groupByAppDay,
@@ -46,6 +47,40 @@ function CellTask({ row, overdue }: { row: TaskListRow; overdue: boolean }) {
   );
 }
 
+/** One event inside a cell, following `CellTask`'s shape: a dot, then a label,
+ * then the truncated title, linking out rather than carrying detail itself.
+ * The dot is the project swatch when the event has one, `--accent` when it
+ * does not — an event is never colourless the way an unassigned task's dot
+ * still resolves to swatch 1.
+ *
+ * The label is `appTimeLabel(startsAt)` — a bare "15:00", not
+ * `eventTimeLabel`'s "15:00 – 16:00" range — because a month cell is ~140px
+ * wide and has a title to fit beside it; the day/week views are where the
+ * full range belongs. All-day events print no label at all: their stored
+ * bounds are app-midnight to app-midnight, so any clock read off them is an
+ * artefact of storage, not a time anyone chose. */
+function CellEvent({ event }: { event: CalendarEventRow }) {
+  const dotClass = event.projectId
+    ? SWATCH[projectColorIndex(event.projectId)]
+    : "bg-[var(--accent)]";
+  return (
+    <Link
+      href={`/calendar?view=day&date=${toDateInputValue(event.startsAt)}`}
+      transitionTypes={["nav-forward"]}
+      title={event.title}
+      className="flex items-center gap-1.5 rounded px-1 py-0.5 text-[11.5px] text-[var(--text-2)] transition-colors hover:bg-[var(--surface-3)]"
+    >
+      <span aria-hidden="true" className={`h-1.5 w-1.5 flex-none rounded-full ${dotClass}`} />
+      {event.allDay ? null : (
+        <span className="mono text-[10.5px] text-[var(--text-3)]">
+          {appTimeLabel(event.startsAt)}
+        </span>
+      )}
+      <span className="truncate">{event.title}</span>
+    </Link>
+  );
+}
+
 /** The month grid: always six rows, so paging through the year does not make
  * the page jump. Days outside the anchor month are dimmed rather than blank —
  * a task due on the 1st of next month is still worth seeing from this one. */
@@ -53,10 +88,12 @@ function MonthView({
   anchor,
   now,
   byDay,
+  eventsByDay,
 }: {
   anchor: Date;
   now: Date;
   byDay: Map<number, TaskListRow[]>;
+  eventsByDay: Map<number, CalendarEventRow[]>;
 }) {
   const weeks = monthGrid(anchor);
   return (
@@ -74,6 +111,8 @@ function MonthView({
       <div className="grid grid-cols-7">
         {weeks.flat().map((day) => {
           const tasks = byDay.get(day.getTime()) ?? [];
+          const events = eventsByDay.get(day.getTime()) ?? [];
+          const cell = monthCellRows(events, tasks, 3);
           const inMonth = isInAppMonth(day, anchor);
           const isToday = isSameAppDay(day, now);
           return (
@@ -95,15 +134,18 @@ function MonthView({
                 {appDayOfMonth(day)}
               </span>
               <div className="flex flex-col gap-0.5">
-                {tasks.slice(0, 3).map((row) => (
+                {cell.events.map((event) => (
+                  <CellEvent key={event.id} event={event} />
+                ))}
+                {cell.tasks.map((row) => (
                   <CellTask key={row.id} row={row} overdue={isOverdueOnDay(row.dueDate, now)} />
                 ))}
                 {/* Truncated rather than scrolled: a cell that scrolls is a
                     cell nobody scrolls. The count is the invitation to open
                     the day view. */}
-                {tasks.length > 3 ? (
+                {cell.overflow > 0 ? (
                   <span className="px-1 text-[11px] text-[var(--text-3)]">
-                    +{tasks.length - 3} more
+                    +{cell.overflow} more
                   </span>
                 ) : null}
               </div>
@@ -196,22 +238,23 @@ export function CalendarGrid({
   anchor,
   now,
   rows,
+  events,
 }: {
   view: CalendarView;
   anchor: Date;
   now: Date;
   rows: TaskListRow[];
-  // Accepted but not yet rendered — wiring the grid to draw these is Task 5.
-  // Left out of the destructure (rather than bound and unused) so the prop
-  // is part of the contract without tripping @typescript-eslint/no-unused-vars.
   events: CalendarEventRow[];
 }) {
   // Bucketed by app-midnight epoch, which is what each cell looks itself up
   // by — never by slicing an ISO string, because the dueDate column carries no
   // constraint forcing midnight.
   const byDay = groupByAppDay(rows, (r) => r.dueDate);
+  const eventsByDay = groupByAppDay(events, (e) => e.startsAt);
 
-  if (view === "month") return <MonthView anchor={anchor} now={now} byDay={byDay} />;
+  if (view === "month") {
+    return <MonthView anchor={anchor} now={now} byDay={byDay} eventsByDay={eventsByDay} />;
+  }
   if (view === "week") {
     const start = startOfAppWeek(anchor);
     return (
