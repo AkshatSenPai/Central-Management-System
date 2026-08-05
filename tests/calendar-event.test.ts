@@ -324,6 +324,22 @@ describe("eventPosition", () => {
     });
     expect(eventPosition(event, window)).toEqual({ topPct: 25, heightPct: 50 });
   });
+
+  it("gives a 15-minute event its true fractional height, with no minimum clamp", () => {
+    // A fixture that only ever lands on a "round" percentage (1/11th, 50%,
+    // 100%) can't tell a correct implementation from one that floors
+    // heightPct at some small constant — every value above would sail past
+    // a plausible clamp undetected. 15 minutes in an 08:00-19:00 (660-minute)
+    // window is 15/660*100 = 2.2727...%, small enough that a clamp anywhere
+    // in the 2-5% range would visibly change it — the exact risk the brief
+    // and spec §7 name: "a 15-minute call yields its true tiny percentage".
+    const event = eventRow({
+      id: "a",
+      startsAt: new Date("2026-08-04T03:30:00.000Z"), // 09:00 IST
+      endsAt: new Date("2026-08-04T03:45:00.000Z"), // 09:15 IST
+    });
+    expect(eventPosition(event, window).heightPct).toBeCloseTo((15 / 660) * 100, 10);
+  });
 });
 
 describe("assignLanes", () => {
