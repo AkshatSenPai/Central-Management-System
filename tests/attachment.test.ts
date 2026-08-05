@@ -80,6 +80,47 @@ describe("sanitiseFileName", () => {
     expect(sanitiseFileName("weird?name*.pdf")).toBe("weird_name_.pdf");
     expect(sanitiseFileName("résumé.pdf")).toBe("r_sum_.pdf");
   });
+
+  // Fix round 2, finding 3: only the leading dot was stripped before —
+  // trailing dots survived unchanged, an asymmetry rather than a
+  // considered choice. Windows silently drops a trailing dot on write,
+  // which makes a key ending in one a latent footgun for any tool that
+  // materialises it.
+  it("strips a trailing dot too, not just a leading one", () => {
+    expect(sanitiseFileName("file.")).toBe("file");
+    expect(sanitiseFileName("invoice.pdf.")).toBe("invoice.pdf");
+  });
+
+  // Fix round 2, finding 2: R2 caps an object key at 1024 UTF-8 bytes;
+  // sanitiseFileName caps its own contribution at 255 (the classic
+  // per-component filesystem limit — see the constant's comment for the
+  // arithmetic against the 1024-byte key budget). At the threshold itself
+  // nothing changes; one character past it, the name is cut but the
+  // extension survives.
+  it("leaves a name at the 255-byte threshold untouched", () => {
+    const exactly255 = "b".repeat(251) + ".txt";
+    expect(exactly255.length).toBe(255);
+    expect(sanitiseFileName(exactly255)).toBe(exactly255);
+  });
+
+  it("truncates a name past the 255-byte threshold, preserving the extension", () => {
+    const oneOver = "b".repeat(252) + ".txt";
+    expect(sanitiseFileName(oneOver)).toBe("b".repeat(251) + ".txt");
+  });
+
+  // The truncation cut is a plain string slice, which can land right after
+  // an internal dot in the base name — and appending the real extension's
+  // own leading dot right after that would recreate the exact ".." pattern
+  // this whole file exists to keep out. Constructed so the 255-byte cut
+  // falls immediately after the embedded "." in `base`, so this only
+  // passes if the post-truncation collapseAndTrimDots pass actually runs.
+  it("does not let truncation recreate '..' at the base/extension boundary", () => {
+    const base = "x".repeat(250) + "." + "y".repeat(100);
+    const hostile = `${base}.pdf`;
+    const result = sanitiseFileName(hostile);
+    expect(result).not.toMatch(/\.\./);
+    expect(result.endsWith(".pdf")).toBe(true);
+  });
 });
 
 describe("buildFileKey", () => {
@@ -102,6 +143,28 @@ describe("buildFileKey", () => {
     const key = buildFileKey("PROJECT", "p1", "c1", "a/b.pdf");
     expect(key).not.toContain("a/b.pdf");
     expect(key).toBe("PROJECT/p1/c1/a_b.pdf");
+  });
+
+  // Fix round 2, finding 1: sanitiseFileName only ever touched fileName —
+  // parentId and id reached the template string completely untouched, so
+  // either one could add or remove segments of its own. parentId and id
+  // are meant to be strict identifiers (a Prisma row id, this attachment's
+  // own cuid), not display strings, so a malformed one throws rather than
+  // being silently rewritten — see assertSafeKeySegment's comment for why.
+  it("throws if parentId is a traversal path instead of a real id", () => {
+    expect(() => buildFileKey("TASK", "../../secrets", "cuidabc", "invoice.pdf")).toThrow();
+  });
+
+  it("throws if id is a traversal path instead of a real id", () => {
+    expect(() => buildFileKey("TASK", "clxyz1", "../../secrets", "invoice.pdf")).toThrow();
+  });
+
+  it("throws if parentId contains a slash", () => {
+    expect(() => buildFileKey("TASK", "a/b", "cuidabc", "invoice.pdf")).toThrow();
+  });
+
+  it("throws if id contains a backslash", () => {
+    expect(() => buildFileKey("TASK", "clxyz1", "a\\b", "invoice.pdf")).toThrow();
   });
 });
 
@@ -162,6 +225,13 @@ describe("validateUpload", () => {
   it("accepts a one-byte upload", () => {
     expect(validateUpload("tiny.txt", 1)).toBeNull();
   });
+
+  // Fix round 2, finding 5: the `sizeBytes <= 0` guard was documented as
+  // covering negatives defensively but nothing asserted it — a future
+  // narrowing to `=== 0` would let a negative size through unnoticed.
+  it("rejects a negative size", () => {
+    expect(validateUpload("x.pdf", -1)).not.toBeNull();
+  });
 });
 
 describe("formatFileSize", () => {
@@ -182,5 +252,12 @@ describe("formatFileSize", () => {
   it("renders the megabyte boundary and the upload limit", () => {
     expect(formatFileSize(1024 * 1024)).toBe("1.0 MB");
     expect(formatFileSize(MAX_UPLOAD_BYTES)).toBe("25.0 MB");
+  });
+
+  // Fix round 2, finding 4: one byte under a megabyte divides out to
+  // 1023.999... KB, which rounds to 1024.0 at one decimal place — a value
+  // that belongs in the MB tier, not still reading as KB.
+  it("rounds a near-megabyte value into the MB tier instead of reporting 1024.0 KB", () => {
+    expect(formatFileSize(1024 * 1024 - 1)).toBe("1.0 MB");
   });
 });
