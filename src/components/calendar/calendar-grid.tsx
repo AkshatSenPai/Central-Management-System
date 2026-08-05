@@ -2,7 +2,14 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL } from "@/lib/task";
 import { projectColorIndex } from "@/lib/project";
-import { monthCellRows } from "@/lib/calendar-event";
+import {
+  assignLanes,
+  eventPosition,
+  eventTimeLabel,
+  monthCellRows,
+  splitDayEvents,
+  timelineWindow,
+} from "@/lib/calendar-event";
 import { appTimeLabel, shortDate, toDateInputValue } from "@/lib/dates";
 import {
   WEEKDAY_LABELS,
@@ -157,24 +164,155 @@ function MonthView({
   );
 }
 
+/** One all-day event inside the untimed band, shaped like the due-task row
+ * beside it (title line, then a second line) so the two kinds read as one
+ * list rather than two different components glued together. The second line
+ * is `eventTimeLabel(event)`, which for an all-day row is always the literal
+ * "All day" — §13's locked label for this exact spot — never a repeat of
+ * the band's own "no set time" heading. */
+function UntimedEventRow({ event }: { event: CalendarEventRow }) {
+  const dotClass = event.projectId
+    ? SWATCH[projectColorIndex(event.projectId)]
+    : "bg-[var(--accent)]";
+  return (
+    <Link
+      href={`/calendar?view=day&date=${toDateInputValue(event.startsAt)}`}
+      transitionTypes={["nav-forward"]}
+      title={event.title}
+      className="flex flex-col gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--surface-2)]"
+    >
+      <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--text)]">
+        <span aria-hidden="true" className={`h-1.5 w-1.5 flex-none rounded-full ${dotClass}`} />
+        <span className="truncate">{event.title}</span>
+      </span>
+      <span className="mono text-[11px] text-[var(--text-3)]">{eventTimeLabel(event)}</span>
+    </Link>
+  );
+}
+
+/** Pixels per hour row in the timeline. A pure layout constant, not part of
+ * the arithmetic `eventPosition`/`timelineWindow` own — those stay in
+ * percentages so they never need to know this number, or that it is in
+ * pixels at all. */
+const HOUR_ROW_HEIGHT_PX = 44;
+
+/** The hour scaffold for one column: a background of hour rows sized by the
+ * `window` every column on screen shares (§7), with the day's own timed
+ * events laid over it via `eventPosition` (position) and `assignLanes`
+ * (side-by-side width for overlaps). Renders even with zero timed events —
+ * an empty grid of hours reads as "nothing booked", where a blank panel
+ * would read as broken (§10) — and never receives an all-day event or a due
+ * task; those belong to the untimed band above it, not here.
+ *
+ * Each box is a `<Link>`, not a `<button>` — gate 2 forbids a raw one, and
+ * the box is an absolutely positioned element carrying `topPct`/`heightPct`,
+ * a lane width, a time label and a title, none of which a default trigger
+ * knows about (spec §7:325). Positioning and sizing live on the outer
+ * element via `style`, with the clickable label/title as its content, so a
+ * later step can swap this `<Link>` for `<EventForm>`'s trigger slot without
+ * touching the box's layout. `min-h-[22px]` is a CSS class, not part of the
+ * `heightPct` arithmetic above it — `eventPosition` deliberately returns a
+ * 15-minute event's true, tiny percentage, and the click target is kept
+ * usable here instead. */
+function DayTimeline({
+  events,
+  window,
+}: {
+  events: CalendarEventRow[];
+  window: { startHour: number; endHour: number };
+}) {
+  const hours = Array.from(
+    { length: window.endHour - window.startHour },
+    (_, i) => window.startHour + i
+  );
+  const lanes = new Map(assignLanes(events).map((l) => [l.id, l] as const));
+  return (
+    <div className="relative" style={{ height: `${hours.length * HOUR_ROW_HEIGHT_PX}px` }}>
+      <div className="absolute inset-0 flex flex-col">
+        {hours.map((hour) => (
+          <span
+            key={hour}
+            className="mono flex-none border-t border-[var(--border)] pl-1 text-[10px] text-[var(--text-3)]"
+            style={{ height: `${HOUR_ROW_HEIGHT_PX}px` }}
+          >
+            {`${String(hour).padStart(2, "0")}:00`}
+          </span>
+        ))}
+      </div>
+      {events.map((event) => {
+        const { topPct, heightPct } = eventPosition(event, window);
+        const lane = lanes.get(event.id);
+        const laneCount = lane?.laneCount ?? 1;
+        const widthPct = 100 / laneCount;
+        const leftPct = (lane?.lane ?? 0) * widthPct;
+        const dotClass = event.projectId
+          ? SWATCH[projectColorIndex(event.projectId)]
+          : "bg-[var(--accent)]";
+        return (
+          <Link
+            key={event.id}
+            href={`/calendar?view=day&date=${toDateInputValue(event.startsAt)}`}
+            transitionTypes={["nav-forward"]}
+            title={event.title}
+            className="absolute min-h-[22px] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] shadow-[var(--shadow)] transition-colors hover:bg-[var(--surface-3)]"
+            style={{
+              top: `${topPct}%`,
+              height: `${heightPct}%`,
+              left: `calc(${leftPct}% + 2px)`,
+              width: `calc(${widthPct}% - 4px)`,
+            }}
+          >
+            <span className="flex items-center gap-1">
+              <span aria-hidden="true" className={`h-1.5 w-1.5 flex-none rounded-full ${dotClass}`} />
+              <span className="mono truncate text-[10px] text-[var(--text-3)]">
+                {eventTimeLabel(event)}
+              </span>
+            </span>
+            <span className="block truncate text-[11px] font-medium text-[var(--text)]">
+              {event.title}
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Week and day share a layout: a column per day, full task rows rather than
- * one-line chips, because there is room for them. */
+ * one-line chips, because there is room for them. Each column now carries
+ * two stacked regions below its date header: the untimed band (that day's
+ * due tasks and all-day events, headed "Due today · no set time" or "No set
+ * time") and the hour timeline (timed events only). The timeline's window is
+ * computed once, here, for every column on screen — never per column, which
+ * would leave the hour rows unaligned across the grid. */
 function ColumnsView({
   days,
   now,
   byDay,
+  events,
+  eventsByDay,
 }: {
   days: Date[];
   now: Date;
   byDay: Map<number, TaskListRow[]>;
+  events: CalendarEventRow[];
+  eventsByDay: Map<number, CalendarEventRow[]>;
 }) {
+  // Fed the timed rows only, never the raw `events` array: an all-day event
+  // runs app-midnight to app-midnight, so a single "Priya on leave" left in
+  // would drag this window to 00:00–24:00 for every column on screen (D5,
+  // §7) — for a row the timeline does not even carry.
+  const window = timelineWindow(splitDayEvents(events).timed);
   return (
     <div
       className={`grid gap-3 ${days.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-7"}`}
     >
       {days.map((day) => {
         const tasks = byDay.get(day.getTime()) ?? [];
+        const dayEvents = eventsByDay.get(day.getTime()) ?? [];
+        const { untimed: allDayEvents, timed: timedEvents } = splitDayEvents(dayEvents);
         const isToday = isSameAppDay(day, now);
+        const hasBandContent = tasks.length > 0 || allDayEvents.length > 0;
         return (
           <section
             key={day.getTime()}
@@ -196,35 +334,50 @@ function ColumnsView({
                 <span className="mono text-[11px] text-[var(--text-3)]">{tasks.length}</span>
               ) : null}
             </div>
-            <div className="flex flex-col gap-1 p-2">
-              {tasks.length === 0 ? (
-                <span className="px-1 py-1 text-[11.5px] text-[var(--text-3)]">—</span>
-              ) : (
-                tasks.map((row) => (
-                  <Link
-                    key={row.id}
-                    href={`/tasks/${row.id}`}
-                    transitionTypes={["nav-forward"]}
-                    className="flex flex-col gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--surface-2)]"
-                  >
-                    <span
-                      className={`text-[12.5px] font-medium ${
-                        isOverdueOnDay(row.dueDate, now)
-                          ? "text-[var(--bad)]"
-                          : "text-[var(--text)]"
-                      }`}
+            {/* The untimed band: due tasks and all-day events. Renders
+                nothing at all — no heading, no empty dash — when the day
+                has neither, so a week of pure meetings does not grow seven
+                empty captions. */}
+            {hasBandContent ? (
+              <div className="border-b border-[var(--border)] p-2">
+                <span className="px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-3)]">
+                  {isToday ? "Due today · no set time" : "No set time"}
+                </span>
+                <div className="mt-1 flex flex-col gap-1">
+                  {allDayEvents.map((event) => (
+                    <UntimedEventRow key={event.id} event={event} />
+                  ))}
+                  {tasks.map((row) => (
+                    <Link
+                      key={row.id}
+                      href={`/tasks/${row.id}`}
+                      transitionTypes={["nav-forward"]}
+                      className="flex flex-col gap-1 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--surface-2)]"
                     >
-                      {row.title}
-                    </span>
-                    <span className="truncate text-[11px] text-[var(--text-3)]">
-                      {row.projectName ?? "Personal"}
-                    </span>
-                    <Badge kind={TASK_PRIORITY_BADGE[row.priority]}>
-                      {TASK_PRIORITY_LABEL[row.priority]}
-                    </Badge>
-                  </Link>
-                ))
-              )}
+                      <span
+                        className={`text-[12.5px] font-medium ${
+                          isOverdueOnDay(row.dueDate, now)
+                            ? "text-[var(--bad)]"
+                            : "text-[var(--text)]"
+                        }`}
+                      >
+                        {row.title}
+                      </span>
+                      <span className="truncate text-[11px] text-[var(--text-3)]">
+                        {row.projectName ?? "Personal"}
+                      </span>
+                      <Badge kind={TASK_PRIORITY_BADGE[row.priority]}>
+                        {TASK_PRIORITY_LABEL[row.priority]}
+                      </Badge>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {/* The hour timeline: timed events only, positioned within the
+                window shared by every column on screen. */}
+            <div className="p-2">
+              <DayTimeline events={timedEvents} window={window} />
             </div>
           </section>
         );
@@ -262,8 +415,18 @@ export function CalendarGrid({
         days={Array.from({ length: 7 }, (_, i) => addDays(start, i))}
         now={now}
         byDay={byDay}
+        events={events}
+        eventsByDay={eventsByDay}
       />
     );
   }
-  return <ColumnsView days={[startOfAppDay(anchor)]} now={now} byDay={byDay} />;
+  return (
+    <ColumnsView
+      days={[startOfAppDay(anchor)]}
+      now={now}
+      byDay={byDay}
+      events={events}
+      eventsByDay={eventsByDay}
+    />
+  );
 }
