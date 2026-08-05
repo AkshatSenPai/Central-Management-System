@@ -10,6 +10,13 @@ import { clientInitials } from "@/lib/client";
 export type CalendarEventRow = {
   id: string;
   title: string;
+  /** A deliberate deviation from spec §6:284-298's verbatim type, which omits
+   * this field — sound for the grid alone (it never renders a description),
+   * but the row now serves a second consumer §6 did not anticipate:
+   * `<EventForm>`'s edit-mode seed, wired from the day-view trigger
+   * (§7:325). Without it every edit through that entry point wrote an empty
+   * string over whatever was stored. See task-7-report.md, "Fix round 1". */
+  description: string | null;
   startsAt: Date;
   endsAt: Date;
   allDay: boolean;
@@ -30,6 +37,7 @@ export type CalendarEventRow = {
 const calendarEventRowSelect = {
   id: true,
   title: true,
+  description: true,
   startsAt: true,
   endsAt: true,
   allDay: true,
@@ -44,6 +52,7 @@ const calendarEventRowSelect = {
 type CalendarEventRowSource = {
   id: string;
   title: string;
+  description: string | null;
   startsAt: Date;
   endsAt: Date;
   allDay: boolean;
@@ -66,6 +75,7 @@ function toCalendarEventRow(e: CalendarEventRowSource): CalendarEventRow {
   return {
     id: e.id,
     title: e.title,
+    description: e.description,
     startsAt: e.startsAt,
     endsAt: e.endsAt,
     allDay: e.allDay,

@@ -314,13 +314,12 @@ function DayTimeline({
             event={{
               id: event.id,
               title: event.title,
-              // CalendarEventRow (spec §6) carries no `description` — it is
-              // the grid's row contract, and the grid never displays one.
-              // <EventForm>'s edit mode needs the full row and has nothing
-              // else to read it from here; see task-7-report.md for why this
-              // is flagged rather than silently patched by widening that
-              // query's select.
-              description: null,
+              // Fix round 1 (task-7-report.md): CalendarEventRow now carries
+              // description (a deliberate deviation from spec §6's verbatim
+              // type — see calendar-event-queries.ts), so this reads the
+              // stored value instead of the hardcoded null that shipped in
+              // the first pass and silently blanked every edited event.
+              description: event.description,
               startsAt: event.startsAt,
               endsAt: event.endsAt,
               allDay: event.allDay,

@@ -26,6 +26,7 @@ function eventRow(overrides: {
 }): CalendarEventRow {
   return {
     title: "Event",
+    description: null,
     creatorId: "u1",
     projectId: null,
     projectName: null,

@@ -5,6 +5,7 @@ import { listCalendarEventsInRange } from "@/lib/calendar-event-queries";
 type EventRow = {
   id: string;
   title: string;
+  description: string | null;
   startsAt: Date;
   endsAt: Date;
   allDay: boolean;
@@ -40,6 +41,7 @@ function eventRow(overrides: Partial<EventRow> = {}): EventRow {
   return {
     id: "e1",
     title: "Kickoff call",
+    description: null,
     startsAt: STARTS,
     endsAt: ENDS,
     allDay: false,
@@ -117,6 +119,7 @@ describe("listCalendarEventsInRange", () => {
     expect(rows[0]).toEqual({
       id: "e1",
       title: "Kickoff call",
+      description: null,
       startsAt: STARTS,
       endsAt: ENDS,
       allDay: false,
@@ -127,6 +130,20 @@ describe("listCalendarEventsInRange", () => {
       clientName: "Harlow & Fitch",
       attendees: [],
     });
+  });
+
+  // The regression case for the day-view edit bug: CalendarEventRow briefly
+  // carried no `description` field, so <EventForm>'s edit-mode seed was
+  // always empty and every save through the day view wrote that emptiness
+  // back over whatever was stored. This is the assertion that would have
+  // caught it — a stored, non-null description surviving the row mapping
+  // unchanged.
+  it("carries a stored description through to the row unchanged", async () => {
+    const { db } = fakeDb({
+      events: [eventRow({ description: "Bring the deck and last month's numbers" })],
+    });
+    const rows = await listCalendarEventsInRange(db, { from: FROM, to: TO });
+    expect(rows[0].description).toBe("Bring the deck and last month's numbers");
   });
 
   it("carries nulls for project and client on an event with neither", async () => {
