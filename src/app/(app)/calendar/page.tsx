@@ -44,7 +44,7 @@ export default async function CalendarPage(props: {
 
   const { from, to } = calendarRange(view, anchor);
 
-  const [rows, events, members, projects, clients] = await Promise.all([
+  const [rows, events, members, projects] = await Promise.all([
     listTasksInRange(prisma, { from, to, userId, projectId, status }),
     // No status: events have no status column, so passing one would not
     // compile — status=DONE shows completed tasks and every event (spec §6).
@@ -59,16 +59,13 @@ export default async function CalendarPage(props: {
       select: { id: true, name: true, clientId: true },
       orderBy: { name: "asc" },
     }),
-    // Step 4's Client Combobox has nothing to render without this — there is
-    // no client query on this page today.
-    prisma.client.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
+    // Deliberately not a fifth query here: step 4's Client Combobox will need
+    // prisma.client.findMany({ select: { id: true, name: true }, orderBy: {
+    // name: "asc" } }) added to this Promise.all, but nothing on this page
+    // renders it yet, and an unread query is a real round trip on every
+    // calendar load (steps ship separately — step 3 may reach production
+    // before <EventForm> exists). Add it when step 4 adds its first reader.
   ]);
-  // Fetched here because this task owns the page's query block, but not yet
-  // rendered — step 4's <EventForm> Client Combobox is the first consumer.
-  void clients;
 
   return (
     <div className="space-y-5 px-6 pb-10 pt-5">
