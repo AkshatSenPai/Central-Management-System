@@ -1,4 +1,4 @@
-import { appTimeLabel } from "@/lib/dates";
+import { appTimeLabel, startOfAppDay } from "@/lib/dates";
 
 /** Pure calendar-event formatting and layout helpers. This is the only
  * unit-testable surface calendar events have — components cannot be rendered
@@ -82,4 +82,148 @@ export function attendeeInitialsLabel(attendees: { initials: string }[]): string
   const shown = attendees.slice(0, MAX_SHOWN).map((a) => a.initials);
   const extra = attendees.length - MAX_SHOWN;
   return extra > 0 ? `${shown.join(", ")} +${extra}` : shown.join(", ");
+}
+
+/** The grid's per-event contract (spec §6). Declared here rather than in
+ * `calendar-event-queries.ts` — which is where the spec assigns it — because
+ * that file does not exist yet in this step's task order and the three
+ * timeline functions below need the exact shape spec `:429-431` types them
+ * against. When the queries file lands it should import this type rather
+ * than redeclare it: duplicating the field list in two places is the
+ * alternative, and the one a later edit to either copy would silently drift
+ * out of sync with. */
+export type CalendarEventRow = {
+  id: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+  allDay: boolean;
+  creatorId: string;
+  projectId: string | null;
+  projectName: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  attendees: Array<{ id: string; name: string; initials: string }>;
+};
+
+const MINUTES_PER_HOUR = 60;
+const DEFAULT_TIMELINE_START_HOUR = 8;
+const DEFAULT_TIMELINE_END_HOUR = 19;
+
+/** Minutes since app-midnight for `d`, fractional. `startOfAppDay` already
+ * carries the fixed +05:30 offset (D2) and already knows which app day `d`
+ * falls on, so subtracting its instant from `d` reads the app-zone clock
+ * without this file re-deriving the offset constant `dates.ts` keeps
+ * private — hardcoding 330 minutes a second place is exactly the drift D2's
+ * "one distinct offset, verified" proof exists to rule out. Not exported:
+ * nothing outside the timeline geometry below needs "minutes since
+ * midnight" as a standalone value. */
+function minutesSinceAppMidnight(d: Date): number {
+  return (d.getTime() - startOfAppDay(d).getTime()) / 60_000;
+}
+
+/** The hour range the day/week timeline draws, in app-zone hours: 08:00–19:00
+ * by default, widening — never narrowing — to fit whatever timed events are
+ * on screen. Floors the earliest start and ceils the latest end, so a 06:30
+ * start opens the grid at 06:00 rather than splitting an hour row in half,
+ * and a 20:15 end closes it at 21:00 rather than stopping short of the
+ * meeting it is drawing. One window for the whole array no matter how many
+ * distinct app days its rows fall on: §7 computes it once "across every day
+ * on screen" precisely so a week's seven columns keep their hour rows
+ * aligned — a per-column window was rejected there for breaking that.
+ *
+ * Takes `timed` rather than the raw event list, and filters any `allDay`
+ * row that reaches it anyway. An all-day event's stored bounds are
+ * app-midnight to app-midnight (D5) — the widest span expressible — so a
+ * single "Priya on leave" left in the input would drag the window to
+ * 00:00–24:00 for a row the timeline does not even draw. `ColumnsView` is
+ * expected to call this as `timelineWindow(splitDayEvents(events).timed)`
+ * (§7), but the filter here is what makes that a guarantee rather than a
+ * hope resting on every future call site remembering to pre-filter. */
+export function timelineWindow(timed: CalendarEventRow[]): { startHour: number; endHour: number } {
+  let startHour = DEFAULT_TIMELINE_START_HOUR;
+  let endHour = DEFAULT_TIMELINE_END_HOUR;
+  for (const event of timed) {
+    if (event.allDay) continue;
+    const startMinutes = minutesSinceAppMidnight(event.startsAt);
+    const endMinutes = minutesSinceAppMidnight(event.endsAt);
+    startHour = Math.min(startHour, Math.floor(startMinutes / MINUTES_PER_HOUR));
+    endHour = Math.max(endHour, Math.ceil(endMinutes / MINUTES_PER_HOUR));
+  }
+  return { startHour, endHour };
+}
+
+/** An event's box within `window`, as percentages of the window's height —
+ * not pixels, because a pure function has no way to know how tall the
+ * column it will be drawn in ends up, and computing one anyway would make
+ * the arithmetic depend on layout. No minimum is applied here: a 15-minute
+ * call yields its true, tiny `heightPct` rather than a floor value invented
+ * to keep the box clickable. That floor belongs in CSS (`min-h-[22px]`,
+ * §7) precisely because it is a rendering concern and this is not one. */
+export function eventPosition(
+  event: CalendarEventRow,
+  window: { startHour: number; endHour: number }
+): { topPct: number; heightPct: number } {
+  const windowMinutes = (window.endHour - window.startHour) * MINUTES_PER_HOUR;
+  const windowStartMinutes = window.startHour * MINUTES_PER_HOUR;
+  const startMinutes = minutesSinceAppMidnight(event.startsAt);
+  const endMinutes = minutesSinceAppMidnight(event.endsAt);
+  const topPct = ((startMinutes - windowStartMinutes) / windowMinutes) * 100;
+  const heightPct = ((endMinutes - startMinutes) / windowMinutes) * 100;
+  return { topPct, heightPct };
+}
+
+/** Lays overlapping events side by side within a day column: a single sweep
+ * over events sorted by start, placing each in the first lane whose last
+ * assigned end is `<=` its own start — half-open `[start, end)`, so an
+ * event starting exactly when the previous one ends is not overlapping it,
+ * and the two are free to share a lane (D5's convention, reused rather than
+ * re-argued here).
+ *
+ * `laneCount` is the width of the event's own overlapping CLUSTER — found
+ * by walking the start-sorted events and merging each into the running
+ * cluster whenever its start falls before the cluster's current latest end,
+ * the same grouping "merge overlapping intervals" uses generally — not a
+ * single running total carried across the whole array. A running total was
+ * the rejected alternative: it would let an unrelated pair of events
+ * elsewhere in the day, or a third event that only overlaps the second and
+ * never the first, change every other event's reported width even though
+ * their boxes never actually share a row. */
+export function assignLanes(
+  events: CalendarEventRow[]
+): Array<{ id: string; lane: number; laneCount: number }> {
+  const sorted = [...events].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  const results: Array<{ id: string; lane: number; laneCount: number }> = [];
+
+  let cluster: CalendarEventRow[] = [];
+  let clusterEnd = -Infinity;
+
+  const flushCluster = () => {
+    if (cluster.length === 0) return;
+    const laneEnds: number[] = [];
+    const lanes: number[] = [];
+    for (const event of cluster) {
+      const start = event.startsAt.getTime();
+      const end = event.endsAt.getTime();
+      const openLane = laneEnds.findIndex((laneEnd) => laneEnd <= start);
+      const lane = openLane === -1 ? laneEnds.length : openLane;
+      laneEnds[lane] = end;
+      lanes.push(lane);
+    }
+    const laneCount = laneEnds.length;
+    cluster.forEach((event, i) => results.push({ id: event.id, lane: lanes[i], laneCount }));
+    cluster = [];
+    clusterEnd = -Infinity;
+  };
+
+  for (const event of sorted) {
+    if (cluster.length > 0 && event.startsAt.getTime() >= clusterEnd) {
+      flushCluster();
+    }
+    cluster.push(event);
+    clusterEnd = Math.max(clusterEnd, event.endsAt.getTime());
+  }
+  flushCluster();
+
+  return results;
 }
