@@ -28,8 +28,15 @@ const SIZE_CLASS: Record<FieldSize, string> = {
   md: "px-3 py-2 text-sm",
 };
 
-const LABEL = "block text-sm text-[var(--text-2)]";
-const ERROR = "mt-1 block text-xs text-[var(--bad)]";
+/** Exported because `password-field.tsx` cannot reuse `Wrap` — see that
+ * file's comment — and has to lay out its own label and error. Sharing the
+ * strings keeps a password field visually identical to every other field
+ * instead of drifting the first time one of these is tweaked. */
+export const fieldLabelClass = "block text-sm text-[var(--text-2)]";
+export const fieldErrorClass = "mt-1 block text-xs text-[var(--bad)]";
+
+const LABEL = fieldLabelClass;
+const ERROR = fieldErrorClass;
 
 export function fieldClass(opts: { size?: FieldSize; className?: string } = {}): string {
   const { size = "md", className } = opts;

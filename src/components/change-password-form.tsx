@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { changePasswordAction } from "@/server/actions/profile";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { PasswordField } from "@/components/ui/password-field";
 import { FormError } from "@/components/ui/form-error";
 
 /** Its own `<form>`, separate from `<ProfileForm>`, and that separation is
@@ -38,26 +38,23 @@ export function ChangePasswordForm() {
       {state?.ok ? <p className="text-sm text-[var(--ok)]">Password changed.</p> : null}
       {/* autoComplete tells a password manager which field is which, so it
           offers to update the stored entry rather than saving a second one. */}
-      <Field
+      <PasswordField
         label="Current password"
         className="w-full"
-        type="password"
         name="currentPassword"
         required
         autoComplete="current-password"
       />
-      <Field
+      <PasswordField
         label="New password"
         className="w-full"
-        type="password"
         name="newPassword"
         required
         autoComplete="new-password"
       />
-      <Field
+      <PasswordField
         label="Confirm new password"
         className="w-full"
-        type="password"
         name="confirmPassword"
         required
         autoComplete="new-password"

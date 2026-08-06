@@ -3,6 +3,7 @@ import { AuthError } from "next-auth";
 import { auth, signIn, googleEnabled } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { PasswordField } from "@/components/ui/password-field";
 
 const ERRORS: Record<string, string> = {
   invalid: "Invalid email or password.",
@@ -63,7 +64,7 @@ export default async function LoginPage({
         )}
         <form action={loginAction} className="space-y-4">
           <Field label="Email" className="w-full" name="email" type="email" required />
-          <Field label="Password" className="w-full" name="password" type="password" required />
+          <PasswordField label="Password" className="w-full" name="password" required />
           <Button type="submit" variant="primary" size="md" className="w-full">
             Sign in
           </Button>

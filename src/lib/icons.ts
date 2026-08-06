@@ -46,6 +46,8 @@ export const ICON_NAMES = [
   "filter_list",
   "attach_file",
   "download",
+  "visibility",
+  "visibility_off",
   // Content and state.
   "error",
   "event",

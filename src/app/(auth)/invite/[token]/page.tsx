@@ -4,6 +4,7 @@ import { knownRedeemError } from "@/lib/invite-errors";
 import { acceptInviteAction } from "@/server/actions/accept-invite";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { PasswordField } from "@/components/ui/password-field";
 
 export default async function InvitePage({
   params,
@@ -57,11 +58,15 @@ export default async function InvitePage({
         )}
         <form action={action} className="space-y-4">
           <Field label="Your name" className="w-full" name="name" required />
-          <Field
+          {/* The one password field in the app where a typo is unrecoverable:
+              this is where an account's password is set for the first time,
+              and until the admin reset shipped, getting it wrong here meant
+              permanently locked out. The toggle is prevention, not
+              convenience. */}
+          <PasswordField
             label="Password (min 8 characters)"
             className="w-full"
             name="password"
-            type="password"
             required
             minLength={8}
           />
