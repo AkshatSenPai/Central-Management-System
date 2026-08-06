@@ -396,11 +396,41 @@ export async function getAttachmentDownloadUrl(
 export type AttachmentDb = Pick<PrismaClient, "attachment">;
 
 /**
- * The sweep Task 6 calls when a task or client is deleted (spec §6:111: "the
+ * The sweep called when a task or client is deleted (spec §6:111: "the
  * database cannot cascade to R2, so `removeTask` / `deleteClient` … gain
  * that call"). Reads every attachment row under `(parentType, parentId)`,
  * attempts to delete their R2 objects, then **unconditionally** deletes the
  * rows — whether or not the R2 attempt fully succeeded.
+ *
+ * **There are exactly two callers, and the third one §6:111 names does not
+ * exist.** That line reads "`removeTask` / `deleteClient` / project deletion
+ * gain that call". The first two are wired (`task-service.ts`'s `removeTask`,
+ * `client-service.ts`'s `deleteClient`, both as the last statement inside
+ * their own transaction). **There is no project-delete path anywhere in this
+ * app** — no `deleteProject`, no `project.delete`, no route, no action — so
+ * there is no third call site to add, and inventing one to satisfy the spec
+ * would be a destructive feature nobody asked for, shipped as a side effect
+ * of a storage fix.
+ *
+ * PROJECT attachments are therefore unorphanable today, and not by luck:
+ * - Nothing deletes a project.
+ * - `deleteClient` refuses while any project exists (`client-service.ts`,
+ *   backstopped by ON DELETE RESTRICT), so a client delete can never reach a
+ *   project's attachments either.
+ * - `Task.project` and `Task.milestone` are optional relations with no
+ *   `onDelete`, so Prisma defaults to `SetNull`: even if a project were
+ *   deleted, it would not destroy the tasks under it, and their TASK
+ *   attachments would still be reachable and still be swept by `removeTask`.
+ *
+ * **If project deletion is ever added, it must call this function** — with
+ * `("PROJECT", projectId)`, as the last statement inside its own
+ * transaction, for the reasons `removeTask`'s call site spells out. It would
+ * also need to decide what happens to that project's *tasks* and their own
+ * TASK attachments, which `SetNull` currently leaves standing. Nothing here
+ * can enforce that; this paragraph is the enforcement, and it is written
+ * here rather than at an absent call site because this is the function such
+ * a change would have to find. `schema.prisma`'s `Attachment.parentId`
+ * comment states the same obligation from the data model's side.
  *
  * **Fix round 2, and why the first version of this function was wrong.**
  * The original implementation aborted before touching any row whenever

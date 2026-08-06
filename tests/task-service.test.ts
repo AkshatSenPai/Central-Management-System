@@ -1,7 +1,34 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { TaskPriority, TaskStatus } from "@/lib/task";
+
+// `removeTask` now sweeps its attachments' R2 objects, so `task-service.ts`
+// imports `attachment-service.ts`, which imports `r2.ts` — and `r2.ts`
+// constructs its `S3Client` at *module scope*, reading four env vars that do
+// not exist in a test run (`r2.ts:83-97`, and the comment there defending
+// eager construction: an unset variable should fail by name at load, not
+// with a signature error minutes later). Without this mock the module graph
+// throws on import and this entire file fails to load, before a single test
+// runs.
+//
+// The same `vi.mock` `tests/attachment-service.test.ts` uses, for the same
+// reason its header gives at length. Keeping it means `r2.ts` keeps the
+// eager-failure property it was deliberately given, rather than that
+// property being traded away to make a test file load.
+vi.mock("@/lib/r2", () => ({
+  deleteObjects: vi.fn(async () => undefined),
+  R2DeleteObjectsError: class extends Error {},
+}));
+
+import { deleteObjects } from "@/lib/r2";
 import { createTask, updateTask, setTaskStatus, removeTask, setTaskAssignees } from "@/lib/task-service";
+
+const mockDeleteObjects = vi.mocked(deleteObjects);
+
+beforeEach(() => {
+  mockDeleteObjects.mockReset();
+  mockDeleteObjects.mockResolvedValue(undefined);
+});
 
 type FakeParts = {
   /** Row returned by task.findUnique — loadTaskScope's walk-up target. */
@@ -20,6 +47,11 @@ type FakeParts = {
   /** Thrown by task.delete when set — simulates a concurrent P2025 raised
    * when the row was already gone by the time the transaction ran. */
   taskDeleteError?: unknown;
+  /** Rows returned by attachment.findMany — what `removeTask`'s
+   * `deleteAttachmentObjectsFor` sweep finds under this task. Absent means a
+   * task with nothing attached, which is the shape every pre-existing test
+   * in this file assumes. */
+  attachments?: { id: string; fileKey: string }[];
 };
 
 type Sink = {
@@ -34,6 +66,10 @@ type Sink = {
    * that caused it, so this sink proves which client it was called on. */
   notifications: Record<string, unknown>[];
   notificationsCleared: Record<string, unknown>[];
+  /** `where` clauses handed to attachment.deleteMany by the sweep. In txW
+   * for a correct implementation; anything landing in dbW means the sweep
+   * escaped `removeTask`'s transaction. */
+  attachmentsDeleted: unknown[];
 };
 
 function emptySink(): Sink {
@@ -46,6 +82,7 @@ function emptySink(): Sink {
     assigneesDeleted: [],
     notifications: [],
     notificationsCleared: [],
+    attachmentsDeleted: [],
   };
 }
 
@@ -63,6 +100,7 @@ function fakeDb(parts: FakeParts) {
     taskFindManyWhere?: unknown;
     userFindManyWhere?: unknown;
     taskAssigneeFindManyWhere?: unknown;
+    attachmentFindManyWhere?: unknown;
   } = {};
 
   const reads = {
@@ -97,6 +135,18 @@ function fakeDb(parts: FakeParts) {
       findMany: async (a: { where: unknown }) => {
         args.taskAssigneeFindManyWhere = a.where;
         return parts.currentAssignees ?? [];
+      },
+    },
+    attachment: {
+      // Returns the fixture regardless of `where`, and the scope is asserted
+      // separately off `args.attachmentFindManyWhere` — the same call
+      // `tests/attachment-service.test.ts`'s own fake makes, for the reason
+      // recorded there: a fake that filtered by `where` itself would hide a
+      // sweep that dropped `parentId` and deleted every TASK attachment in
+      // the database, because the fixture would come back either way.
+      findMany: async (a: { where: unknown }) => {
+        args.attachmentFindManyWhere = a.where;
+        return parts.attachments ?? [];
       },
     },
   };
@@ -145,6 +195,12 @@ function fakeDb(parts: FakeParts) {
         return { count: 0 };
       },
     },
+    attachment: {
+      deleteMany: async (a: unknown) => {
+        sink.attachmentsDeleted.push(a);
+        return { count: 0 };
+      },
+    },
   });
 
   const db = {
@@ -155,6 +211,7 @@ function fakeDb(parts: FakeParts) {
     taskAssignee: { ...reads.taskAssignee, ...writers(dbW).taskAssignee },
     activityLog: writers(dbW).activityLog,
     notification: writers(dbW).notification,
+    attachment: { ...reads.attachment, ...writers(dbW).attachment },
     // Mirrors real transactional rollback: a thrown error undoes everything
     // this specific call pushed into txW before the error propagates, so a
     // retry that starts a fresh $transaction never inherits a previous
@@ -170,6 +227,7 @@ function fakeDb(parts: FakeParts) {
         assigneesDeleted: txW.assigneesDeleted.length,
         notifications: txW.notifications.length,
         notificationsCleared: txW.notificationsCleared.length,
+        attachmentsDeleted: txW.attachmentsDeleted.length,
       };
       try {
         return await fn({
@@ -180,6 +238,7 @@ function fakeDb(parts: FakeParts) {
           taskAssignee: { ...reads.taskAssignee, ...writers(txW).taskAssignee },
           activityLog: writers(txW).activityLog,
           notification: writers(txW).notification,
+          attachment: { ...reads.attachment, ...writers(txW).attachment },
         });
       } catch (e) {
         txW.created.length = before.created;
@@ -190,6 +249,7 @@ function fakeDb(parts: FakeParts) {
         txW.assigneesDeleted.length = before.assigneesDeleted;
         txW.notifications.length = before.notifications;
         txW.notificationsCleared.length = before.notificationsCleared;
+        txW.attachmentsDeleted.length = before.attachmentsDeleted;
         throw e;
       }
     },
@@ -580,6 +640,92 @@ describe("removeTask", () => {
     const { db } = fakeDb({ task: taskWithProject, taskDeleteError: race });
     const result = await removeTask(db, { taskId: "t1", actorId: "u1" });
     expect(result).toEqual({ ok: false, error: "Task not found" });
+  });
+
+  // Spec §6:111 — "the one place where a missed code path silently leaks
+  // storage, and it is the part to review hardest". Until this call site
+  // existed, `deleteAttachmentObjectsFor` had no caller at all, so every
+  // claim its doc comment makes about running nested inside someone else's
+  // transaction was untested reasoning. These are that path's first
+  // automated coverage. They cannot prove the objects actually left the
+  // bucket — only a real browser pass listing the prefix can, and that is
+  // task 7's job — but they can prove the sweep is *reached*, with the right
+  // scope, on the right sink, and that no ordinary failure skips it.
+  describe("the attachment sweep", () => {
+    const attachments = [
+      { id: "a1", fileKey: "TASK/t1/uuid1/brief.pdf" },
+      { id: "a2", fileKey: "TASK/t1/uuid2/logo.png" },
+    ];
+
+    it("deletes every R2 object under the task, and the rows naming them", async () => {
+      const { db, txW } = fakeDb({ task: taskWithProject, attachments });
+      const result = await removeTask(db, { taskId: "t1", actorId: "u1" });
+      expect(result).toEqual({ ok: true, data: undefined });
+      expect(mockDeleteObjects).toHaveBeenCalledWith([
+        "TASK/t1/uuid1/brief.pdf",
+        "TASK/t1/uuid2/logo.png",
+      ]);
+      expect(txW.attachmentsDeleted).toEqual([{ where: { id: { in: ["a1", "a2"] } } }]);
+    });
+
+    // The scope, asserted directly rather than inferred from which rows came
+    // back — the fake returns its fixture regardless of `where`, precisely so
+    // a sweep that dropped `parentId` (and would delete every TASK
+    // attachment in the database) cannot pass by returning the same rows.
+    it("scopes the sweep to this task, by both parentType and parentId", async () => {
+      const { db, args } = fakeDb({ task: taskWithProject, attachments });
+      await removeTask(db, { taskId: "t1", actorId: "u1" });
+      expect(args.attachmentFindManyWhere).toEqual({ parentType: "TASK", parentId: "t1" });
+    });
+
+    // Nested inside `removeTask`'s own transaction, which is the premise the
+    // whole "leak rather than lie" ruling rests on: a sweep running on the
+    // outer `db` would commit row deletions the enclosing transaction could
+    // no longer roll back.
+    it("runs inside the transaction — nothing lands on the outer db", async () => {
+      const { db, dbW, txW } = fakeDb({ task: taskWithProject, attachments });
+      await removeTask(db, { taskId: "t1", actorId: "u1" });
+      expect(dbW.attachmentsDeleted).toHaveLength(0);
+      expect(txW.attachmentsDeleted).toHaveLength(1);
+    });
+
+    // The leak-not-lie ruling itself. R2 refuses; the rows go anyway; the
+    // task delete still succeeds. The alternative — abort — would leave rows
+    // pointing at objects that may already be gone, under a task that no
+    // longer exists, and would fail a delete the user asked for because a
+    // bucket had a hiccup.
+    it("still deletes the rows, and still succeeds, when R2 refuses", async () => {
+      mockDeleteObjects.mockRejectedValue(new Error("R2 unreachable"));
+      const { db, txW } = fakeDb({ task: taskWithProject, attachments });
+      const result = await removeTask(db, { taskId: "t1", actorId: "u1" });
+      expect(result).toEqual({ ok: true, data: undefined });
+      expect(txW.attachmentsDeleted).toEqual([{ where: { id: { in: ["a1", "a2"] } } }]);
+      expect(txW.deleted).toHaveLength(1);
+    });
+
+    it("touches R2 not at all for a task with nothing attached", async () => {
+      const { db, txW } = fakeDb({ task: taskWithProject });
+      await removeTask(db, { taskId: "t1", actorId: "u1" });
+      expect(mockDeleteObjects).not.toHaveBeenCalled();
+      expect(txW.attachmentsDeleted).toHaveLength(0);
+    });
+
+    // The ordering decision at this call site: the sweep is the LAST
+    // statement in the transaction, so it is never reached by a run that is
+    // about to roll back for an unrelated reason. A P2025 on `task.delete`
+    // is exactly that run — and if the sweep had been placed first, R2
+    // objects would already be gone by the time the rollback restored the
+    // rows that name them.
+    it("is never reached when the task delete itself loses a race", async () => {
+      const race = new Prisma.PrismaClientKnownRequestError("Record to delete does not exist.", {
+        code: "P2025",
+        clientVersion: "test",
+      });
+      const { db, txW } = fakeDb({ task: taskWithProject, attachments, taskDeleteError: race });
+      await removeTask(db, { taskId: "t1", actorId: "u1" });
+      expect(mockDeleteObjects).not.toHaveBeenCalled();
+      expect(txW.attachmentsDeleted).toHaveLength(0);
+    });
   });
 });
 

@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity, fieldDiff } from "@/lib/activity";
 import { notify, clearNotificationsFor } from "@/lib/notification-service";
+import { deleteAttachmentObjectsFor } from "@/lib/attachment-service";
 import { nextTaskOrder, type TaskStatus, type TaskPriority } from "@/lib/task";
 
 export type TaskWriteInput = {
@@ -336,6 +337,33 @@ export async function removeTask(
         clientId: scope.clientId,
         meta: { name: title },
       });
+      // Attachments do NOT cascade. `Attachment.parentId` carries no foreign
+      // key by design (schema.prisma:475-480: "a polymorphic parent cannot
+      // carry three foreign keys at once … The cost is real and is paid in
+      // the service layer"), so `tx.task.delete` above leaves every
+      // attachment row on this task standing, each still naming an object in
+      // R2 that nothing will ever reach again. This call is the payment.
+      // Spec §6:111 calls it "the one place where a missed code path
+      // silently leaks storage".
+      //
+      // **Last in the transaction, deliberately.** This is the only step
+      // here that touches a system Postgres cannot roll back: by the time it
+      // returns, R2 objects are actually gone, and no later `throw` can undo
+      // that. Every operation above it can still fail and roll back cleanly;
+      // none of them can now fail *after* the bucket has been changed. Move
+      // it earlier and a P2025 race on `task.delete`, or a failure in
+      // `clearNotificationsFor`, would roll the rows back into existence
+      // pointing at objects that no longer exist — the "row without object"
+      // §6:108 names as the failure direction to avoid. Last shrinks that
+      // window to the `deleteMany` and the commit itself.
+      //
+      // It cannot fail this transaction on R2's account: an R2 error is
+      // caught, logged and swallowed inside, and every row is deleted
+      // regardless. See `deleteAttachmentObjectsFor`'s own comment for why
+      // leaking an orphan object beats leaving a row that lies, and why a
+      // per-key split is not reachable from inside someone else's
+      // transaction.
+      await deleteAttachmentObjectsFor(tx, { parentType: "TASK", parentId: input.taskId });
     });
   } catch (e) {
     if (isRowGoneRace(e)) return err("Task not found");

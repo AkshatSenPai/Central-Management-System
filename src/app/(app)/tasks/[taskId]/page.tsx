@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getTaskDetail } from "@/lib/task-queries";
 import { listTaskComments } from "@/lib/comment-queries";
+import { listAttachments } from "@/lib/attachment-queries";
 import { CommentThread } from "@/components/comments/comment-thread";
+import { Attachments } from "@/components/attachments/attachments";
 import {
   TASK_PRIORITY_BADGE,
   TASK_PRIORITY_LABEL,
@@ -34,7 +36,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
   const task = await getTaskDetail(prisma, taskId);
   if (!task) notFound();
 
-  const [projects, activeMembers, comments] = await Promise.all([
+  const [projects, activeMembers, comments, attachments] = await Promise.all([
     // The options list must still include the task's own project even when
     // that project is DONE — otherwise React's <select> reconciliation
     // (updateOptions) falls back to selecting the first non-disabled option
@@ -53,6 +55,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
       orderBy: { name: "asc" },
     }),
     listTaskComments(prisma, taskId),
+    listAttachments(prisma, { parentType: "TASK", parentId: taskId }),
   ]);
 
   // Only a project task has milestones to offer, and only that project's own.
@@ -177,6 +180,31 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
               projectId={task.projectId}
               clientId={task.clientId}
               items={task.checklist}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-medium text-[var(--text)]">Files</h2>
+              {attachments.length > 0 ? (
+                <span className="text-xs text-[var(--text-3)]">{attachments.length}</span>
+              ) : null}
+            </div>
+            {/* projectId and clientId are carried for the *activity*
+                timeline, not this list: every attachment write records a
+                client-scoped ActivityLog row, and the client detail page is
+                the only thing that reads those. Both are null on a personal
+                task, which is what the action's own `if` skips. */}
+            <Attachments
+              attachments={attachments}
+              scope={{
+                parentType: "TASK",
+                parentId: task.id,
+                projectId: task.projectId,
+                clientId: task.clientId,
+              }}
+              viewerId={session.user.id}
+              viewerIsAdmin={session.user.role === "ADMIN"}
             />
           </section>
 
