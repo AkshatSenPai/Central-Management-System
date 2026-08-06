@@ -17,6 +17,7 @@ export function Topbar({
   userEmail,
   signOutAction,
   members,
+  projects,
   notifications,
   unreadCount,
 }: {
@@ -24,6 +25,10 @@ export function Topbar({
   userEmail: string;
   signOutAction: () => Promise<void>;
   members: { id: string; name: string }[];
+  /** Quick Add's project picker. Same `{ id, name, clientId }` shape
+   * `<TaskForm>` uses, so both pickers read the same rows and `clientId` is
+   * available for the action's client-page revalidation. */
+  projects: { id: string; name: string; clientId: string }[];
   notifications: NotificationRow[];
   unreadCount: number;
 }) {
@@ -40,7 +45,7 @@ export function Topbar({
       className="relative z-30 flex h-14 flex-none items-center gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-5"
     >
       <SearchBox />
-      <QuickAdd members={members} />
+      <QuickAdd members={members} projects={projects} />
       <NotificationBell notifications={notifications} unreadCount={unreadCount} />
       <AccountMenu
         userName={userName}

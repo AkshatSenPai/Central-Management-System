@@ -26,7 +26,7 @@ export default async function AppLayout({
   // One round trip, not two: the sidebar's My Tasks count and quick-add's
   // member list are both needed on every screen and neither depends on the
   // other.
-  const [members, myTaskCount, notifications, unreadCount] = await Promise.all([
+  const [members, myTaskCount, notifications, unreadCount, projects] = await Promise.all([
     prisma.user.findMany({
       where: { active: true },
       select: { id: true, name: true },
@@ -42,6 +42,21 @@ export default async function AppLayout({
     // rather than four sequential ones.
     listNotifications(prisma, { userId: session.user.id }),
     countUnreadNotifications(prisma, session.user.id),
+    // Quick Add's project picker. This is the one real cost in that feature:
+    // the layout wraps every authenticated page, so this runs on every page
+    // load whether or not the popover is ever opened. It joins the existing
+    // Promise.all rather than adding a round trip, and returns a handful of
+    // rows, so the added latency is close to nothing — but it is not free,
+    // and it is the part of Quick Add a reviewer should push back on first.
+    //
+    // `not: "DONE"` matches the task detail page's own project query. A
+    // finished project should not be offered for new work; one in
+    // MAINTENANCE should, because it is still live work.
+    prisma.project.findMany({
+      where: { status: { not: "DONE" } },
+      select: { id: true, name: true, clientId: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   async function signOutAction() {
@@ -78,6 +93,7 @@ export default async function AppLayout({
           userEmail={session.user.email ?? ""}
           signOutAction={signOutAction}
           members={members}
+          projects={projects}
           notifications={notifications}
           unreadCount={unreadCount}
         />
