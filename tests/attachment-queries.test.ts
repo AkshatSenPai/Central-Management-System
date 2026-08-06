@@ -4,7 +4,6 @@ import { listAttachments } from "@/lib/attachment-queries";
 
 type AttachmentRowSource = {
   id: string;
-  fileKey: string;
   fileName: string;
   contentType: string;
   size: number;
@@ -35,7 +34,6 @@ const CREATED_AT = new Date("2026-08-05T09:00:00.000Z");
 function attachmentRow(overrides: Partial<AttachmentRowSource> = {}): AttachmentRowSource {
   return {
     id: "a1",
-    fileKey: "TASK/t1/cuid1/brief.pdf",
     fileName: "brief.pdf",
     contentType: "application/pdf",
     size: 51200,
@@ -67,12 +65,18 @@ describe("listAttachments", () => {
     expect((findManyArgs[0] as { orderBy: unknown }).orderBy).toEqual({ createdAt: "desc" });
   });
 
-  it("maps a row through the flat shape, carrying the raw fileKey through for the download button", async () => {
+  // `toEqual` on the whole object, not field-by-field assertions: this row is
+  // serialised into the RSC payload of three pages, so an *extra* field is as
+  // much a defect as a missing one, and only an exact-shape assertion catches
+  // the extra. That is what this test is for now — Task 5 removed `fileKey`
+  // from this shape (see `attachment-queries.ts`'s own comment: the download
+  // action takes an id and re-reads the key server-side), and nothing but an
+  // exact match would notice it creeping back in.
+  it("maps a row through the flat shape, and publishes no field the list does not render", async () => {
     const { db } = fakeDb({ attachments: [attachmentRow()] });
     const rows = await listAttachments(db, { parentType: "TASK", parentId: "t1" });
     expect(rows[0]).toEqual({
       id: "a1",
-      fileKey: "TASK/t1/cuid1/brief.pdf",
       fileName: "brief.pdf",
       contentType: "application/pdf",
       size: 51200,
@@ -81,6 +85,16 @@ describe("listAttachments", () => {
       uploaderInitials: "DR",
       at: CREATED_AT,
     });
+  });
+
+  // The select is the other half of the same guarantee: a field that is never
+  // read out of the database cannot be leaked by a mapper that forgets to
+  // drop it.
+  it("does not even select fileKey — the storage layout never leaves the server", async () => {
+    const { db, findManyArgs } = fakeDb({ attachments: [] });
+    await listAttachments(db, { parentType: "TASK", parentId: "t1" });
+    const select = (findManyArgs[0] as { select: Record<string, unknown> }).select;
+    expect(select).not.toHaveProperty("fileKey");
   });
 
   it("works the same for a PROJECT or CLIENT parent — the query has no TASK-specific logic", async () => {

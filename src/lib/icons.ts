@@ -44,6 +44,8 @@ export const ICON_NAMES = [
   "close",
   "person_add",
   "filter_list",
+  "attach_file",
+  "download",
   // Content and state.
   "error",
   "event",
@@ -62,11 +64,18 @@ export const ICON_NAMES = [
  *   more_horiz     — the design uses it for row overflow menus. This app has
  *                    no overflow menus; member row actions are two labelled
  *                    buttons, which is better at that count.
- *   push_pin, schedule, attach_file — Phases 3c and 6.
+ *   push_pin, schedule — Phases 3c and 6.
  *
- * `notifications` and `search` were both on this list and have since earned
- * their place back, as the features they label were built. The list is a
- * record of what was considered, not a permanent exclusion.
+ * `notifications`, `search` and `attach_file` were all on this list and have
+ * since earned their place back, as the features they label were built. The
+ * list is a record of what was considered, not a permanent exclusion.
+ * `attach_file` is the clearest case of that rule working as intended: it
+ * was written into the Phase 3c spec's vocabulary lock alongside
+ * `alternate_email`, and stayed out of the font for four days while the
+ * comments half of that phase shipped and the attachments half was parked.
+ * It arrives now, in the same commit as the upload control and the file list
+ * that render it and `download`, because gate 7 would have failed on either
+ * of them a moment sooner.
  *
  * Each was on this list until gate 7 asked where it was rendered and there
  * was no honest answer. That is the gate working, not the gate being

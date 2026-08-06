@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity } from "@/lib/activity";
 import { buildFileKey, validateUpload, type AttachmentParentType } from "@/lib/attachment";
-import { presignPut, deleteObjects, R2DeleteObjectsError } from "@/lib/r2";
+import { presignPut, presignGet, deleteObjects, R2DeleteObjectsError } from "@/lib/r2";
 
 /** `requestUpload`, `confirmUpload`, `removeAttachment` and
  * `deleteAttachmentObjectsFor` — spec §6's two-step write, its deletion
@@ -344,6 +344,47 @@ export async function removeAttachment(
   await deleteObjects([attachment.fileKey]);
 
   return ok(undefined);
+}
+
+/**
+ * One download click: read the row, sign a GET for the object it names, hand
+ * back the URL. §6:106 — "reads go through a short-lived presigned GET minted
+ * per click" — so there is nothing cached here and nothing to invalidate; the
+ * URL is good for `r2.ts`'s 5 minutes and is not stored anywhere.
+ *
+ * **`attachmentId`, never a `fileKey`.** The caller says *which attachment*;
+ * this function reads the key. That is the whole reason the key was dropped
+ * from `AttachmentRow` in Task 5 (see `attachment-queries.ts`'s comment for
+ * the full argument, and this version of Next's own Server Actions security
+ * guidance for the rule it follows), and it only holds if this signature
+ * refuses to accept a key. It does.
+ *
+ * `fileName` goes to `presignGet` as the `downloadName` so the browser saves
+ * the file under the display name the list is showing, rather than under the
+ * sanitised last segment of the key — a name nobody chose. See `presignGet`'s
+ * own comment for what that override does and why `attachment` disposition is
+ * the right half of §7:119.
+ *
+ * A missing row is `err`, not a throw: an attachment removed in another tab
+ * between the page render and the click is an ordinary race, and "Attachment
+ * not found" is the same message `removeAttachment` above gives it. Nothing
+ * here checks *who* is asking beyond the `requireUser()` its action already
+ * did — §7's model is that every signed-in member can read every attachment,
+ * the same visibility the list they clicked from already grants. This is
+ * deliberately narrower than `removeAttachment`'s uploader-or-admin gate,
+ * because that gate is about destruction, not visibility. */
+export async function getAttachmentDownloadUrl(
+  db: Pick<PrismaClient, "attachment">,
+  input: { attachmentId: string }
+): Promise<ActionResult<{ url: string }>> {
+  const attachment = await db.attachment.findUnique({
+    where: { id: input.attachmentId },
+    select: { fileKey: true, fileName: true },
+  });
+  if (!attachment) return err("Attachment not found");
+
+  const url = await presignGet({ key: attachment.fileKey, downloadName: attachment.fileName });
+  return ok({ url });
 }
 
 /** The narrow surface `deleteAttachmentObjectsFor` needs to run nested

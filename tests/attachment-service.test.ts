@@ -37,26 +37,31 @@ vi.mock("@/lib/r2", () => {
   }
   return {
     presignPut: vi.fn(async () => "https://example.r2.cloudflarestorage.com/signed-put"),
+    presignGet: vi.fn(async () => "https://example.r2.cloudflarestorage.com/signed-get"),
     deleteObjects: vi.fn(async () => undefined),
     R2DeleteObjectsError,
   };
 });
 
-import { presignPut, deleteObjects, R2DeleteObjectsError } from "@/lib/r2";
+import { presignPut, presignGet, deleteObjects, R2DeleteObjectsError } from "@/lib/r2";
 import {
   requestUpload,
   confirmUpload,
   removeAttachment,
+  getAttachmentDownloadUrl,
   deleteAttachmentObjectsFor,
 } from "@/lib/attachment-service";
 
 const mockPresignPut = vi.mocked(presignPut);
+const mockPresignGet = vi.mocked(presignGet);
 const mockDeleteObjects = vi.mocked(deleteObjects);
 
 beforeEach(() => {
   mockPresignPut.mockReset();
+  mockPresignGet.mockReset();
   mockDeleteObjects.mockReset();
   mockPresignPut.mockResolvedValue("https://example.r2.cloudflarestorage.com/signed-put");
+  mockPresignGet.mockResolvedValue("https://example.r2.cloudflarestorage.com/signed-get");
   mockDeleteObjects.mockResolvedValue(undefined);
 });
 
@@ -105,7 +110,7 @@ function fakeDb(parts: FakeParts) {
   const dbW = emptySink();
   const txW = emptySink();
   const push = (label: string) => parts.sequence?.push(label);
-  const args: { attachmentFindManyWhere?: unknown } = {};
+  const args: { attachmentFindManyWhere?: unknown; attachmentFindUniqueArgs?: unknown } = {};
 
   const reads = {
     task: {
@@ -118,7 +123,10 @@ function fakeDb(parts: FakeParts) {
       findUnique: async () => parts.client ?? null,
     },
     attachment: {
-      findUnique: async () => parts.attachment ?? null,
+      findUnique: async (a: unknown) => {
+        args.attachmentFindUniqueArgs = a;
+        return parts.attachment ?? null;
+      },
       // The fixture is returned regardless of `where` — same as
       // `tests/attachment-queries.test.ts`'s own fake — so the *query scope*
       // has to be proven by asserting `args.attachmentFindManyWhere`
@@ -539,6 +547,79 @@ describe("removeAttachment", () => {
     const result = await removeAttachment(db, { attachmentId: "att1", actorId: "u1", isAdmin: false });
     expect(result).toEqual({ ok: true, data: undefined });
     expect(txW.activity[0]).toMatchObject({ clientId: null });
+  });
+});
+
+describe("getAttachmentDownloadUrl", () => {
+  // Its own fixture rather than removeAttachment's: this function selects
+  // only `fileKey` and `fileName`, and a fixture carrying the permission
+  // fields it never reads would imply a gate that is deliberately not here
+  // (§7 — every signed-in member may read every attachment; the
+  // uploader-or-admin line is about destruction).
+  const storedAttachment = {
+    fileKey: "TASK/t1/cuid1/brief.pdf",
+    fileName: "brief.pdf",
+  };
+
+  it("signs a GET for the key the row names, not for anything the caller supplied", async () => {
+    const { db } = fakeDb({ attachment: storedAttachment });
+    const result = await getAttachmentDownloadUrl(db, { attachmentId: "att1" });
+    expect(result).toEqual({
+      ok: true,
+      data: { url: "https://example.r2.cloudflarestorage.com/signed-get" },
+    });
+    expect(mockPresignGet).toHaveBeenCalledWith({
+      key: "TASK/t1/cuid1/brief.pdf",
+      downloadName: "brief.pdf",
+    });
+  });
+
+  // The security property the whole `attachmentId`-not-`fileKey` decision
+  // rests on (see the function's own comment, and `attachment-queries.ts`'s):
+  // this function's only input is a row id, and the key it signs is read from
+  // that row. A mutation that accepted a key from the caller and passed it
+  // straight through would have to change this signature to compile, but a
+  // mutation that looked the row up by something *other* than the id — or
+  // that stopped looking it up at all — would not. This asserts the lookup.
+  it("looks the row up by the id it was given", async () => {
+    const { db, args } = fakeDb({ attachment: storedAttachment });
+    await getAttachmentDownloadUrl(db, { attachmentId: "att1" });
+    expect(args.attachmentFindUniqueArgs).toMatchObject({ where: { id: "att1" } });
+  });
+
+  // The display name, not the sanitised last segment of the key: the two
+  // differ for any name with a space or a non-ASCII character, and the one
+  // the user is looking at in the list is the display name.
+  it("asks for the display name as the download name, even when the key's own segment differs", async () => {
+    const { db } = fakeDb({
+      attachment: {
+        ...storedAttachment,
+        fileKey: "TASK/t1/cuid1/Q4_Report_Final.pdf",
+        fileName: "Q4 Report — Final.pdf",
+      },
+    });
+    await getAttachmentDownloadUrl(db, { attachmentId: "att1" });
+    expect(mockPresignGet).toHaveBeenCalledWith({
+      key: "TASK/t1/cuid1/Q4_Report_Final.pdf",
+      downloadName: "Q4 Report — Final.pdf",
+    });
+  });
+
+  it("returns Attachment not found for a row removed between the render and the click, and signs nothing", async () => {
+    const { db } = fakeDb({ attachment: null });
+    const result = await getAttachmentDownloadUrl(db, { attachmentId: "gone" });
+    expect(result).toEqual({ ok: false, error: "Attachment not found" });
+    expect(mockPresignGet).not.toHaveBeenCalled();
+  });
+
+  // A read. Nothing about minting a download URL should touch a row, in
+  // either sink — the two-sink harness exists to make that assertable rather
+  // than assumed.
+  it("writes nothing", async () => {
+    const { db, dbW, txW } = fakeDb({ attachment: storedAttachment });
+    await getAttachmentDownloadUrl(db, { attachmentId: "att1" });
+    expect(dbW).toEqual({ created: [], deleted: [], deletedMany: [], activity: [] });
+    expect(txW).toEqual({ created: [], deleted: [], deletedMany: [], activity: [] });
   });
 });
 

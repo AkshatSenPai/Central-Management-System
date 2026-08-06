@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_CONTENT_TYPE,
   MAX_UPLOAD_BYTES,
   buildFileKey,
   formatFileSize,
+  normaliseContentType,
   sanitiseFileName,
   validateUpload,
 } from "@/lib/attachment";
@@ -231,6 +233,78 @@ describe("validateUpload", () => {
   // narrowing to `=== 0` would let a negative size through unnoticed.
   it("rejects a negative size", () => {
     expect(validateUpload("x.pdf", -1)).not.toBeNull();
+  });
+
+  // Task 5: `requestUploadAction` reads this number as `Number(formData.get(
+  // "sizeBytes") ?? "")`, which is `NaN` for a missing or non-numeric field.
+  // Every comparison against `NaN` is false, so without an explicit guard
+  // both checks above pass it straight through and an upload with no
+  // declared size at all reports as valid.
+  it("rejects a size that is not a number, rather than passing it through", () => {
+    expect(validateUpload("mystery.bin", Number.NaN)).not.toBeNull();
+  });
+
+  it("rejects an infinite size", () => {
+    expect(validateUpload("mystery.bin", Number.POSITIVE_INFINITY)).not.toBeNull();
+  });
+
+  it("names the file in the unreadable-size message, and does not call it empty", () => {
+    const error = validateUpload("mystery.bin", Number.NaN);
+    expect(error).toContain("mystery.bin");
+    expect(error).not.toContain("empty");
+  });
+});
+
+describe("normaliseContentType", () => {
+  // The reason this function exists: the browser PUTs with the header, the
+  // server signs the header, and R2 compares them byte for byte. Both sides
+  // call this, so both sides land on the same string — a property worth an
+  // explicit assertion rather than only a comment.
+  it("is idempotent, so signing a normalised value cannot drift from sending it", () => {
+    for (const input of ["", "  ", "application/pdf", "text/plain; charset=utf-8", "not a type"]) {
+      expect(normaliseContentType(normaliseContentType(input))).toBe(normaliseContentType(input));
+    }
+  });
+
+  it("passes an ordinary type through untouched", () => {
+    expect(normaliseContentType("application/pdf")).toBe("application/pdf");
+    expect(normaliseContentType("image/png")).toBe("image/png");
+  });
+
+  it("keeps a parameter, which File.type can carry for text", () => {
+    expect(normaliseContentType("text/plain; charset=utf-8")).toBe("text/plain; charset=utf-8");
+  });
+
+  it("trims surrounding whitespace rather than rejecting over it", () => {
+    expect(normaliseContentType("  application/pdf  ")).toBe("application/pdf");
+  });
+
+  // File.type is "" whenever the browser cannot guess a type — a .log file,
+  // or one with no extension. That is an ordinary upload, not a bad one.
+  it("falls back for an empty or whitespace-only type", () => {
+    expect(normaliseContentType("")).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("   ")).toBe(DEFAULT_CONTENT_TYPE);
+  });
+
+  // The destination is a signed HTTP header. A CR or LF reaching it is the
+  // shape of a header-injection attempt, and there is no legitimate
+  // content-type that contains one.
+  it("falls back rather than passing through a value carrying CR or LF", () => {
+    expect(normaliseContentType("text/plain\r\nX-Injected: 1")).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("text/plain\nX-Injected: 1")).toBe(DEFAULT_CONTENT_TYPE);
+  });
+
+  it("falls back for a value that is not type/subtype at all", () => {
+    expect(normaliseContentType("not a type")).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("application")).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("application/")).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("/pdf")).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("a/b/c")).toBe(DEFAULT_CONTENT_TYPE);
+  });
+
+  it("falls back for quotes and backslashes, which the narrow grammar excludes", () => {
+    expect(normaliseContentType('text/plain; charset="utf-8"')).toBe(DEFAULT_CONTENT_TYPE);
+    expect(normaliseContentType("text/plain\\")).toBe(DEFAULT_CONTENT_TYPE);
   });
 });
 

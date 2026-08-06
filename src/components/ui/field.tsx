@@ -4,6 +4,7 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
 } from "react";
+import { buttonClass } from "@/components/ui/button";
 
 export type FieldSize = "xs" | "sm" | "md";
 
@@ -102,6 +103,63 @@ export function SelectField({
         {children}
       </select>
     </Wrap>
+  );
+}
+
+/** A file picker that looks like a button.
+ *
+ * **Why this is a primitive rather than a gate-3 exemption.** Gate 3 forbids
+ * a raw `<input>` outside this directory, and a file input is a raw input;
+ * the attachment upload control needed one. `checkbox.tsx` already answers
+ * the same question for the same reason — "one small component is cheaper
+ * than three standing exemptions in gate 3" — and the argument is stronger
+ * here, not weaker: a native file input is the *one* control browsers render
+ * with their own unstyleable chrome, so leaving it raw would put a
+ * grey-on-white OS button, with its own font and its own "No file chosen",
+ * on three pages of an app whose entire design system exists to stop exactly
+ * that. An exemption would have bought a control that ignores both themes.
+ *
+ * **How it works.** The input is `sr-only` rather than `hidden` — hidden
+ * would remove it from the tab order and break keyboard access entirely,
+ * while `sr-only` leaves it focusable and operable and merely invisible. The
+ * `<label>` wrapping it is what the user sees and clicks: a click anywhere
+ * on the label opens the picker, which is native label-for-control behaviour
+ * and needs no JavaScript.
+ *
+ * Because the visible element is the label but the focusable element is the
+ * input inside it, the ring has to be drawn by the parent on the child's
+ * behalf — hence `has-[:focus-visible]:` rather than the plain
+ * `focus-visible:` in `buttonClass`'s own base, which would only ever fire
+ * on a label that cannot receive focus. `has-[:disabled]:` covers the other
+ * half for the same reason. Both are `:has()` selectors, so the styling
+ * follows the input's real state rather than a prop this component would
+ * otherwise have to be told twice.
+ *
+ * `type` is fixed and cannot be overridden — a `FileField` that is not a
+ * file input would pass gate 3 while defeating the reason it exists. */
+/** Its own constant, and every class in it followed by whitespace or the
+ * closing quote — never by a `${`. Tailwind v4 finds classes by scanning
+ * source text for candidates, and a candidate written flush against an
+ * interpolation is not recognised: the first draft of this component ended
+ * `… has-[:disabled]:opacity-50${className ? …}`, and that one utility — the
+ * only one in the string touching a `${` — was silently absent from the
+ * built CSS while every other class on the same line compiled. Nothing fails;
+ * the control just renders at full opacity while disabled. `scripts/
+ * gates.mjs` carries a warning of the same family for the same reason. */
+const FILE_FIELD =
+  "cursor-pointer gap-1.5 has-[:focus-visible]:shadow-[var(--ring)] " +
+  "has-[:disabled]:cursor-default has-[:disabled]:opacity-50";
+
+export function FileField({
+  className,
+  children,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "type"> & { children: ReactNode }) {
+  return (
+    <label className={buttonClass({ className: className ? `${FILE_FIELD} ${className}` : FILE_FIELD })}>
+      {children}
+      <input type="file" className="sr-only" {...props} />
+    </label>
   );
 }
 

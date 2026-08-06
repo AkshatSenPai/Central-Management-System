@@ -145,13 +145,63 @@ export async function presignPut(input: {
   });
 }
 
+/** Builds the `Content-Disposition` R2 should send back with a downloaded
+ * object, in RFC 6266's two-part form: a plain `filename=` an ancient client
+ * can read, plus a `filename*=` carrying the real UTF-8 name for everything
+ * from about 2011 onward. Both are needed — the first alone loses every
+ * non-ASCII character, the second alone is ignored by clients that only know
+ * the original grammar.
+ *
+ * The ASCII half is scrubbed twice over: non-printable and non-ASCII
+ * characters become `_`, and so do `"` and `\`, the two characters that
+ * could otherwise close or escape their way out of the quoted string this
+ * name is interpolated into. `fileName` reaches here straight off an
+ * `Attachment` row, which stores the *display* name exactly as uploaded
+ * (§7:118: sanitisation applies to the key, not to what is shown), so it is
+ * genuinely arbitrary user input and the only place its shape is constrained
+ * is right here. The UTF-8 half needs no such care: `encodeURIComponent`
+ * percent-encodes everything outside an unreserved ASCII set, quotes and
+ * separators included. */
+function contentDisposition(fileName: string): string {
+  const ascii = fileName.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
+
 /** Presigns a GET for one download click. The bucket is private and stays
  * private (§6/§7) — this is the only way a stored file is ever read, so a
  * URL is minted fresh per click rather than cached: caching one would just
  * be caching a capability that outlives the click that asked for it, right
- * up until its 5-minute expiry. */
-export async function presignGet(input: { key: string }): Promise<string> {
-  const command = new GetObjectCommand({ Bucket: r2.bucket, Key: input.key });
+ * up until its 5-minute expiry.
+ *
+ * `downloadName` is optional and sets `response-content-disposition` on the
+ * signed URL — an S3 response override R2 implements, applied to the
+ * response R2 itself sends, not a header this origin ever adds. It does two
+ * things, both wanted:
+ *
+ * 1. **The saved file gets its real name back.** The last segment of the key
+ *    is the *sanitised* name (`attachment.ts`'s `sanitiseFileName`), so a
+ *    download without this override saves `"Q4 Report — Final.pdf"` as
+ *    `"Q4_Report_Final.pdf"` — a name the user never chose, differing from
+ *    the one the attachment list is showing them at that moment.
+ * 2. **`attachment` rather than `inline` closes the last edge of §7:119.**
+ *    That line's reasoning is that an uploaded HTML file "is downloaded from
+ *    R2's domain via a presigned URL, not rendered on ours" — true, and the
+ *    origin boundary is what makes it safe. Asking for `attachment` means it
+ *    is not rendered *anywhere*: the browser saves it instead of executing
+ *    it even on R2's own domain. It also makes `window.location.href = url`
+ *    a safe way to start the download, because a response the browser saves
+ *    rather than renders never unloads the page that asked for it.
+ *
+ * Omitting it leaves the signed URL exactly as it was before this parameter
+ * existed — no override parameter, R2's own defaults. */
+export async function presignGet(input: { key: string; downloadName?: string }): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: r2.bucket,
+    Key: input.key,
+    ResponseContentDisposition: input.downloadName
+      ? contentDisposition(input.downloadName)
+      : undefined,
+  });
   return getSignedUrl(r2.client, command, { expiresIn: PRESIGN_EXPIRY_SECONDS });
 }
 

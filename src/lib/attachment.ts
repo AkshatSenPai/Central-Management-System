@@ -181,6 +181,62 @@ export function buildFileKey(
   return `${parentType}/${parentId}/${id}/${sanitiseFileName(fileName)}`;
 }
 
+/** What a file with no detectable type is stored and signed as. The generic
+ * S3/HTTP "these are just bytes" type, which is also what R2 falls back to on
+ * its own for an object uploaded without one. */
+export const DEFAULT_CONTENT_TYPE = "application/octet-stream";
+
+/** A conservative `type/subtype` with optional `;key=value` parameters.
+ * Deliberately narrower than RFC 9110's grammar — no quoted strings, no
+ * whitespace beyond a single optional space after `;` — because this value's
+ * destination is a *signed HTTP header*, and the only thing widening the
+ * grammar buys is more shapes to reason about. Anything with a CR, an LF, a
+ * quote or a backslash in it is not a content-type this app has any reason to
+ * accept, and refusing them here means no downstream layer has to wonder. */
+const CONTENT_TYPE_PATTERN =
+  /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+(?:; ?[A-Za-z0-9!#$&^_.+-]+=[A-Za-z0-9!#$&^_.+-]+)*$/;
+
+/** The single content-type rule, applied in exactly one place.
+ *
+ * The presigned PUT is signed over `content-type` (`r2.ts`'s `presignPut`
+ * passes `signableHeaders: new Set(["content-type"])` precisely so it is),
+ * which means the browser's `fetch(uploadUrl, { headers: { "Content-Type":
+ * … } })` must send back **byte-for-byte** what the server signed, or R2
+ * rejects the upload with a signature error naming neither side. Two copies
+ * of a fallback rule — one in the browser deciding what to send, one on the
+ * server deciding what to sign — is exactly the shape that breaks the day
+ * one of them is edited alone.
+ *
+ * So there is only one copy, and it runs on the server:
+ * `requestUploadAction` normalises the raw `File.type` it is given, signs
+ * *that*, and **returns the normalised string it actually signed**. The
+ * upload control then PUTs with the value it got back rather than the one it
+ * sent. The browser never applies this rule; it echoes the server's answer.
+ * The two sides cannot disagree, because only one of them is deciding.
+ *
+ * It lives in this file rather than beside the action for the reason the
+ * file header gives — it is a pure rule about what may reach R2, and this is
+ * the layer a plain fixture can exercise. Its tests are the only thing
+ * standing between the grammar below and a header nobody meant to sign.
+ *
+ * Two inputs get the fallback rather than a rejection:
+ *
+ * - **Empty.** `File.type` is `""` whenever the browser cannot guess a type
+ *   from the extension — a real, ordinary case for `.log`, `.psd`, or any
+ *   file with no extension at all. Rejecting would refuse a legitimate
+ *   upload over a fact about the *browser's* MIME table, not about the file.
+ * - **Malformed.** A value that fails `CONTENT_TYPE_PATTERN` came from
+ *   something other than this app's own upload control, since `File.type` is
+ *   always either `""` or a well-formed type. Falling back keeps the upload
+ *   working while guaranteeing that whatever reaches the signer is a shape
+ *   `r2.ts` and R2 both understand — which is the point, rather than
+ *   producing a friendlier error for a caller that is not a person. */
+export function normaliseContentType(contentType: string): string {
+  const trimmed = contentType.trim();
+  if (!CONTENT_TYPE_PATTERN.test(trimmed)) return DEFAULT_CONTENT_TYPE;
+  return trimmed;
+}
+
 const KILOBYTE = 1024;
 const MEGABYTE = KILOBYTE * 1024;
 
@@ -233,6 +289,18 @@ export function formatFileSize(bytes: number): string {
  * into a clear message instead of a silent phantom attachment. Revisit only
  * if a real workflow needs a deliberate placeholder file — none does today. */
 export function validateUpload(fileName: string, sizeBytes: number): string | null {
+  // `NaN` before `<= 0`, because every comparison against `NaN` is false: a
+  // `sizeBytes` of `NaN` would slip past both the zero-byte check below and
+  // the over-limit check under it and be reported as a perfectly valid
+  // upload. That is not a hypothetical shape — Task 5's `requestUploadAction`
+  // reads this number out of `FormData` with `Number(...)`, which yields
+  // `NaN` for a missing field or any non-numeric string, so the one caller
+  // that cannot be trusted to send a real number is exactly the one whose
+  // input reaches here unguarded. Rejecting outright rather than coercing to
+  // zero for the same reason `assertSafeKeySegment` throws instead of
+  // cleaning: an unreadable size is a broken caller, and the message should
+  // say so rather than blame an empty file.
+  if (!Number.isFinite(sizeBytes)) return `${fileName} has no readable size`;
   if (sizeBytes <= 0) return `${fileName} is empty`;
   if (sizeBytes > MAX_UPLOAD_BYTES) {
     return `${fileName} is too large — the limit is ${formatFileSize(MAX_UPLOAD_BYTES)}`;
