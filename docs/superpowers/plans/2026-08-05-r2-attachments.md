@@ -143,13 +143,16 @@ No Prisma, no React, no AWS import in this file — it is the only unit-testable
 
 ---
 
-### Task 7: browser QA — **BLOCKED, 2026-08-06**
+### Task 7: browser QA — **PASSED, 2026-08-06**
+
+> The CORS policy below was applied to the bucket mid-session, and everything that had been blocked on it then passed. The record of the blocker is kept because the policy is a **deployment prerequisite** — a fresh environment needs it again, with its own origin.
+
 
 ⚠️ **Real Chrome via `mcp__plugin_chrome-devtools-mcp`, never the embedded pane** — it reports `visibilityState: "hidden"` and shows a correct page as a blank one. Assert `visibilityState === "visible"` before believing any measurement. *(Done: every measurement below was taken with `visibilityState === "visible"` asserted first.)*
 
-> ## ⛔ The blocker: the bucket has no CORS policy
+> ## ⚠️ The bucket needs a CORS policy — **set 2026-08-06, and required again per environment**
 >
-> Chrome refuses the presigned PUT at the preflight — *"No 'Access-Control-Allow-Origin' header is present on the requested resource."* This is a bucket setting, not a code defect: the same presigned URL is accepted by R2 from Node. The plan's own preamble says "the R2 bucket, credentials and CORS exist"; the first two do, the third does not.
+> Before it was set, Chrome refused the presigned PUT at the preflight — *"No 'Access-Control-Allow-Origin' header is present on the requested resource."* Never a code defect: the same presigned URL was accepted by R2 from Node throughout. The plan's own preamble said "the R2 bucket, credentials and CORS exist"; the first two did, the third did not. **Production needs its own origin added before attachments work there.**
 >
 > Set in **Cloudflare → R2 → `cmsforuse-attachments` → Settings → CORS Policy**:
 >
@@ -184,16 +187,18 @@ No Prisma, no React, no AWS import in this file — it is the only unit-testable
 - [x] No horizontal overflow at narrow width (empty state).
 - [x] A failed PUT left **no object and no row** — §6:108's safe failure direction, observed rather than argued.
 
-**Still to do, all gated on CORS:**
+**Passed once CORS was set — the full click-through:**
 
-- [ ] Upload a small file to a task. It appears in the list; the object exists in R2.
-- [ ] Download it — the presigned GET works and the file is intact.
-- [ ] Remove it — row and object both gone.
-- [ ] **A file named with traversal characters** uploads under a sanitised key, and the display name is unchanged. *(The key half is proven — a blocked PUT for `"kickoff notes.txt"` targeted `kickoff_notes.txt`. The display half needs a row.)*
-- [ ] **Delete a task that has attachments — then check the bucket.** The leak check; list the prefix directly.
-- [ ] Same for a client with attachments and no projects.
-- [ ] The **populated** list at phone width.
-- [ ] Remove every test object and confirm the bucket prefix is empty. *(The bucket is empty as of 2026-08-06.)*
+- [x] Upload a small file to a task. Preflight `OPTIONS` → 204, `PUT` → 200; the row appears with the display name, size and uploader; the object is in R2 under a four-segment key.
+- [x] Download it. **It saved as `kickoff notes.txt` — the display name with its space — not the sanitised `kickoff_notes.txt` from the key.** 73 bytes, contents byte-identical. The page did not unload, confirming `location.href` plus `attachment` disposition behaves as designed.
+- [x] Remove it — row gone from the list **and** object gone from the bucket, verified by listing.
+- [x] **A file named `../../../etc/passwd`** uploaded under key segment `etc_passwd`, exactly four segments, inside its own task prefix — and the list shows `../../../etc/passwd` **verbatim**. §7:118 holds in both directions at once: sanitised as a path, untouched as a display string. The activity log records the raw name too.
+- [x] **Delete a task that has attachments — then check the bucket.** Two files attached to a throwaway task; after deleting the task, `TASK/{id}/` listed **0 objects** and the DB held **0 attachment rows**. The leak is closed.
+- [x] Same for a client with attachments and no projects — 1 object and 1 row before, 0 and 0 after. *(Driven through `deleteClient` directly rather than the UI: the browser session is a MEMBER and the delete control is admin-only. That the button was **not rendered** for a MEMBER is itself the admin gate verifying. The sweep under test is the same code either way.)*
+- [x] The **populated** list at phone width — name wraps, metadata wraps, Download/Remove stay on one line, no horizontal overflow.
+- [x] Every test object removed; **the bucket is empty and `Attachment` has zero rows.**
+
+**Not covered, and worth knowing:** every upload in this pass was driven by constructing a `File` in JavaScript and dispatching `change`, because the OS file-picker dialog cannot be scripted. That exercises everything downstream of the pick — validation, both actions, the PUT, the list — but not the picker dialog itself. A human clicking "Attach a file" and choosing a real file from disk is the one step still unproven, and it is the least likely to be broken.
 
 ---
 

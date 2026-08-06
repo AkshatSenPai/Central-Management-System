@@ -2,15 +2,15 @@
 
 **Start here.** This is where the work stopped and what happens next. `TODO.md` remains the long-form backlog; this file is the shorter question of *what do I do now*.
 
-**The goal for the next session: set one CORS policy, finish attachments' QA, then build chat or deploy.**
+**The goal for the next session: merge the attachments branch, then deploy.**
 
 ---
 
-## The one thing blocking everything
+## Attachments are finished
 
-**The R2 bucket has no CORS policy, so no file can be uploaded from a browser.** Not in production, not locally. The code is correct — R2 accepts the presigned PUT from Node — but Chrome blocks the preflight: *"No 'Access-Control-Allow-Origin' header is present on the requested resource."*
+All seven tasks are done and the browser QA passed end to end on 2026-08-06. **`feat/r2-attachments` is ready to merge into `master` and nobody has merged it yet — that is the next action.**
 
-Fix it in the Cloudflare dashboard: **R2 → `cmsforuse-attachments` → Settings → CORS Policy**.
+One thing to carry forward: the bucket needed a **CORS policy**, which did not exist and blocked every browser upload until it was set. It now lists `http://localhost:3000` and `https://cmsforuse.space`. **Verify the production origin is really there before trusting attachments after deploying** — a fresh bucket or a new origin needs this again, and the failure looks like a generic "could not be uploaded" with the real reason only in the browser console.
 
 ```json
 [
@@ -23,9 +23,7 @@ Fix it in the Cloudflare dashboard: **R2 → `cmsforuse-attachments` → Setting
 ]
 ```
 
-Only `PUT` needs listing — the download is a top-level navigation, not a `fetch`, so CORS never sees it. **This cannot be scripted with the credentials in `.env`**: that token is object-scoped and `GetBucketCors` returns `AccessDenied`. It needs the dashboard or an admin-scoped token.
-
-Everything else on the branch is done.
+Only `PUT` needs listing — the download is a top-level navigation, not a `fetch`, so CORS never sees it. Only `content-type` — `content-length` is browser-set and never appears in a preflight. **Not scriptable with the credentials in `.env`**: that token is object-scoped and `GetBucketCors` returns `AccessDenied`. Dashboard or an admin-scoped token.
 
 ---
 
@@ -33,44 +31,32 @@ Everything else on the branch is done.
 
 | Branch | Commit | State |
 |---|---|---|
-| `master` | `cda4ec9` | Clean, deployable, **814 tests**. Unaffected by any of the below. |
-| `feat/r2-attachments` | 13 commits ahead | Attachments, **tasks 1-6 of 7 done**. Clean tree, **924 tests**, gates 9/9, tsc and lint clean, clean production build. |
+| `master` | `cda4ec9` | Clean, deployable, **814 tests**. Does not yet have attachments. |
+| `feat/r2-attachments` | 14 commits ahead | Attachments, **all 7 tasks done and QA'd**. Clean tree, **924 tests**, gates 9/9, tsc and lint clean, clean production build. **Ready to merge.** |
 
 Note: the R2 credentials live in **`.env`**, not `.env.local` — the plan and older docs both say `.env.local` and are wrong about it.
 
 ---
 
-## 1. Finish attachments — task 7 only
+## 1. Merge attachments
 
 **Branch:** `feat/r2-attachments`
-**Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md`
+**Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md` — every task checked off, with the QA results recorded under task 7.
 
-Tasks 5 and 6 landed on 2026-08-06: the four Server Actions, a `FileField` primitive, the upload control, the file list, the `attach_file` and `download` icons, both parent-delete sweeps, and the component on the task, project and client pages.
+Tasks 5-7 landed on 2026-08-06: the four Server Actions, a `FileField` primitive, the upload control, the file list, the `attach_file` and `download` icons, both parent-delete sweeps, the component on the task/project/client pages, and the full browser pass.
 
-### What task 7 already proved
+### What QA proved
 
-The R2 layer was verified end to end against the real bucket, using the app's own exports rather than a reimplementation — 16 checks, all passing:
+- **A PUT whose body size differs from the signed `content-length` is refused by R2.** §6:110's second enforcement is real, not decorative.
+- **Deleting a task with two attachments left its bucket prefix with zero objects and zero rows.** The leak §6:111 calls "the part to review hardest" is closed — verified by listing the prefix directly, not by trusting the UI. Same for a client.
+- A file named `../../../etc/passwd` stored under key segment `etc_passwd`, four segments, inside its own prefix — while the list *and* the activity log show the name verbatim. §7:118 holding in both directions at once.
+- Download saves under the **display** name (`kickoff notes.txt`, space intact), not the sanitised key segment, and does not unload the page.
+- Over-25 MB rejected with **zero** network requests.
+- Both themes; populated list at phone width, no horizontal overflow.
 
-- R2 accepts the presigned PUT, and the URL signs `content-length;content-type;host`.
-- **A PUT whose body differs in size from the signed `content-length` is refused.** §6:110's second enforcement is real, not decorative.
-- The presigned GET returns the bytes intact, as `Content-Disposition: attachment` under the *display* name.
-- A traversal-shaped filename stays inside its own four-segment prefix.
-- `deleteObjects` really empties the prefix — confirmed by listing the bucket with a **separate** client from the one under test.
-- No checksum parameter is baked into the URL, so the `WHEN_REQUIRED` ruling below still holds in practice.
+The bucket and the `Attachment` table were both left empty.
 
-In the browser: the 25 MB rejection fires with **zero network requests** (the client-side check genuinely precedes minting a URL), and the Files section renders in both themes with the focus ring landing on the file picker.
-
-### What is left, all of it gated on CORS
-
-- [ ] Upload a small file to a task — it appears in the list, and the object is in R2.
-- [ ] Download it; remove it; confirm row *and* object are gone.
-- [ ] A file named with traversal characters uploads under a sanitised key **and keeps its display name in the list**.
-- [ ] **Delete a task that has attachments, then list the bucket prefix directly.** The leak check. It cannot be done from the UI.
-- [ ] Same for a client with attachments and no projects.
-- [ ] The populated list at phone width (the empty state is already checked).
-- [ ] Remove every test object; confirm the bucket is empty.
-
-The bucket is empty right now, so anything found in it later is from that session.
+**One gap, deliberate:** every upload was driven by constructing a `File` in JavaScript, because the OS file-picker dialog cannot be scripted. Everything downstream of the pick is proven; the dialog itself is not. It is the least likely thing to be broken, but it is the one step a human should click once.
 
 ### Rulings — don't re-argue these
 
@@ -99,7 +85,7 @@ DMs plus open channels, sitting *alongside* WhatsApp rather than replacing it �
 
 ## 3. Deploy
 
-`TODO.md` §1 has the full checklist. Short version: Vercel on the free Hobby plan, region `sin1`, eight environment variables (four auth/app, four R2), **the CORS policy above**, deploy, then invite the team from **Settings → Members**.
+`TODO.md` §1 has the full checklist. Short version: Vercel on the free Hobby plan, region `sin1`, eight environment variables (four auth/app, four R2), **`https://cmsforuse.space` confirmed in the bucket's CORS policy**, deploy, then invite the team from **Settings → Members**.
 
 Two things this unblocks that are impossible today: **reminders and recurring tasks** both need a live URL for cron, and **email** needs a verified domain.
 

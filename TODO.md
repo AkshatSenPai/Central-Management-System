@@ -14,7 +14,7 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 
 **Read this before starting anything.** The R2 attachment pipeline is half built on a branch, not on `master`. `master` is at `237ca63` and is clean, deployable, and unaffected by any of it.
 
-**Branch state (2026-08-06):** 13 commits ahead of `master`. **924 tests, gates 9/9, tsc clean, lint clean, clean production build.** Working tree clean. Tasks 1-6 are done; **task 7 is the only one left, and it is blocked on a bucket setting, not on code** — see the CORS item in §1.
+**Branch state (2026-08-06):** 14 commits ahead of `master`. **924 tests, gates 9/9, tsc clean, lint clean, clean production build.** Working tree clean. **All seven tasks are done, including the browser QA. The feature is finished and the branch is ready to merge into `master`** — that merge is the next action and nobody has done it yet.
 
 **Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md`. **Design:** §6 and §7 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — this needed a plan, not a new spec, because Phase 3c already designed it and parked it.
 
@@ -26,11 +26,20 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 | 4 — service and query | done, 2 fix rounds, re-review clean |
 | 5 — actions, UI, and the two icons | done 2026-08-06 |
 | 6 — parent-delete hooks and page wiring | done 2026-08-06 |
-| **7 — browser QA** | **blocked on the R2 CORS policy. Everything not gated on it passed.** |
+| 7 — browser QA | **done 2026-08-06 — full click-through passed** |
 
-**What task 7 proved, and what it could not.** The R2 layer was verified end to end against the real bucket with the app's own `presignPut`/`presignGet`/`deleteObjects` — 16 checks, all passing: R2 accepts the presigned PUT; a PUT whose body size differs from the signed `content-length` is **refused** (so §6:110's second enforcement is real, not decorative); the GET returns the bytes intact under the display name; a traversal-shaped name stays inside its own four-segment prefix; and `deleteObjects` really empties the prefix, confirmed by listing the bucket with a *separate* client. In the browser, the client-side 25 MB rejection fires with **zero** network requests — the check genuinely precedes minting a URL — and the Files section renders correctly in both themes with the focus ring on the file picker.
+**What task 7 proved.** The R2 layer was verified against the real bucket using the app's own `presignPut`/`presignGet`/`deleteObjects` — 16 checks — and then the whole feature was clicked through in real Chrome. Highlights, because two of these are properties nobody had actually seen hold:
 
-What is still unproven is everything downstream of a successful browser upload: the row appearing in the list, download, remove, and the parent-delete leak check against a real attachment. All four need CORS first. The failed upload attempt did leave the two-step write's safe direction visible, though — a blocked PUT produced **no object and no row**, which is exactly §6:108's stated failure direction.
+- **A PUT whose body size differs from the signed `content-length` is refused by R2.** §6:110's second enforcement is real, not decorative.
+- **Deleting a task with two attachments left `TASK/{id}/` with zero objects and zero rows.** The leak §6:111 calls "the part to review hardest" is closed, verified by listing the prefix directly rather than trusting the UI. Same result for a client.
+- A file named `../../../etc/passwd` stored under key segment `etc_passwd` — four segments, inside its own prefix — while the list and the activity log both show the name **verbatim**. Sanitised as a path, untouched as a display string, simultaneously.
+- Download saved the file under its **display** name (`kickoff notes.txt`, space intact), not the sanitised key segment, and did not unload the page.
+- Over-25 MB is rejected with **zero** network requests, so the client-side check genuinely precedes minting a URL.
+- Both themes, and the populated list at phone width with no horizontal overflow.
+
+The bucket and the `Attachment` table were both left empty.
+
+**One gap, deliberate:** every upload was driven by constructing a `File` in JavaScript, because the OS file-picker dialog cannot be scripted. Everything downstream of the pick is proven; the dialog itself is not.
 
 **Four rulings a fresh session would otherwise re-litigate:**
 
@@ -71,7 +80,7 @@ Everything below is in `DEPLOY.md` in full. Short version:
 - [ ] **Set the Vercel region to `sin1` (Singapore)** so the app sits beside the Neon database. Neon has no Mumbai region; Singapore is the closest, and leaving Vercel on the US default costs a round trip on every page.
 - [ ] **Env vars** (Production): `DATABASE_URL`, `AUTH_SECRET` (a NEW one, not the local), `AUTH_URL`, `NEXT_PUBLIC_APP_URL`. The last is not optional — invite links refuse to generate without it.
 - [ ] **R2 env vars** (Production), the same four now in **`.env`** (not `.env.local` — earlier drafts of this file and the plan both say `.env.local`; the values are actually in `.env`): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. There is no region variable — R2 is always `auto`.
-- [ ] **⚠️ A CORS policy on the R2 bucket. Uploads cannot work without it, in production or locally.** Found 2026-08-06 during task 7's browser pass: the presigned PUT is correct and R2 accepts it from Node, but from a browser Chrome blocks it at the preflight — *"No 'Access-Control-Allow-Origin' header is present"*. The bucket `cmsforuse-attachments` has no CORS rules. Set them in the Cloudflare dashboard under **R2 → cmsforuse-attachments → Settings → CORS Policy**:
+- [ ] **⚠️ Confirm the production origin is in the R2 bucket's CORS policy. Uploads cannot work without it.** Found 2026-08-06 during task 7's browser pass — the bucket had no CORS rules at all, and Chrome blocked every upload at the preflight (*"No 'Access-Control-Allow-Origin' header is present"*) while R2 accepted the identical presigned URL from Node. **A policy was applied that day and uploads now work locally**, but check it lists `https://cmsforuse.space` before trusting attachments in production. **R2 → cmsforuse-attachments → Settings → CORS Policy**:
 
   ```json
   [
