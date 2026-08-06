@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity, fieldDiff } from "@/lib/activity";
+import { deleteAttachmentObjectsFor } from "@/lib/attachment-service";
 import type { ClientStatus } from "@/lib/client";
 
 export type ClientWriteInput = {
@@ -144,6 +145,19 @@ export async function deleteClient(
         clientId: null,
         meta: { name: client.name },
       });
+      // The client half of spec §6:111 — see the longer note on
+      // `removeTask`'s own call for why attachments cannot cascade and why
+      // this sits last in the transaction rather than first.
+      //
+      // **CLIENT attachments only, and that is the whole set.** This client
+      // has no projects (refused above, and backstopped by ON DELETE
+      // RESTRICT), so there are no PROJECT attachments under it to sweep,
+      // and no project means no project tasks, so no TASK attachments
+      // either. A personal task carries no client at all. So the one
+      // parentType reachable from here is CLIENT, and a broader sweep would
+      // be code defending against a state `projectCount > 0` already makes
+      // unreachable.
+      await deleteAttachmentObjectsFor(tx, { parentType: "CLIENT", parentId: input.clientId });
     });
   } catch (e) {
     // A project created between the count and the delete trips the FK.

@@ -10,6 +10,50 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 
 ---
 
+## 0. In flight — `feat/r2-attachments`, paused 2026-08-05
+
+**Read this before starting anything.** The R2 attachment pipeline is half built on a branch, not on `master`. `master` is at `237ca63` and is clean, deployable, and unaffected by any of it.
+
+**Branch state (2026-08-06):** 14 commits ahead of `master`. **924 tests, gates 9/9, tsc clean, lint clean, clean production build.** Working tree clean. **All seven tasks are done, including the browser QA. The feature is finished and the branch is ready to merge into `master`** — that merge is the next action and nobody has done it yet.
+
+**Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md`. **Design:** §6 and §7 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — this needed a plan, not a new spec, because Phase 3c already designed it and parked it.
+
+| Task | State |
+|---|---|
+| 1 — pure layer (`attachment.ts`) | done, 2 fix rounds, re-review clean |
+| 2 — SDK install | done |
+| 3 — R2 client and presigners (`r2.ts`) | done, 1 fix round |
+| 4 — service and query | done, 2 fix rounds, re-review clean |
+| 5 — actions, UI, and the two icons | done 2026-08-06 |
+| 6 — parent-delete hooks and page wiring | done 2026-08-06 |
+| 7 — browser QA | **done 2026-08-06 — full click-through passed** |
+
+**What task 7 proved.** The R2 layer was verified against the real bucket using the app's own `presignPut`/`presignGet`/`deleteObjects` — 16 checks — and then the whole feature was clicked through in real Chrome. Highlights, because two of these are properties nobody had actually seen hold:
+
+- **A PUT whose body size differs from the signed `content-length` is refused by R2.** §6:110's second enforcement is real, not decorative.
+- **Deleting a task with two attachments left `TASK/{id}/` with zero objects and zero rows.** The leak §6:111 calls "the part to review hardest" is closed, verified by listing the prefix directly rather than trusting the UI. Same result for a client.
+- A file named `../../../etc/passwd` stored under key segment `etc_passwd` — four segments, inside its own prefix — while the list and the activity log both show the name **verbatim**. Sanitised as a path, untouched as a display string, simultaneously.
+- Download saved the file under its **display** name (`kickoff notes.txt`, space intact), not the sanitised key segment, and did not unload the page.
+- Over-25 MB is rejected with **zero** network requests, so the client-side check genuinely precedes minting a URL.
+- Both themes, and the populated list at phone width with no horizontal overflow.
+
+The bucket and the `Attachment` table were both left empty.
+
+**One gap, deliberate:** every upload was driven by constructing a `File` in JavaScript, because the OS file-picker dialog cannot be scripted. Everything downstream of the pick is proven; the dialog itself is not.
+
+**Four rulings a fresh session would otherwise re-litigate:**
+
+- **`attach_file` and `download` must be added in task 5, not earlier.** Gate 7 is "every icon in `icons.ts` is used somewhere" and fails on an icon nothing renders. The plan originally had them in task 2 and was wrong; it is corrected, but the reasoning is easy to lose.
+- **`deleteAttachmentObjectsFor` deletes every row regardless and never aborts the parent delete on an R2 failure.** Leak, do not lie — spec §6:108. It cannot selectively commit because task 6 nests it inside `removeTask`/`deleteClient`'s transaction. This was a real bug found by review: task 3's fix made `deleteObjects` non-atomic, and task 4 assumed a throw meant nothing was deleted. Neither was wrong alone.
+- **`removeAttachment` gates on uploader-or-admin.** A deliberate extension of the spec, which is silent on attachment permissions — it matches 3c's D3 for comments and the same rule in announcements and calendar events.
+- **`requestChecksumCalculation: "WHEN_REQUIRED"` in `r2.ts` is load-bearing.** Without it the SDK bakes a checksum of an *empty* body into every presigned PUT and all uploads fail. Two reviewers confirmed it by generating URLs both ways. It is not stray config.
+
+**Still open on this branch:** `deleteAttachmentObjectsFor` has no call site until task 6, so its nested-transaction reasoning is unverified. Task 7 must delete a parent that has attachments and then **list the bucket prefix directly** — that is the only way to prove the leak is closed.
+
+**After R2:** chat (spec written and reviewed, four sequenced steps, zero code), then deploy, then time tracking, then invoices.
+
+---
+
 ## 1. Deploy — the next thing to do
 
 Everything below is in `DEPLOY.md` in full. Short version:
@@ -35,7 +79,23 @@ Everything below is in `DEPLOY.md` in full. Short version:
   At six people the capacity argument is moot: normal use is roughly 26k function invocations a month, which is noise. Only chat polling would move that number, and chat is the last thing on the list.
 - [ ] **Set the Vercel region to `sin1` (Singapore)** so the app sits beside the Neon database. Neon has no Mumbai region; Singapore is the closest, and leaving Vercel on the US default costs a round trip on every page.
 - [ ] **Env vars** (Production): `DATABASE_URL`, `AUTH_SECRET` (a NEW one, not the local), `AUTH_URL`, `NEXT_PUBLIC_APP_URL`. The last is not optional — invite links refuse to generate without it.
-- [ ] **R2 env vars** (Production), the same four now in `.env.local`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. There is no region variable — R2 is always `auto`.
+- [ ] **R2 env vars** (Production), the same four now in **`.env`** (not `.env.local` — earlier drafts of this file and the plan both say `.env.local`; the values are actually in `.env`): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. There is no region variable — R2 is always `auto`.
+- [ ] **⚠️ Confirm the production origin is in the R2 bucket's CORS policy. Uploads cannot work without it.** Found 2026-08-06 during task 7's browser pass — the bucket had no CORS rules at all, and Chrome blocked every upload at the preflight (*"No 'Access-Control-Allow-Origin' header is present"*) while R2 accepted the identical presigned URL from Node. **A policy was applied that day and uploads now work locally**, but check it lists `https://cmsforuse.space` before trusting attachments in production. **R2 → cmsforuse-attachments → Settings → CORS Policy**:
+
+  ```json
+  [
+    {
+      "AllowedOrigins": ["https://cmsforuse.space", "http://localhost:3000"],
+      "AllowedMethods": ["PUT"],
+      "AllowedHeaders": ["content-type"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+  ```
+
+  **Only `PUT` needs listing.** The download is a top-level navigation (`window.location.href`), not a `fetch`, so it is not a CORS request at all. `content-type` is the only header the browser asks permission for — `content-length` is set by the browser itself and is never in a preflight.
+
+  This cannot be done with the credentials in `.env`: that token is object-scoped, and `GetBucketCors` on it returns `AccessDenied`. It needs the dashboard, or an admin-scoped API token.
 - [ ] Optional: `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, plus the callback URL in Google Cloud. Email + password works without it.
 - [ ] Deploy, sign in, invite the team from **Settings → Members**. Invite links are copy-paste — there is no email yet.
 

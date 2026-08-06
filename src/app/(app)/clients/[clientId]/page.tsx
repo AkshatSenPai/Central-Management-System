@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getClientDetail } from "@/lib/client-queries";
 import { listClientActivity } from "@/lib/activity";
+import { listAttachments } from "@/lib/attachment-queries";
 import { CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from "@/lib/client";
 import { isProjectActive } from "@/lib/project";
 import { monthYear } from "@/lib/dates";
@@ -19,12 +20,13 @@ import { ContactList } from "@/components/clients/contact-list";
 import { ContactForm } from "@/components/clients/contact-form";
 import { ProjectRow } from "@/components/projects/project-row";
 import { ProjectForm } from "@/components/projects/project-form";
+import { Attachments } from "@/components/attachments/attachments";
 
 const CHIP = "text-xs text-[var(--text-3)]";
 
 export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await props.params;
-  const [client, activity, session, members] = await Promise.all([
+  const [client, activity, session, members, attachments] = await Promise.all([
     getClientDetail(prisma, clientId),
     listClientActivity(prisma, { clientId }),
     auth(),
@@ -33,10 +35,15 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    listAttachments(prisma, { parentType: "CLIENT", parentId: clientId }),
   ]);
   if (!client) notFound();
+  // The layout already redirects. Repeated here because the file list needs
+  // `session.user.id` — not just the optional-chained role this page read
+  // before — and TypeScript cannot see a guard in another file.
+  if (!session?.user) redirect("/login");
 
-  const isAdmin = session?.user.role === "ADMIN";
+  const isAdmin = session.user.role === "ADMIN";
   const websiteLabel = client.website?.replace(/^https?:\/\//i, "").replace(/\/$/, "");
 
   return (
@@ -154,6 +161,29 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 ))}
               </div>
             )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-medium text-[var(--text)]">Files</h2>
+              {attachments.length > 0 ? (
+                <span className="text-xs text-[var(--text-3)]">{attachments.length}</span>
+              ) : null}
+            </div>
+            {/* Above Activity, not below it: the timeline is a trailing
+                audit log and belongs last on this page, the same way it
+                already sat after Projects. */}
+            <Attachments
+              attachments={attachments}
+              scope={{
+                parentType: "CLIENT",
+                parentId: client.id,
+                projectId: null,
+                clientId: client.id,
+              }}
+              viewerId={session.user.id}
+              viewerIsAdmin={isAdmin}
+            />
           </section>
 
           <section className="space-y-3">

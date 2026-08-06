@@ -1,8 +1,9 @@
 {
-  "signature": "12b6e8ad2eed4cf9",
+  "signature": "cd0a1ddc0f1fa94f",
   "icons": [
     "add",
     "alternate_email",
+    "attach_file",
     "business_center",
     "calendar_month",
     "call",
@@ -13,6 +14,7 @@
     "close",
     "dark_mode",
     "delete",
+    "download",
     "drag_indicator",
     "edit",
     "error",
@@ -35,5 +37,5 @@
     "settings",
     "space_dashboard"
   ],
-  "bytes": 5456
+  "bytes": 5528
 }

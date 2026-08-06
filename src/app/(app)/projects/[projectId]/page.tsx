@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProjectDetail } from "@/lib/project-queries";
 import { listProjectTasks } from "@/lib/task-queries";
+import { listAttachments } from "@/lib/attachment-queries";
 import { taskListSummary } from "@/lib/task";
 import { PROJECT_HEALTH_BADGE, PROJECT_HEALTH_LABEL } from "@/lib/project";
 import { shortDate } from "@/lib/dates";
@@ -19,6 +21,7 @@ import { MilestoneStrip } from "@/components/projects/milestone-strip";
 import { MilestoneForm } from "@/components/projects/milestone-form";
 import { TaskForm } from "@/components/tasks/task-form";
 import { TaskRow } from "@/components/tasks/task-row";
+import { Attachments } from "@/components/attachments/attachments";
 
 const STAT_LABEL = "text-[11px] font-semibold tracking-wide text-[var(--text-3)]";
 
@@ -26,16 +29,24 @@ export default async function ProjectDetailPage(props: {
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await props.params;
+  const session = await auth();
+  // The layout already redirects; repeated because this page now reads
+  // session.user directly — for the attachment list's uploader-or-admin
+  // remove gate — and TypeScript cannot see a guard in another file. Same
+  // reasoning, same two lines, as the task detail page.
+  if (!session?.user) redirect("/login");
+
   const project = await getProjectDetail(prisma, projectId);
   if (!project) notFound();
 
-  const [tasks, members] = await Promise.all([
+  const [tasks, members, attachments] = await Promise.all([
     listProjectTasks(prisma, projectId),
     prisma.user.findMany({
       where: { active: true },
       select: { id: true, name: true, active: true },
       orderBy: { name: "asc" },
     }),
+    listAttachments(prisma, { parentType: "PROJECT", parentId: projectId }),
   ]);
 
   // Already loaded by getProjectDetail — no second milestone query.
@@ -191,6 +202,29 @@ export default async function ProjectDetailPage(props: {
             milestones={project.milestones}
           />
         )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-lg font-medium text-[var(--text)]">Files</h2>
+          {attachments.length > 0 ? (
+            <span className="text-xs text-[var(--text-3)]">{attachments.length}</span>
+          ) : null}
+        </div>
+        {/* `projectId` repeats `parentId` here, and that is on purpose — see
+            AttachmentScope's own comment. Every page fills in every id it
+            knows; the action dedupes the resulting paths. */}
+        <Attachments
+          attachments={attachments}
+          scope={{
+            parentType: "PROJECT",
+            parentId: project.id,
+            projectId: project.id,
+            clientId: project.clientId,
+          }}
+          viewerId={session.user.id}
+          viewerIsAdmin={session.user.role === "ADMIN"}
+        />
       </section>
     </div>
   );
