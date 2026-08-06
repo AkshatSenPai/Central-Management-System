@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import {
-  PROJECT_STATUSES,
+  PROJECT_LIFECYCLE_STATUSES,
   PROJECT_STATUS_LABEL,
   PROJECT_HEALTHS,
   PROJECT_HEALTH_LABEL,
@@ -70,6 +70,15 @@ export function ProjectForm({
   // everything the user typed and leave them an error about a field they can
   // no longer see. Values held in state survive that reset.
   const [values, setValues] = useState<Values>(() => initialValues(project, presetClientId));
+  // The status select offers the lifecycle statuses, and additionally the
+  // project's own status when that is not among them — which means Done.
+  // Done is deliberately not a choice (finishing is a button on the project's
+  // own page), but it must still be *rendered* for a project that already has
+  // it, or React selects the first option instead and the next save silently
+  // reopens a finished project as Planning.
+  const statusOptions = PROJECT_LIFECYCLE_STATUSES.includes(values.status)
+    ? PROJECT_LIFECYCLE_STATUSES
+    : [...PROJECT_LIFECYCLE_STATUSES, values.status];
   // React 19 resets the form once the action resolves. Text inputs get their
   // controlled value restored, but a <select> does not — React's state did not
   // change, so nothing re-commits its DOM value. Remounting the form subtree
@@ -181,7 +190,10 @@ export function ProjectForm({
               value={values.status}
               onChange={(e) => set("status", e.target.value as ProjectStatus)}
             >
-              {PROJECT_STATUSES.map((status) => (
+              {/* See `statusOptions` above for why this is not simply
+                  PROJECT_LIFECYCLE_STATUSES. `tasks/[taskId]/page.tsx:43-46`
+                  documents the same React behaviour for its own picker. */}
+              {statusOptions.map((status) => (
                 <option key={status} value={status}>
                   {PROJECT_STATUS_LABEL[status]}
                 </option>
