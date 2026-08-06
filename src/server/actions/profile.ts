@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { profileSchema } from "@/lib/profile";
+import { changeOwnPassword, profileSchema } from "@/lib/profile";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { requireUser, AuthError } from "@/server/guards";
 
@@ -33,6 +33,34 @@ export async function updateProfileAction(
     });
     revalidatePath("/settings/profile");
     return ok(undefined);
+  } catch (e) {
+    if (e instanceof AuthError) return err(e.message);
+    throw e;
+  }
+}
+
+/**
+ * `requireUser()` supplies the id, and the form carries no user id at all —
+ * so this action has no target to tamper with. That is the same property
+ * `changeOwnPassword`'s signature enforces, stated once more at the door
+ * where the untrusted `FormData` actually arrives.
+ *
+ * Nothing is revalidated. A password change alters no rendered data, and
+ * re-rendering `/settings/profile` would only discard the success message
+ * this returns.
+ */
+export async function changePasswordAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    return await changeOwnPassword(prisma, {
+      userId: user.id,
+      current: String(formData.get("currentPassword") ?? ""),
+      next: String(formData.get("newPassword") ?? ""),
+      confirm: String(formData.get("confirmPassword") ?? ""),
+    });
   } catch (e) {
     if (e instanceof AuthError) return err(e.message);
     throw e;
