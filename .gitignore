@@ -40,3 +40,36 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Planning and session notes — kept on disk, deliberately not published.
+#
+# These are the working notes the project was built from: a backlog, a
+# session handoff, deployment and cost notes, and the per-phase specs and
+# implementation plans under docs/superpowers/. They are genuinely useful
+# locally and are still written and read every session — they are ignored,
+# not deleted. Owner's call (2026-08-06): the repo should carry the code,
+# not the process behind it.
+#
+# Safe to ignore because nothing in src/ or tests/ references a docs/ path.
+# Code comments cite spec *sections* ("spec §6:108", "3c D3") rather than
+# file paths, so none of them dangle. Keep it that way: if a comment ever
+# needs to point at a document, quote the reasoning inline instead.
+#
+# NOT ignored, on purpose:
+#   AGENTS.md   — the "this Next.js version has breaking changes, read
+#                 node_modules/next/dist/docs/ first" warning. Five lines,
+#                 and the one thing a newcomer must read before writing any
+#                 Next code in this repo.
+#   CLAUDE.md   — one line, includes AGENTS.md.
+#   README.md   — the repo's front door.
+#   docs/security/ — the npm-audit triage explains why 12 high findings are
+#                 not production-reachable. That is about the dependencies,
+#                 not about the process, and it saves the next person the
+#                 same investigation.
+/TODO.md
+/HANDOFF.md
+/TOMORROW.md
+/DEPLOY.md
+/docs/superpowers/
+/docs/design/claude-design-prompt.md
+.superpowers/
