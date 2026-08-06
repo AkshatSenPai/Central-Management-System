@@ -14,7 +14,7 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 
 **Read this before starting anything.** The R2 attachment pipeline is half built on a branch, not on `master`. `master` is at `237ca63` and is clean, deployable, and unaffected by any of it.
 
-**Branch state:** 11 commits ahead of `master`. **896 tests, gates 9/9, tsc clean, lint clean.** Working tree clean. Nothing is half-written — the branch ends on a completed and reviewed task.
+**Branch state (2026-08-06):** 13 commits ahead of `master`. **924 tests, gates 9/9, tsc clean, lint clean, clean production build.** Working tree clean. Tasks 1-6 are done; **task 7 is the only one left, and it is blocked on a bucket setting, not on code** — see the CORS item in §1.
 
 **Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md`. **Design:** §6 and §7 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — this needed a plan, not a new spec, because Phase 3c already designed it and parked it.
 
@@ -24,9 +24,13 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 | 2 — SDK install | done |
 | 3 — R2 client and presigners (`r2.ts`) | done, 1 fix round |
 | 4 — service and query | done, 2 fix rounds, re-review clean |
-| **5 — actions, UI, and the two icons** | **not started — resume here** |
-| 6 — parent-delete hooks and page wiring | not started |
-| 7 — browser QA | not started |
+| 5 — actions, UI, and the two icons | done 2026-08-06 |
+| 6 — parent-delete hooks and page wiring | done 2026-08-06 |
+| **7 — browser QA** | **blocked on the R2 CORS policy. Everything not gated on it passed.** |
+
+**What task 7 proved, and what it could not.** The R2 layer was verified end to end against the real bucket with the app's own `presignPut`/`presignGet`/`deleteObjects` — 16 checks, all passing: R2 accepts the presigned PUT; a PUT whose body size differs from the signed `content-length` is **refused** (so §6:110's second enforcement is real, not decorative); the GET returns the bytes intact under the display name; a traversal-shaped name stays inside its own four-segment prefix; and `deleteObjects` really empties the prefix, confirmed by listing the bucket with a *separate* client. In the browser, the client-side 25 MB rejection fires with **zero** network requests — the check genuinely precedes minting a URL — and the Files section renders correctly in both themes with the focus ring on the file picker.
+
+What is still unproven is everything downstream of a successful browser upload: the row appearing in the list, download, remove, and the parent-delete leak check against a real attachment. All four need CORS first. The failed upload attempt did leave the two-step write's safe direction visible, though — a blocked PUT produced **no object and no row**, which is exactly §6:108's stated failure direction.
 
 **Four rulings a fresh session would otherwise re-litigate:**
 
@@ -66,7 +70,23 @@ Everything below is in `DEPLOY.md` in full. Short version:
   At six people the capacity argument is moot: normal use is roughly 26k function invocations a month, which is noise. Only chat polling would move that number, and chat is the last thing on the list.
 - [ ] **Set the Vercel region to `sin1` (Singapore)** so the app sits beside the Neon database. Neon has no Mumbai region; Singapore is the closest, and leaving Vercel on the US default costs a round trip on every page.
 - [ ] **Env vars** (Production): `DATABASE_URL`, `AUTH_SECRET` (a NEW one, not the local), `AUTH_URL`, `NEXT_PUBLIC_APP_URL`. The last is not optional — invite links refuse to generate without it.
-- [ ] **R2 env vars** (Production), the same four now in `.env.local`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. There is no region variable — R2 is always `auto`.
+- [ ] **R2 env vars** (Production), the same four now in **`.env`** (not `.env.local` — earlier drafts of this file and the plan both say `.env.local`; the values are actually in `.env`): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. There is no region variable — R2 is always `auto`.
+- [ ] **⚠️ A CORS policy on the R2 bucket. Uploads cannot work without it, in production or locally.** Found 2026-08-06 during task 7's browser pass: the presigned PUT is correct and R2 accepts it from Node, but from a browser Chrome blocks it at the preflight — *"No 'Access-Control-Allow-Origin' header is present"*. The bucket `cmsforuse-attachments` has no CORS rules. Set them in the Cloudflare dashboard under **R2 → cmsforuse-attachments → Settings → CORS Policy**:
+
+  ```json
+  [
+    {
+      "AllowedOrigins": ["https://cmsforuse.space", "http://localhost:3000"],
+      "AllowedMethods": ["PUT"],
+      "AllowedHeaders": ["content-type"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+  ```
+
+  **Only `PUT` needs listing.** The download is a top-level navigation (`window.location.href`), not a `fetch`, so it is not a CORS request at all. `content-type` is the only header the browser asks permission for — `content-length` is set by the browser itself and is never in a preflight.
+
+  This cannot be done with the credentials in `.env`: that token is object-scoped, and `GetBucketCors` on it returns `AccessDenied`. It needs the dashboard, or an admin-scoped API token.
 - [ ] Optional: `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, plus the callback URL in Google Cloud. Email + password works without it.
 - [ ] Deploy, sign in, invite the team from **Settings → Members**. Invite links are copy-paste — there is no email yet.
 

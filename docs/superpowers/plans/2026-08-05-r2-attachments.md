@@ -143,19 +143,57 @@ No Prisma, no React, no AWS import in this file — it is the only unit-testable
 
 ---
 
-### Task 7: browser QA
+### Task 7: browser QA — **BLOCKED, 2026-08-06**
 
-⚠️ **Real Chrome via `mcp__plugin_chrome-devtools-mcp`, never the embedded pane** — it reports `visibilityState: "hidden"` and shows a correct page as a blank one. Assert `visibilityState === "visible"` before believing any measurement.
+⚠️ **Real Chrome via `mcp__plugin_chrome-devtools-mcp`, never the embedded pane** — it reports `visibilityState: "hidden"` and shows a correct page as a blank one. Assert `visibilityState === "visible"` before believing any measurement. *(Done: every measurement below was taken with `visibilityState === "visible"` asserted first.)*
+
+> ## ⛔ The blocker: the bucket has no CORS policy
+>
+> Chrome refuses the presigned PUT at the preflight — *"No 'Access-Control-Allow-Origin' header is present on the requested resource."* This is a bucket setting, not a code defect: the same presigned URL is accepted by R2 from Node. The plan's own preamble says "the R2 bucket, credentials and CORS exist"; the first two do, the third does not.
+>
+> Set in **Cloudflare → R2 → `cmsforuse-attachments` → Settings → CORS Policy**:
+>
+> ```json
+> [
+>   {
+>     "AllowedOrigins": ["https://cmsforuse.space", "http://localhost:3000"],
+>     "AllowedMethods": ["PUT"],
+>     "AllowedHeaders": ["content-type"],
+>     "MaxAgeSeconds": 3600
+>   }
+> ]
+> ```
+>
+> Only `PUT`: the download is a top-level navigation, not a `fetch`. Only `content-type`: `content-length` is browser-set and never appears in a preflight. **Not scriptable with the credentials in `.env`** — that token is object-scoped and `GetBucketCors` returns `AccessDenied`.
+
+**Passed — the R2 layer, verified against the real bucket using the app's own exports** (16 checks; `r2.ts` is deliberately untested, and its header names exactly this pass as the verification it wants):
+
+- [x] R2 accepts the presigned PUT; `X-Amz-SignedHeaders=content-length;content-type;host`.
+- [x] **A PUT whose body size differs from the signed `content-length` is refused** — §6:110's second enforcement is real.
+- [x] No checksum parameter in the URL; the `WHEN_REQUIRED` ruling holds in practice.
+- [x] The presigned GET returns the bytes intact, as `attachment` under the display name.
+- [x] A traversal name yields exactly four segments and stays under its own prefix.
+- [x] **`deleteObjects` really empties the prefix** — confirmed by listing the bucket with a *separate* client from the one under test.
+- [x] `deleteObjects([])` is a no-op.
+
+**Passed — in the browser:**
+
+- [x] **Over 25 MB is rejected client-side with ZERO network requests** — proving the check precedes minting a URL, not merely that it exists.
+- [x] The Files section renders in both themes; dark resolves `--text-2`/`--border` to the dark palette.
+- [x] The `FileField` focus ring works — focusing the `sr-only` input draws `--ring` on the label via `has-[:focus-visible]`.
+- [x] No horizontal overflow at narrow width (empty state).
+- [x] A failed PUT left **no object and no row** — §6:108's safe failure direction, observed rather than argued.
+
+**Still to do, all gated on CORS:**
 
 - [ ] Upload a small file to a task. It appears in the list; the object exists in R2.
 - [ ] Download it — the presigned GET works and the file is intact.
 - [ ] Remove it — row and object both gone.
-- [ ] **Upload something over 25 MB** — rejected client-side before any URL is minted.
-- [ ] **A file named with traversal characters** uploads under a sanitised key, and the display name is unchanged.
-- [ ] **Delete a task that has attachments — then check the bucket.** The objects must be gone. This is the leak check and it cannot be done from the UI alone; list the bucket prefix directly.
+- [ ] **A file named with traversal characters** uploads under a sanitised key, and the display name is unchanged. *(The key half is proven — a blocked PUT for `"kickoff notes.txt"` targeted `kickoff_notes.txt`. The display half needs a row.)*
+- [ ] **Delete a task that has attachments — then check the bucket.** The leak check; list the prefix directly.
 - [ ] Same for a client with attachments and no projects.
-- [ ] Both themes; phone width.
-- [ ] Remove every test object and confirm the bucket prefix is empty.
+- [ ] The **populated** list at phone width.
+- [ ] Remove every test object and confirm the bucket prefix is empty. *(The bucket is empty as of 2026-08-06.)*
 
 ---
 
