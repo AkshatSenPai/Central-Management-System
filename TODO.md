@@ -1,8 +1,8 @@
 # TODO — pick up from here
 
-Written 2026-08-03 at the end of the session that built Phases 3c, 4 and part of 6; revised 2026-08-04. Read this first in a new chat; everything below was checked against the repo, not recalled.
+Written 2026-08-03 at the end of the session that built Phases 3c, 4 and part of 6; revised 2026-08-04 and 2026-08-06. Read this first in a new chat; everything below was checked against the repo, not recalled.
 
-**State:** `master`, working tree clean apart from untracked `.superpowers/`. **814 tests, gates 9/9**, `tsc` clean, `lint` clean (0 errors, 0 warnings), production build clean — all verified 2026-08-05 on the merged result. Not yet deployed.
+**State:** `master`, working tree clean apart from untracked `.superpowers/`. **931 tests, gates 9/9**, `tsc` clean, `lint` clean (0 errors, 0 warnings), production build clean — all verified 2026-08-06. **Pushed to GitHub** (`arkquen0/Central-Management-System`, private) — the repo had no remote at all until that day. **Not yet deployed.**
 
 **The team is six people.** Every cost and capacity figure in this file is sized for six. An earlier draft assumed fifteen, and the two specs in §3 still carry that older arithmetic in places — their conclusions hold, the numbers want correcting.
 
@@ -10,11 +10,11 @@ Longer context lives in `DEPLOY.md` (deployment) and `TOMORROW.md` (costs, block
 
 ---
 
-## 0. In flight — `feat/r2-attachments`, paused 2026-08-05
+## 0. Nothing in flight — attachments shipped 2026-08-06
 
-**Read this before starting anything.** The R2 attachment pipeline is half built on a branch, not on `master`. `master` is at `237ca63` and is clean, deployable, and unaffected by any of it.
+**There is no half-built branch to pick up.** `feat/r2-attachments` was merged into `master` at `e73bb08` on 2026-08-06 and deleted; the calendar fix `e723112` followed. Everything is on `master` and **pushed to GitHub** — `arkquen0/Central-Management-System`, private. Kept as a section because the rulings below are still live, not because there is work outstanding here.
 
-**Branch state (2026-08-06):** 14 commits ahead of `master`. **924 tests, gates 9/9, tsc clean, lint clean, clean production build.** Working tree clean. **All seven tasks are done, including the browser QA. The feature is finished and the branch is ready to merge into `master`** — that merge is the next action and nobody has done it yet.
+**Current state:** **931 tests, gates 9/9, tsc clean, lint clean, clean production build.** Working tree clean apart from untracked `.superpowers/`.
 
 **Plan:** `docs/superpowers/plans/2026-08-05-r2-attachments.md`. **Design:** §6 and §7 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — this needed a plan, not a new spec, because Phase 3c already designed it and parked it.
 
@@ -48,9 +48,14 @@ The bucket and the `Attachment` table were both left empty.
 - **`removeAttachment` gates on uploader-or-admin.** A deliberate extension of the spec, which is silent on attachment permissions — it matches 3c's D3 for comments and the same rule in announcements and calendar events.
 - **`requestChecksumCalculation: "WHEN_REQUIRED"` in `r2.ts` is load-bearing.** Without it the SDK bakes a checksum of an *empty* body into every presigned PUT and all uploads fail. Two reviewers confirmed it by generating URLs both ways. It is not stray config.
 
-**Still open on this branch:** `deleteAttachmentObjectsFor` has no call site until task 6, so its nested-transaction reasoning is unverified. Task 7 must delete a parent that has attachments and then **list the bucket prefix directly** — that is the only way to prove the leak is closed.
+**Two more rulings the browser pass added:**
 
-**After R2:** chat (spec written and reviewed, four sequenced steps, zero code), then deploy, then time tracking, then invoices.
+- **The sweep is the LAST statement in each parent-delete transaction.** It is the only step touching something Postgres cannot roll back, so nothing later can undo a bucket change that already happened. Placed first, a P2025 race on `task.delete` would roll the rows back into existence pointing at objects already gone.
+- **The download action takes an `attachmentId`, never a `fileKey`,** and `fileKey` is not on `AttachmentRow` at all. An action that signs whatever key it is handed signs *any* key in the bucket.
+
+**Before touching `task-service.ts` or `client-service.ts`:** both now reach `r2.ts` through `attachment-service.ts`, and `r2.ts` builds its `S3Client` at module scope — so any test file importing either service throws on import without the four R2 env vars. Both suites mock `@/lib/r2`. A new suite that dies before running a single test is hitting this.
+
+**Next:** deploy (§1). Then time tracking, Vault, or chat — see §3.
 
 ---
 
@@ -120,7 +125,9 @@ The build already handles Prisma: `postinstall: prisma generate` and `build: pri
 
 Roughly in order of value to a six-person studio.
 
-- [ ] **File attachments / the R2 upload pipeline.** *(Unblocked 2026-08-03 — the bucket and credentials now exist.)* Nothing in `src/` reads or writes `Attachment` yet: there is no R2 client, no presign, no upload UI. The design is already written — §6 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md` — and must not be re-invented. Build it against tasks, projects and clients first; chat attachments extend it later.
+- [x] **File attachments / the R2 upload pipeline — SHIPPED 2026-08-06.** Attach files to a task, project or client. Browser uploads straight to R2 via a presigned PUT; downloads go through a presigned GET minted per click. Seven tasks, QA'd end to end against the real bucket. Spec: §6 and §7 of `docs/superpowers/specs/2026-08-02-phase-3c-comments-attachments-design.md`. Plan: `docs/superpowers/plans/2026-08-05-r2-attachments.md`, with the QA results under task 7. Merged at `e73bb08`. See §0 for the rulings.
+
+  **The bucket needed a CORS policy that did not exist**, and that blocked every browser upload until it was set — see §1. Chat attachments extend this pipeline rather than replacing it.
 - [x] **Calendar events for meetings — SHIPPED 2026-08-05.** *(Owner request, 2026-08-03.)* Create, edit and delete events on the calendar beside task deadlines; attendees get a bell row when one is scheduled or moved. Spec: `docs/superpowers/specs/2026-08-04-calendar-events-design.md`. Plans: the four in `docs/superpowers/plans/` dated 2026-08-04 and 2026-08-05.
 
   **It shipped in four separately-merged steps, and the first one was not the feature.** Every date in this app was day-granular and pinned to UTC, deliberately. A 3pm meeting was the first thing that needed a clock, so step 1 moved every day boundary to a single app timezone (`APP_TIMEZONE = "Asia/Kolkata"`, `startOfAppDay`, and the four app-field accessors in `src/lib/dates.ts`) with **no new tables and no feature**, so a red suite could only be blamed on one half. Stored dates kept their day because every one is a UTC-midnight instant, which always falls inside the matching IST day — verified over 55,152 instants across 150 years.
