@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { setMemberActive, setMemberRole } from "@/lib/member-service";
+import { resetMemberPassword, setMemberActive, setMemberRole } from "@/lib/member-service";
+import { verifyPassword } from "@/lib/password";
 
 type FakeParts = {
   target?: unknown;
@@ -179,5 +180,66 @@ describe("setMemberRole", () => {
       ok: false,
       error: "Another member change happened at the same time. Try again.",
     });
+  });
+});
+
+describe("resetMemberPassword", () => {
+  it("sets a temporary password and returns it once", async () => {
+    const { db, updates } = fakeDb({ target: member });
+    const result = await resetMemberPassword(db, { targetId: "m1", actorId: "a1" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.temporaryPassword.length).toBeGreaterThanOrEqual(8);
+    expect(updates).toHaveLength(1);
+  });
+
+  // The round trip. A stored hash that does not verify against the password
+  // just handed to the admin is the exact failure this feature exists to
+  // prevent, and it is invisible in the database — it surfaces only when the
+  // locked-out member tries the password and it does not work.
+  it("stores a hash that verifies against the returned password", async () => {
+    const { db, updates } = fakeDb({ target: member });
+    const result = await resetMemberPassword(db, { targetId: "m1", actorId: "a1" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const stored = updates[0].passwordHash as string;
+    expect(await verifyPassword(stored, result.data.temporaryPassword)).toBe(true);
+  });
+
+  // Same guard shape as setMemberActive's self-deactivation check. Without
+  // it, "reset my own password" is a documented way around the
+  // current-password check changeOwnPassword exists to enforce — an unlocked
+  // admin laptop would be a two-click account takeover.
+  it("refuses to reset your own password, and writes nothing", async () => {
+    const { db, updates } = fakeDb({ target: admin });
+    const result = await resetMemberPassword(db, { targetId: "a1", actorId: "a1" });
+    expect(result.ok).toBe(false);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("errors on an unknown member and writes nothing", async () => {
+    const { db, updates } = fakeDb({ target: null });
+    const result = await resetMemberPassword(db, { targetId: "ghost", actorId: "a1" });
+    expect(result).toEqual({ ok: false, error: "Member not found" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("gives a different password each time", async () => {
+    const a = await resetMemberPassword(fakeDb({ target: member }).db, { targetId: "m1", actorId: "a1" });
+    const b = await resetMemberPassword(fakeDb({ target: member }).db, { targetId: "m1", actorId: "a1" });
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    expect(a.data.temporaryPassword).not.toBe(b.data.temporaryPassword);
+  });
+
+  // Deliberately allowed. An admin reactivating someone will often reset
+  // them in the same sitting, and refusing would force an order for no
+  // reason. `authenticate` still rejects an inactive user before it checks
+  // any password, so a reset alone never grants access.
+  it("allows resetting an inactive member", async () => {
+    const { db, updates } = fakeDb({ target: { id: "m1", role: "MEMBER", active: false } });
+    const result = await resetMemberPassword(db, { targetId: "m1", actorId: "a1" });
+    expect(result.ok).toBe(true);
+    expect(updates).toHaveLength(1);
   });
 });

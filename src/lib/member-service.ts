@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 
 /** Internal sentinel thrown inside a transaction when the post-update recount
  * shows zero active admins remain — caught and mapped to the friendly guard
@@ -110,4 +111,52 @@ export async function setMemberRole(
     data: { role: input.role },
   });
   return ok(undefined);
+}
+
+/**
+ * Admin reset for a member who cannot sign in at all. Generates a temporary
+ * password, stores its hash, and **returns the plaintext exactly once** —
+ * the caller shows it to the admin and it exists nowhere else. It is never
+ * logged and never stored, because only the hash is kept, so an admin who
+ * navigates away before sending it must reset again.
+ *
+ * This exists because there was previously no recovery path whatsoever:
+ * `passwordHash` was written in exactly one place, `redeemInvite`, and that
+ * function refuses an email that already has an account. A mistyped password
+ * at signup was permanent, and the only remedy was writing a hash directly
+ * to the production database.
+ *
+ * **Self-reset is refused**, the same call `setMemberActive` makes for
+ * self-deactivation. An admin changing their own password uses
+ * `changeOwnPassword`, which requires knowing the current one. Without this
+ * guard, "reset my own password" becomes a documented way around that check,
+ * and an unlocked admin laptop is a two-click account takeover.
+ *
+ * There is deliberately **no active-admin invariant** here, unlike
+ * `setMemberActive`. Resetting a password changes neither who is an admin
+ * nor how many accounts are active — the account stays exactly as privileged
+ * as it was, so none of that function's serializable-transaction machinery
+ * applies. An inactive member can be reset too: an admin reactivating
+ * someone will often reset them in the same sitting, and refusing would
+ * force an order for no reason. `authenticate` (`credentials.ts`) still
+ * rejects an inactive user before it checks any password, so a reset alone
+ * never grants access.
+ */
+export async function resetMemberPassword(
+  db: PrismaClient,
+  input: { targetId: string; actorId: string }
+): Promise<ActionResult<{ temporaryPassword: string }>> {
+  if (input.targetId === input.actorId) {
+    return err("Use your profile to change your own password");
+  }
+
+  const target = await db.user.findUnique({ where: { id: input.targetId } });
+  if (!target) return err("Member not found");
+
+  const temporaryPassword = generateTemporaryPassword();
+  await db.user.update({
+    where: { id: input.targetId },
+    data: { passwordHash: await hashPassword(temporaryPassword) },
+  });
+  return ok({ temporaryPassword });
 }
