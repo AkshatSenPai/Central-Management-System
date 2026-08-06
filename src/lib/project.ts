@@ -2,15 +2,43 @@ import { z } from "zod";
 import type { BadgeKind } from "@/lib/badges";
 import { shortDate } from "@/lib/dates";
 
-export const PROJECT_STATUSES = ["PLANNING", "IN_PROGRESS", "ON_HOLD", "DONE"] as const;
+export const PROJECT_STATUSES = [
+  "PLANNING",
+  "IN_PROGRESS",
+  "ON_HOLD",
+  "MAINTENANCE",
+  "DONE",
+] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   PLANNING: "Planning",
   IN_PROGRESS: "In Progress",
   ON_HOLD: "On Hold",
+  MAINTENANCE: "Maintenance",
   DONE: "Done",
 };
+
+/** The statuses the *pickers* offer — everything except `DONE`.
+ *
+ * Finishing a project is a button, not a dropdown option. The dropdown
+ * answers "where is this project now"; the button answers "are we
+ * finished". They were split because the status dropdown auto-submits on
+ * change, so finishing a client engagement — the one status change that
+ * pulls a project out of the default list, the task form's project picker
+ * and the calendar filter — previously cost a single mis-click and read no
+ * differently from moving it to On Hold.
+ *
+ * **Derived, never a second literal array.** A parallel hand-written list
+ * drifts the first time a status is added, and the failure is silent: the
+ * new status simply never appears in a dropdown and nothing errors.
+ *
+ * Deliberately **not** used by `project-filters.tsx`. The filter must keep
+ * offering all five, or a finished project becomes unfindable — which is the
+ * opposite of what taking `DONE` out of the picker is for. */
+export const PROJECT_LIFECYCLE_STATUSES: readonly ProjectStatus[] = PROJECT_STATUSES.filter(
+  (s) => s !== "DONE"
+);
 
 export const PROJECT_HEALTHS = ["ON_TRACK", "AT_RISK", "BLOCKED"] as const;
 export type ProjectHealth = (typeof PROJECT_HEALTHS)[number];

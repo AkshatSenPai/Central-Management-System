@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  PROJECT_STATUSES,
+  PROJECT_LIFECYCLE_STATUSES,
   PROJECT_STATUS_LABEL,
   PROJECT_HEALTH_LABEL,
   PROJECT_HEALTH_BADGE,
@@ -65,13 +67,18 @@ describe("milestoneSchema", () => {
 });
 
 describe("project vocabulary", () => {
-  it("labels project statuses as Planning, In Progress, On Hold and Done", () => {
+  it("labels every project status, and labels exactly the statuses that exist", () => {
     expect(PROJECT_STATUS_LABEL).toEqual({
       PLANNING: "Planning",
       IN_PROGRESS: "In Progress",
       ON_HOLD: "On Hold",
+      MAINTENANCE: "Maintenance",
       DONE: "Done",
     });
+    // `toEqual` on the whole map is the point: an added status with no label
+    // renders as a raw enum value in the dropdown, and a leftover label for a
+    // removed status is dead weight. Only an exact match catches both.
+    expect(Object.keys(PROJECT_STATUS_LABEL).sort()).toEqual([...PROJECT_STATUSES].sort());
   });
 
   it("labels health as On Track, At Risk and Blocked", () => {
@@ -88,11 +95,14 @@ describe("project vocabulary", () => {
 });
 
 describe("isProjectActive", () => {
-  it("is false for DONE and true for the other three", () => {
+  // DONE is the only inactive status, and that is load-bearing: a project's
+  // presence in its client's active count, in the task form's project picker
+  // and in the calendar filter all key off this one function.
+  it("is false for DONE and true for every other status", () => {
     expect(isProjectActive("DONE")).toBe(false);
-    expect(isProjectActive("PLANNING")).toBe(true);
-    expect(isProjectActive("IN_PROGRESS")).toBe(true);
-    expect(isProjectActive("ON_HOLD")).toBe(true);
+    for (const status of PROJECT_LIFECYCLE_STATUSES) {
+      expect(isProjectActive(status)).toBe(true);
+    }
   });
 });
 
@@ -217,5 +227,60 @@ describe("parseHealthFilter", () => {
 
   it("takes the first entry of an array-valued searchParam", () => {
     expect(parseHealthFilter(["BLOCKED", "AT_RISK"])).toBe("BLOCKED");
+  });
+});
+
+describe("PROJECT_LIFECYCLE_STATUSES", () => {
+  // Derived, not a second hand-written array. If someone adds a status to
+  // PROJECT_STATUSES and forgets a parallel list, it silently never appears
+  // in a dropdown — nothing errors. This asserts the two can only ever
+  // differ by DONE.
+  it("is every status except DONE", () => {
+    expect(PROJECT_LIFECYCLE_STATUSES).toEqual(PROJECT_STATUSES.filter((s) => s !== "DONE"));
+  });
+
+  it("excludes DONE, because finishing is a button not a dropdown option", () => {
+    expect(PROJECT_LIFECYCLE_STATUSES).not.toContain("DONE");
+  });
+
+  it("includes MAINTENANCE", () => {
+    expect(PROJECT_LIFECYCLE_STATUSES).toContain("MAINTENANCE");
+  });
+});
+
+describe("MAINTENANCE status", () => {
+  it("is a valid project status", () => {
+    expect(PROJECT_STATUSES).toContain("MAINTENANCE");
+  });
+
+  it("has a label", () => {
+    expect(PROJECT_STATUS_LABEL.MAINTENANCE).toBe("Maintenance");
+  });
+
+  // The whole point of the status. A maintained project is still live work,
+  // so it must keep counting toward the client's active total and stay
+  // selectable in the task form's project picker — both key off this.
+  it("counts as active", () => {
+    expect(isProjectActive("MAINTENANCE")).toBe(true);
+  });
+
+  it("sits immediately before DONE, so DONE stays last", () => {
+    expect(PROJECT_STATUSES[PROJECT_STATUSES.length - 1]).toBe("DONE");
+    expect(PROJECT_STATUSES[PROJECT_STATUSES.length - 2]).toBe("MAINTENANCE");
+  });
+
+  it("is accepted by projectSchema", () => {
+    const result = projectSchema.safeParse({ ...validProject, status: "MAINTENANCE" });
+    expect(result.success).toBe(true);
+  });
+
+  // The filter keeps all five deliberately — a finished or maintained
+  // project has to stay findable in the projects list.
+  it("is accepted by parseStatusFilter", () => {
+    expect(parseStatusFilter("MAINTENANCE")).toBe("MAINTENANCE");
+  });
+
+  it("leaves DONE filterable too", () => {
+    expect(parseStatusFilter("DONE")).toBe("DONE");
   });
 });

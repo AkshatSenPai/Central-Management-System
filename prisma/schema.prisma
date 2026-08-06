@@ -97,6 +97,11 @@ enum ProjectStatus {
   PLANNING
   IN_PROGRESS
   ON_HOLD
+  /// Shipped, and the studio is still supporting it — the client's funnel,
+  /// CRM or marketing kept running after delivery. Counts as active work:
+  /// `isProjectActive` is `status !== "DONE"`, so a maintained project stays
+  /// in its client's active total and in the task form's project picker.
+  MAINTENANCE
   DONE
 }
 
