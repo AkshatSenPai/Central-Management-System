@@ -7,6 +7,7 @@ import { parseDateInput } from "@/lib/dates";
 import { parseTaskStatusFilter } from "@/lib/task";
 import { calendarPeriodSummary } from "@/lib/calendar-event";
 import { calendarRange, calendarTitle, parseCalendarView, stepAnchor } from "@/lib/calendar";
+import { lastParam } from "@/lib/search-params";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CalendarFilters } from "@/components/calendar/calendar-filters";
@@ -36,7 +37,6 @@ export default async function CalendarPage(props: {
   if (!session?.user) redirect("/login");
 
   const raw = await props.searchParams;
-  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
   // One `now` for the whole render, so the page cannot cross midnight
   // mid-render and disagree with itself about which cell is today.
@@ -44,13 +44,20 @@ export default async function CalendarPage(props: {
   const view = parseCalendarView(raw.view) ?? "month";
   // parseDateInput already returns null for anything that is not YYYY-MM-DD,
   // so it validates the anchor param with no new code.
-  const anchor = parseDateInput(first(raw.date)) ?? now;
+  // `lastParam`, not `[0]`: like `view`, the anchor date is carried in a
+  // hidden input on `CalendarFilters` and overridden by the prev/next/today
+  // submit buttons, so a paging click sends `date` twice and the button's
+  // value is the later one. See `lastParam`'s comment for the guarantee.
+  const anchor = parseDateInput(lastParam(raw.date)) ?? now;
   const status = parseTaskStatusFilter(raw.status);
   // Opaque cuids, so they cannot be validated against a union the way view and
   // status can. An unknown id simply matches nothing, which is the honest
   // result — and the query parameterises them, so it is not an injection risk.
-  const userId = first(raw.person) || null;
-  const projectId = first(raw.project) || null;
+  // These two have no hidden-input/button pair, so first and last are the same
+  // value in practice; `lastParam` is used anyway so every parameter on this
+  // page resolves by one rule rather than two.
+  const userId = lastParam(raw.person) || null;
+  const projectId = lastParam(raw.project) || null;
 
   const { from, to } = calendarRange(view, anchor);
 
@@ -86,6 +93,7 @@ export default async function CalendarPage(props: {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <CalendarFilters
           view={view}
+          anchor={anchor}
           prevAnchor={stepAnchor(view, anchor, -1)}
           nextAnchor={stepAnchor(view, anchor, 1)}
           today={now}

@@ -20,12 +20,31 @@ const VIEW_LABEL: Record<CalendarView, string> = {
  * mean picking a person threw away the month you had paged to — the exact trap
  * <ProjectFilters> documents. The view and the anchor date are therefore
  * carried as hidden inputs even though this form does not visibly edit them;
- * the prev/next/today buttons are separate submits that override the anchor.
+ * the prev/next/today buttons are separate submits that override the anchor,
+ * and the three view buttons override the view.
+ *
+ * **Both carried parameters are therefore sent twice, and that is the design,
+ * not a defect** — but it was a defect for as long as the server read the
+ * wrong one. A hidden input written above the buttons is serialised before
+ * them (the HTML form data set is built in tree order, with the submitter's
+ * pair inserted where the submitter sits), so the *last* value is always the
+ * button that was pressed and the first is the default being carried.
+ * `parseCalendarView` and the page's `date` handling both resolve with
+ * `lastParam` for that reason. Reading `[0]` is what made the Month/Week/Day
+ * switcher inert on every click.
+ *
+ * The hidden `date` input is the other half of the same rule, and it was
+ * missing until 2026-08-06 — so this component's own promise above ("picking
+ * a person threw away the month you had paged to") was broken in exactly the
+ * way it warns about: a select auto-submit carried no `date` at all, and the
+ * page fell back to today. Paging to November and then filtering by a person
+ * silently jumped back to August.
  *
  * Every select auto-submits on change, matching the app's other filters, with
  * a <noscript> submit button as the fallback. */
 export function CalendarFilters({
   view,
+  anchor,
   prevAnchor,
   nextAnchor,
   today,
@@ -36,6 +55,9 @@ export function CalendarFilters({
   projects,
 }: {
   view: CalendarView;
+  /** Where the calendar currently sits. Carried, not edited — the prev/next/
+   * today buttons override it. */
+  anchor: Date;
   prevAnchor: Date;
   nextAnchor: Date;
   today: Date;
@@ -47,8 +69,12 @@ export function CalendarFilters({
 }) {
   return (
     <form method="get" className="flex flex-wrap items-center gap-2">
-      {/* Carried, not edited, so changing a filter keeps where you are. */}
+      {/* Carried, not edited, so changing a filter keeps where you are. Both
+          must stay ABOVE the submit buttons that override them — the last
+          value of a repeated parameter is the one the server takes, and these
+          are the defaults, not the overrides. */}
       <input type="hidden" name="view" value={view} />
+      <input type="hidden" name="date" value={toDateInputValue(anchor)} />
 
       <span className="flex items-center gap-0.5">
         <Button

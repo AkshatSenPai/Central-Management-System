@@ -38,8 +38,30 @@ describe("parseCalendarView", () => {
     expect(parseCalendarView("../../etc/passwd")).toBeNull();
   });
 
-  it("takes the first of a repeated param", () => {
-    expect(parseCalendarView(["week", "day"])).toBe("week");
+  // Reversed 2026-08-06, and this test is the bug's own postmortem. It used
+  // to assert `"week"` — the FIRST value — and that passing assertion is what
+  // made the calendar's view switcher silently inert for as long as it
+  // existed.
+  //
+  // `CalendarFilters` is one GET form. It carries the current view in a
+  // hidden input near the top so that changing an unrelated filter does not
+  // reset it, and it also gives each of Month/Week/Day its own submit button
+  // named `view`. A browser serialises both, in tree order, so clicking
+  // "Week" from a month view sends `?view=month&view=week` — the carried
+  // default first, the thing the user just clicked second. Taking `[0]` read
+  // the default every single time, so the view could never change; the URL
+  // grew a second parameter and the page re-rendered identically.
+  //
+  // The last value is the override. See `lastParam` in `search-params.ts`.
+  it("takes the LAST of a repeated param — the submit button overrides the carried default", () => {
+    expect(parseCalendarView(["week", "day"])).toBe("day");
+    expect(parseCalendarView(["month", "week"])).toBe("week");
+  });
+
+  // A crafted URL whose last value is junk is still rejected, rather than
+  // falling back to an earlier valid one — same refusal as a single bad value.
+  it("rejects a repeated param whose last value is not a view", () => {
+    expect(parseCalendarView(["week", "year"])).toBeNull();
   });
 });
 

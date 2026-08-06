@@ -1,4 +1,5 @@
 import { addDays, appMonth, appWeekday, appYear, APP_TIMEZONE, startOfAppDay } from "@/lib/dates";
+import { lastParam } from "@/lib/search-params";
 
 /** Everything here is pure and app-timezone. Stored due dates are UTC midnight —
  * `parseDateInput` guarantees it — so a calendar that bucketed in local time
@@ -14,9 +15,17 @@ export const CALENDAR_VIEWS = ["month", "week", "day"] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
 
 /** Null means "not specified", so the caller applies its own default — the
- * same contract as `parseTaskStatusFilter` and `parseStatusFilter`. */
+ * same contract as `parseTaskStatusFilter` and `parseStatusFilter`.
+ *
+ * Resolves a repeated `view` with `lastParam`, not `[0]`, and that is the
+ * whole fix for a switcher that never switched. `CalendarFilters` carries the
+ * current view in a hidden input *and* offers a submit button per view, so
+ * clicking "Week" from a month sends `?view=month&view=week`; the first value
+ * is the default being carried, the last is the button that was pressed. See
+ * `lastParam`'s own comment for why the ordering is guaranteed rather than
+ * incidental. */
 export function parseCalendarView(raw: string | string[] | undefined): CalendarView | null {
-  const value = Array.isArray(raw) ? raw[0] : raw;
+  const value = lastParam(raw);
   if (!value) return null;
   return (CALENDAR_VIEWS as readonly string[]).includes(value) ? (value as CalendarView) : null;
 }
