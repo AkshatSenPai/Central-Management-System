@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { shortDate } from "@/lib/dates";
+import { PageHeader } from "@/components/ui/page-header";
+import { SectionCard } from "@/components/ui/section-card";
+import { Badge } from "@/components/ui/badge";
 import { InviteForm } from "@/components/members/invite-form";
 import { MemberRowActions } from "@/components/members/member-row-actions";
 
@@ -18,39 +22,40 @@ export default async function MembersPage() {
   ]);
 
   return (
-    <div className="space-y-8 p-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-[var(--text)]">Members</h1>
-        <p className="mt-1 text-sm text-[var(--text-3)]">Invite and manage your team.</p>
-      </div>
+    <div className="space-y-5 p-8">
+      <PageHeader title="Members" subtitle="Invite and manage your team." />
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-[var(--text)]">Invite someone</h2>
+      <SectionCard title="Invite someone">
         <InviteForm />
-      </section>
+      </SectionCard>
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-[var(--text)]">
-          Team ({members.length})
-        </h2>
-        <table className="w-full max-w-3xl text-left text-sm text-[var(--text)]">
-          <thead className="border-b border-[var(--border)] text-[var(--text-3)]">
+      {/* `flush` because the table draws its own row separators and should
+          reach the card's edge, like every other row list in the app. */}
+      <SectionCard title="Team" meta={members.length} flush>
+        <table className="w-full text-left text-sm text-[var(--text)]">
+          <thead className="border-b border-[var(--border)] text-xs text-[var(--text-3)]">
             <tr>
-              <th className="py-2">Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th className="px-4 py-2 font-medium">Name</th>
+              <th className="px-4 py-2 font-medium">Email</th>
+              <th className="px-4 py-2 font-medium">Role</th>
+              <th className="px-4 py-2 font-medium">Status</th>
+              <th className="px-4 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {members.map((m) => (
-              <tr key={m.id} className="border-b border-[var(--border)]">
-                <td className="py-2">{m.name}</td>
-                <td>{m.email}</td>
-                <td>{m.role}</td>
-                <td>{m.active ? "Active" : "Deactivated"}</td>
-                <td>
+              <tr key={m.id} className="border-b border-[var(--border)] last:border-b-0">
+                <td className="px-4 py-2.5">{m.name}</td>
+                <td className="px-4 py-2.5 text-[var(--text-2)]">{m.email}</td>
+                <td className="px-4 py-2.5">
+                  <Badge kind={m.role === "ADMIN" ? "strong" : "neutral"}>{m.role}</Badge>
+                </td>
+                <td className="px-4 py-2.5">
+                  <Badge kind={m.active ? "ok" : "neutral"}>
+                    {m.active ? "Active" : "Deactivated"}
+                  </Badge>
+                </td>
+                <td className="px-4 py-2.5">
                   <MemberRowActions
                     userId={m.id}
                     role={m.role}
@@ -62,21 +67,31 @@ export default async function MembersPage() {
             ))}
           </tbody>
         </table>
-      </section>
+      </SectionCard>
 
       {pendingInvites.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-medium text-[var(--text)]">
-            Pending invites ({pendingInvites.length})
-          </h2>
-          <ul className="max-w-3xl space-y-1 text-sm text-[var(--text-2)]">
+        <SectionCard title="Pending invites" meta={pendingInvites.length} flush>
+          <ul className="text-sm text-[var(--text-2)]">
             {pendingInvites.map((i) => (
-              <li key={i.id}>
-                {i.email} — {i.role} — expires {i.expiresAt.toLocaleDateString()}
+              <li
+                key={i.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-[var(--text)]">{i.email}</span>
+                <span className="flex flex-none items-center gap-3">
+                  <Badge kind="neutral">{i.role}</Badge>
+                  {/* shortDate, not toLocaleDateString: every other date in
+                      the app renders through the app-timezone helpers, and a
+                      raw locale call here would drift by a day near midnight
+                      IST. */}
+                  <span className="text-xs text-[var(--text-3)]">
+                    expires {shortDate(i.expiresAt)}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>
-        </section>
+        </SectionCard>
       )}
     </div>
   );

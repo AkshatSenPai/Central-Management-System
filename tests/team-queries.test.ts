@@ -4,18 +4,19 @@ import { getMemberProfile, listTeamCards } from "@/lib/team-queries";
 
 type UserRow = { id: string; name: string; title: string | null };
 type GroupRow = { userId: string; _count: { _all: number } };
-type InProgressRow = {
+type OpenTaskRow = {
   userId: string;
   task: {
     id: string;
     title: string;
+    status: string;
     dueDate: Date | null;
     priority: string;
     project: { id: string; name: string; client: { id: string; name: string } } | null;
   };
 };
 
-function fakeDb(parts: { users?: UserRow[]; groups?: GroupRow[]; inProgress?: InProgressRow[] }) {
+function fakeDb(parts: { users?: UserRow[]; groups?: GroupRow[]; openTasks?: OpenTaskRow[] }) {
   const byDelegate = { user: 0, taskAssigneeGroupBy: 0, taskAssigneeFindMany: 0 };
   const userFindManyArgs: unknown[] = [];
   const groupByArgs: unknown[] = [];
@@ -38,7 +39,7 @@ function fakeDb(parts: { users?: UserRow[]; groups?: GroupRow[]; inProgress?: In
       findMany: async (args: unknown) => {
         byDelegate.taskAssigneeFindMany++;
         findManyArgs.push(args);
-        return parts.inProgress ?? [];
+        return parts.openTasks ?? [];
       },
     },
   } as unknown as PrismaClient;
@@ -62,18 +63,35 @@ function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
   return { userId: "u1", _count: { _all: 3 }, ...overrides };
 }
 
-function inProgressRow(overrides: Partial<InProgressRow> = {}): InProgressRow {
+function openTaskRow(overrides: Partial<OpenTaskRow> = {}): OpenTaskRow {
   return {
     userId: "u1",
     task: {
       id: "t1",
       title: "Draft the brief",
+      status: "IN_PROGRESS",
       dueDate: DUE,
       priority: "HIGH",
       project: { id: "p1", name: "Brand Guidelines v3", client: { id: "c1", name: "Harlow & Fitch" } },
     },
     ...overrides,
   };
+}
+
+/** A row in some status other than IN_PROGRESS — the case the card used to
+ * render as though the member had nothing on. */
+function todoRow(id: string, overrides: Partial<OpenTaskRow["task"]> = {}): OpenTaskRow {
+  return openTaskRow({
+    task: {
+      id,
+      title: id.toUpperCase(),
+      status: "TO_DO",
+      dueDate: null,
+      priority: "MEDIUM",
+      project: null,
+      ...overrides,
+    },
+  });
 }
 
 describe("listTeamCards", () => {
@@ -101,7 +119,7 @@ describe("listTeamCards", () => {
         userRow({ id: "u5" }),
       ],
       groups: [groupRow({ userId: "u1", _count: { _all: 2 } })],
-      inProgress: [inProgressRow({ userId: "u1" })],
+      openTasks: [openTaskRow({ userId: "u1" })],
     });
     await listTeamCards(five.db);
     expect(five.callsByDelegate()).toEqual({ user: 1, taskAssigneeGroupBy: 1, taskAssigneeFindMany: 1 });
@@ -152,7 +170,7 @@ describe("listTeamCards", () => {
   // unknown members anyway, so every card would still render correctly while
   // production hydrated every IN_PROGRESS assignment row in the database on
   // each /team render.
-  it("asks only for IN_PROGRESS tasks belonging to the listed members in the third query", async () => {
+  it("asks only for open tasks belonging to the listed members in the third query", async () => {
     const { db, findManyArgs } = fakeDb({
       users: [userRow({ id: "u1" }), userRow({ id: "u2" })],
     });
@@ -160,19 +178,99 @@ describe("listTeamCards", () => {
     const where = (findManyArgs[0] as { where: unknown }).where;
     expect(where).toEqual({
       userId: { in: ["u1", "u2"] },
-      task: { status: "IN_PROGRESS" },
+      task: { status: { not: "DONE" } },
     });
+  });
+
+  // The partition is "IN_PROGRESS versus everything else still open", NOT
+  // "IN_PROGRESS versus TO_DO". Written this way so a status added later —
+  // the ProjectStatus MAINTENANCE precedent — lands in otherOpen and stays
+  // visible, rather than falling through both buckets and silently vanishing
+  // from the card while still counting in the badge.
+  it("files every non-IN_PROGRESS open status under otherOpen, including REVIEW", async () => {
+    const { db } = fakeDb({
+      users: [userRow({ id: "u1" })],
+      openTasks: [
+        openTaskRow({ task: { ...openTaskRow().task, id: "ip", status: "IN_PROGRESS" } }),
+        todoRow("td"),
+        todoRow("rv", { status: "REVIEW" }),
+      ],
+    });
+    const cards = await listTeamCards(db);
+    expect(cards[0].inProgress.map((t) => t.id)).toEqual(["ip"]);
+    expect(cards[0].otherOpen.map((t) => t.id).sort()).toEqual(["rv", "td"]);
+  });
+
+  it("carries each open task's status so the card can label it", async () => {
+    const { db } = fakeDb({
+      users: [userRow({ id: "u1" })],
+      openTasks: [todoRow("rv", { status: "REVIEW" })],
+    });
+    const cards = await listTeamCards(db);
+    expect(cards[0].otherOpen[0].status).toBe("REVIEW");
+  });
+
+  it("orders otherOpen by due date then priority, exactly as inProgress is ordered", async () => {
+    const { db } = fakeDb({
+      users: [userRow({ id: "u1" })],
+      openTasks: [
+        todoRow("late", { dueDate: new Date("2026-08-20T00:00:00.000Z") }),
+        todoRow("undated", { priority: "URGENT" }),
+        todoRow("early", { dueDate: new Date("2026-08-10T00:00:00.000Z") }),
+      ],
+    });
+    const cards = await listTeamCards(db);
+    expect(cards[0].otherOpen.map((t) => t.id)).toEqual(["early", "late", "undated"]);
+  });
+
+  // The badge already reports the true total, so the list may cap — but it
+  // must say so. Silently showing 3 of 9 would understate a member's load on
+  // the one page whose entire job is showing load.
+  it("caps otherOpen and reports the remainder rather than dropping it", async () => {
+    const { db } = fakeDb({
+      users: [userRow({ id: "u1" })],
+      groups: [groupRow({ userId: "u1", _count: { _all: 5 } })],
+      openTasks: [todoRow("a"), todoRow("b"), todoRow("c"), todoRow("d"), todoRow("e")],
+    });
+    const cards = await listTeamCards(db);
+    expect(cards[0].otherOpen).toHaveLength(3);
+    expect(cards[0].otherOpenExtra).toBe(2);
+  });
+
+  it("reports no remainder when otherOpen fits", async () => {
+    const { db } = fakeDb({
+      users: [userRow({ id: "u1" })],
+      openTasks: [todoRow("a"), todoRow("b")],
+    });
+    const cards = await listTeamCards(db);
+    expect(cards[0].otherOpen).toHaveLength(2);
+    expect(cards[0].otherOpenExtra).toBe(0);
+  });
+
+  // The reported defect, at the query layer: five TO_DO tasks used to produce
+  // an empty card body indistinguishable from a member with nothing assigned.
+  it("gives a member whose work is all unstarted a non-empty card body", async () => {
+    const { db } = fakeDb({
+      users: [userRow({ id: "u1" })],
+      groups: [groupRow({ userId: "u1", _count: { _all: 5 } })],
+      openTasks: [todoRow("a"), todoRow("b"), todoRow("c"), todoRow("d"), todoRow("e")],
+    });
+    const cards = await listTeamCards(db);
+    expect(cards[0].inProgress).toEqual([]);
+    expect(cards[0].otherOpen.length).toBeGreaterThan(0);
+    expect(cards[0].openTaskLabel).toBe("5 open tasks");
   });
 
   it("names the client and project on each In Progress task", async () => {
     const { db } = fakeDb({
       users: [userRow({ id: "u1" })],
-      inProgress: [inProgressRow({ userId: "u1" })],
+      openTasks: [openTaskRow({ userId: "u1" })],
     });
     const cards = await listTeamCards(db);
     expect(cards[0].inProgress[0]).toEqual({
       id: "t1",
       title: "Draft the brief",
+      status: "IN_PROGRESS",
       projectId: "p1",
       projectName: "Brand Guidelines v3",
       clientId: "c1",
@@ -185,10 +283,17 @@ describe("listTeamCards", () => {
   it("carries nulls for a personal In Progress task and still renders the title", async () => {
     const { db } = fakeDb({
       users: [userRow({ id: "u1" })],
-      inProgress: [
-        inProgressRow({
+      openTasks: [
+        openTaskRow({
           userId: "u1",
-          task: { id: "t2", title: "Renew passport", dueDate: null, priority: "LOW", project: null },
+          task: {
+            id: "t2",
+            title: "Renew passport",
+            status: "IN_PROGRESS",
+            dueDate: null,
+            priority: "LOW",
+            project: null,
+          },
         }),
       ],
     });
@@ -196,6 +301,7 @@ describe("listTeamCards", () => {
     expect(cards[0].inProgress[0]).toEqual({
       id: "t2",
       title: "Renew passport",
+      status: "IN_PROGRESS",
       projectId: null,
       projectName: null,
       clientId: null,
@@ -206,33 +312,36 @@ describe("listTeamCards", () => {
   });
 
   it("orders each member's In Progress tasks by due date then priority", async () => {
-    const a = inProgressRow({
+    const s = "IN_PROGRESS";
+    const a = openTaskRow({
       userId: "u1",
-      task: { id: "a", title: "A", dueDate: null, priority: "LOW", project: null },
+      task: { id: "a", title: "A", status: s, dueDate: null, priority: "LOW", project: null },
     });
-    const b = inProgressRow({
+    const b = openTaskRow({
       userId: "u1",
-      task: { id: "b", title: "B", dueDate: new Date("2026-08-20T00:00:00.000Z"), priority: "MEDIUM", project: null },
+      task: { id: "b", title: "B", status: s, dueDate: new Date("2026-08-20T00:00:00.000Z"), priority: "MEDIUM", project: null },
     });
-    const c = inProgressRow({
+    const c = openTaskRow({
       userId: "u1",
-      task: { id: "c", title: "C", dueDate: new Date("2026-08-10T00:00:00.000Z"), priority: "HIGH", project: null },
+      task: { id: "c", title: "C", status: s, dueDate: new Date("2026-08-10T00:00:00.000Z"), priority: "HIGH", project: null },
     });
-    const d = inProgressRow({
+    const d = openTaskRow({
       userId: "u1",
-      task: { id: "d", title: "D", dueDate: null, priority: "URGENT", project: null },
+      task: { id: "d", title: "D", status: s, dueDate: null, priority: "URGENT", project: null },
     });
-    const { db } = fakeDb({ users: [userRow({ id: "u1" })], inProgress: [a, b, c, d] });
+    const { db } = fakeDb({ users: [userRow({ id: "u1" })], openTasks: [a, b, c, d] });
     const cards = await listTeamCards(db);
     expect(cards[0].inProgress.map((t) => t.id)).toEqual(["c", "b", "d", "a"]);
   });
 
-  it("reports a member with no tasks as zero open with an empty In Progress list", async () => {
+  it("reports a member with no tasks as zero open with both lists empty", async () => {
     const { db } = fakeDb({ users: [userRow({ id: "u1" })] });
     const cards = await listTeamCards(db);
     expect(cards[0].openTaskCount).toBe(0);
     expect(cards[0].openTaskLabel).toBe("No open tasks");
     expect(cards[0].inProgress).toEqual([]);
+    expect(cards[0].otherOpen).toEqual([]);
+    expect(cards[0].otherOpenExtra).toBe(0);
   });
 
   it("carries the job title and initials for each member", async () => {
@@ -247,7 +356,7 @@ describe("listTeamCards", () => {
     const { db } = fakeDb({
       users: [userRow({ id: "u1" })],
       groups: [groupRow({ userId: "ghost", _count: { _all: 5 } })],
-      inProgress: [inProgressRow({ userId: "ghost" })],
+      openTasks: [openTaskRow({ userId: "ghost" })],
     });
     const cards = await listTeamCards(db);
     expect(cards).toHaveLength(1);

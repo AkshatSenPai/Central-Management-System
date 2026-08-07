@@ -1,5 +1,5 @@
 {
-  "signature": "656aa5e0aef64a6d",
+  "signature": "aae2b9b65ecc18e7",
   "icons": [
     "add",
     "alternate_email",
@@ -9,6 +9,7 @@
     "call",
     "campaign",
     "check_circle",
+    "checklist",
     "chevron_left",
     "chevron_right",
     "close",
@@ -20,6 +21,7 @@
     "error",
     "event",
     "expand_more",
+    "feedback",
     "filter_list",
     "groups",
     "layers",
@@ -39,5 +41,5 @@
     "visibility",
     "visibility_off"
   ],
-  "bytes": 5840
+  "bytes": 5996
 }

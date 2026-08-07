@@ -15,7 +15,7 @@ import {
 } from "@/lib/task";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
-import { cardClass } from "@/components/ui/card";
+import { SectionCard } from "@/components/ui/section-card";
 import { Icon } from "@/components/ui/icon";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
@@ -163,33 +163,24 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-6">
           {task.description ? (
-            <p className="max-w-2xl whitespace-pre-wrap text-sm text-[var(--text-2)]">{task.description}</p>
+            <SectionCard title="Description">
+              <p className="whitespace-pre-wrap text-sm text-[var(--text-2)]">{task.description}</p>
+            </SectionCard>
           ) : null}
 
-          <section className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-lg font-medium text-[var(--text)]">Checklist</h2>
-              {task.checklistTotal > 0 ? (
-                <span className="text-xs text-[var(--text-3)]">
-                  {task.checklistDone}/{task.checklistTotal} done
-                </span>
-              ) : null}
-            </div>
+          <SectionCard
+            title="Checklist"
+            meta={task.checklistTotal > 0 ? `${task.checklistDone}/${task.checklistTotal} done` : null}
+          >
             <Checklist
               taskId={task.id}
               projectId={task.projectId}
               clientId={task.clientId}
               items={task.checklist}
             />
-          </section>
+          </SectionCard>
 
-          <section className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-lg font-medium text-[var(--text)]">Files</h2>
-              {attachments.length > 0 ? (
-                <span className="text-xs text-[var(--text-3)]">{attachments.length}</span>
-              ) : null}
-            </div>
+          <SectionCard title="Files" meta={attachments.length > 0 ? attachments.length : null}>
             {/* projectId and clientId are carried for the *activity*
                 timeline, not this list: every attachment write records a
                 client-scoped ActivityLog row, and the client detail page is
@@ -206,15 +197,9 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
               viewerId={session.user.id}
               viewerIsAdmin={session.user.role === "ADMIN"}
             />
-          </section>
+          </SectionCard>
 
-          <section className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-lg font-medium text-[var(--text)]">Comments</h2>
-              {comments.length > 0 ? (
-                <span className="text-xs text-[var(--text-3)]">{comments.length}</span>
-              ) : null}
-            </div>
+          <SectionCard title="Comments" meta={comments.length > 0 ? comments.length : null}>
             <CommentThread
               comments={comments}
               scope={{ taskId: task.id, projectId: task.projectId, clientId: task.clientId }}
@@ -222,31 +207,32 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
               viewerId={session.user.id}
               viewerIsAdmin={session.user.role === "ADMIN"}
             />
-          </section>
+          </SectionCard>
         </div>
 
-        <aside className={cardClass({ className: "h-fit space-y-3 p-4" })}>
-          <h2 className="text-sm font-semibold text-[var(--text)]">Assignees</h2>
-          {task.assignees.length === 0 ? (
-            <p className="text-xs text-[var(--text-3)]">Unassigned</p>
-          ) : (
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-              {task.assignees.map((a) => (
-                <span key={a.id} className="flex items-center gap-1.5">
-                  <InitialsAvatar initials={a.initials} shape="circle" size={22} />
-                  <span className="text-xs text-[var(--text-2)]">{a.name}</span>
-                </span>
-              ))}
-            </div>
-          )}
-          <TaskAssigneesForm
-            taskId={task.id}
-            projectId={task.projectId}
-            clientId={task.clientId}
-            members={members}
-            selectedIds={selectedAssigneeIds}
-          />
-        </aside>
+        <SectionCard title="Assignees" className="h-fit">
+          <div className="space-y-3">
+            {task.assignees.length === 0 ? (
+              <p className="text-xs text-[var(--text-3)]">Unassigned</p>
+            ) : (
+              <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                {task.assignees.map((a) => (
+                  <span key={a.id} className="flex items-center gap-1.5">
+                    <InitialsAvatar initials={a.initials} shape="circle" size={22} />
+                    <span className="text-xs text-[var(--text-2)]">{a.name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <TaskAssigneesForm
+              taskId={task.id}
+              projectId={task.projectId}
+              clientId={task.clientId}
+              members={members}
+              selectedIds={selectedAssigneeIds}
+            />
+          </div>
+        </SectionCard>
       </div>
     </div>
   );

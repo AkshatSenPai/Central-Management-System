@@ -2,9 +2,10 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { clientInitials } from "@/lib/client";
 import {
   isTaskOverdue,
-  sortMyTasks,
+  sortMyTasksBy,
   taskDueLabel,
   taskRowSubtitle,
+  type MyTaskSort,
   type TaskPriority,
   type TaskStatus,
   type TaskStatusFilter,
@@ -78,11 +79,19 @@ function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
  * same "not DONE unless ALL or an explicit status" rule as listProjects.
  * Named for the assignee rather than the viewer because /team/[memberId]
  * reads it for someone other than the person looking. Ordered by createdAt
- * ascending so sortMyTasks' stable in-memory sort has a deterministic input;
- * exactly one db call, whatever the row count. */
+ * ascending so the stable in-memory sort has a deterministic input; exactly
+ * one db call, whatever the row count.
+ *
+ * `sort` is optional and defaults to the due-date order, so the two callers
+ * with no sort axis of their own — the dashboard and /team/[memberId] — keep
+ * the ordering they had before /my-tasks gained a picker. Sorting stays in
+ * memory rather than moving to `orderBy` because the Project sort's
+ * personal-last rule has no SQL expression here: "personal" is
+ * `projectName === null`, and ordering by a nullable joined column puts nulls
+ * wherever the collation feels like. */
 export async function listAssignedTasks(
   db: PrismaClient,
-  input: { userId: string; status?: TaskStatusFilter | null }
+  input: { userId: string; status?: TaskStatusFilter | null; sort?: MyTaskSort | null }
 ): Promise<TaskListRow[]> {
   const where: Prisma.TaskWhereInput = { assignees: { some: { userId: input.userId } } };
   if (!input.status) where.status = { not: "DONE" };
@@ -104,7 +113,50 @@ export async function listAssignedTasks(
       })
     )
   );
-  return sortMyTasks(rows);
+  return sortMyTasksBy(rows, input.sort ?? null);
+}
+
+/** Every task in the studio, for the admin All Tasks page.
+ *
+ * A separate function rather than `listAssignedTasks` with an optional
+ * `userId`, for exactly the reason recorded on `listTasksInRange` below:
+ * making that parameter optional turns /my-tasks and /team/[memberId] into
+ * all-tasks views the moment a caller passes undefined, and no type catches
+ * it. The two whole-studio readers are both explicit functions instead.
+ *
+ * **This applies no access control.** It returns everything, so its single
+ * call site is responsible for the admin check — the same contract every
+ * other query in this file has, and the reason that page's guard is the first
+ * thing in it.
+ *
+ * Unlike `listAssignedTasks` this includes tasks with no assignee at all;
+ * `groupTasksByAssignee` files those under its Unassigned group, and they are
+ * the main thing an admin opens this page to find. */
+export async function listAllTasks(
+  db: PrismaClient,
+  input: { status?: TaskStatusFilter | null; sort?: MyTaskSort | null } = {}
+): Promise<TaskListRow[]> {
+  const where: Prisma.TaskWhereInput = {};
+  if (!input.status) where.status = { not: "DONE" };
+  else if (input.status !== "ALL") where.status = input.status;
+
+  const tasks = await db.task.findMany({
+    where,
+    orderBy: { createdAt: "asc" },
+    select: taskRowSelect,
+  });
+
+  const rows = tasks.map((t) =>
+    toTaskListRow(
+      t,
+      taskRowSubtitle({
+        clientName: t.project?.client.name ?? null,
+        projectName: t.project?.name ?? null,
+        dueDate: t.dueDate,
+      })
+    )
+  );
+  return sortMyTasksBy(rows, input.sort ?? null);
 }
 
 /** Tasks due inside a half-open window, for the calendar.

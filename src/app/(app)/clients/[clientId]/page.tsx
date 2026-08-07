@@ -9,7 +9,7 @@ import { CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from "@/lib/client";
 import { isProjectActive } from "@/lib/project";
 import { monthYear } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
-import { cardClass } from "@/components/ui/card";
+import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PlainText } from "@/components/ui/plain-text";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
@@ -121,58 +121,41 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               Editing goes through the same Edit button in the header as every
               other client field; a second edit affordance here would be two
               ways to change one thing. */}
-          <section className="space-y-3">
-            {/* The engagement type is not repeated here — it is already a
-                badge beside the client's name, and saying it twice on one
-                screen makes a reader wonder which one is authoritative. */}
-            <h2 className="text-lg font-medium text-[var(--text)]">Notes</h2>
+          {/* The engagement type is not repeated here — it is already a
+              badge beside the client's name, and saying it twice on one
+              screen makes a reader wonder which one is authoritative. */}
+          <SectionCard title="Notes">
             {client.notes ? (
-              <div className={cardClass({ className: "p-4" })}>
-                {/* Links and @mentions render live, so "portal: https://…,
-                    ask @Dana for the login" is clickable rather than
-                    something to copy out by hand. */}
-                <PlainText
-                  body={client.notes}
-                  members={members}
-                  className="text-sm leading-[1.6] text-[var(--text-2)]"
-                />
-              </div>
+              /* Links and @mentions render live, so "portal: https://…,
+                 ask @Dana for the login" is clickable rather than
+                 something to copy out by hand. */
+              <PlainText
+                body={client.notes}
+                members={members}
+                className="text-sm leading-[1.6] text-[var(--text-2)]"
+              />
             ) : (
               <EmptyState message="No notes yet. Use Edit to record what this client bought, who to contact, and anything the team should know." />
             )}
-          </section>
+          </SectionCard>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-lg font-medium text-[var(--text)]">Projects</h2>
-                <span className="text-xs text-[var(--text-3)]">
-                  {client.projects.filter((p) => isProjectActive(p.status)).length} active
-                </span>
-              </div>
-              <ProjectForm presetClientId={client.id} />
-            </div>
+          <SectionCard
+            title="Projects"
+            meta={`${client.projects.filter((p) => isProjectActive(p.status)).length} active`}
+            action={<ProjectForm presetClientId={client.id} />}
+            flush={client.projects.length > 0}
+          >
             {client.projects.length === 0 ? (
               <EmptyState message="No projects for this client yet." />
             ) : (
-              <div className={cardClass({ className: "overflow-hidden" })}>
-                {client.projects.map((row) => (
-                  <ProjectRow key={row.id} row={row} />
-                ))}
-              </div>
+              client.projects.map((row) => <ProjectRow key={row.id} row={row} />)
             )}
-          </section>
+          </SectionCard>
 
-          <section className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-lg font-medium text-[var(--text)]">Files</h2>
-              {attachments.length > 0 ? (
-                <span className="text-xs text-[var(--text-3)]">{attachments.length}</span>
-              ) : null}
-            </div>
-            {/* Above Activity, not below it: the timeline is a trailing
-                audit log and belongs last on this page, the same way it
-                already sat after Projects. */}
+          {/* Above Activity, not below it: the timeline is a trailing
+              audit log and belongs last on this page, the same way it
+              already sat after Projects. */}
+          <SectionCard title="Files" meta={attachments.length > 0 ? attachments.length : null}>
             <Attachments
               attachments={attachments}
               scope={{
@@ -184,23 +167,23 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               viewerId={session.user.id}
               viewerIsAdmin={isAdmin}
             />
-          </section>
+          </SectionCard>
 
-          <section className="space-y-3">
-            <h2 className="text-lg font-medium text-[var(--text)]">Activity</h2>
+          <SectionCard title="Activity">
             <ActivityTimeline entries={activity} />
-          </section>
+          </SectionCard>
         </div>
 
-        <aside className={cardClass({ className: "h-fit space-y-4 p-4" })}>
-          <h2 className="text-sm font-semibold text-[var(--text)]">Contacts</h2>
-          {client.contacts.length === 0 ? (
-            <EmptyState message="No contacts yet." />
-          ) : (
-            <ContactList clientId={client.id} contacts={client.contacts} />
-          )}
-          <ContactForm clientId={client.id} />
-        </aside>
+        <SectionCard title="Contacts" className="h-fit">
+          <div className="space-y-4">
+            {client.contacts.length === 0 ? (
+              <EmptyState message="No contacts yet." />
+            ) : (
+              <ContactList clientId={client.id} contacts={client.contacts} />
+            )}
+            <ContactForm clientId={client.id} />
+          </div>
+        </SectionCard>
       </div>
     </div>
   );

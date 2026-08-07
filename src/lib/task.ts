@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { BadgeKind } from "@/lib/badges";
+import { clientInitials } from "@/lib/client";
 import { shortDate, isOverdue } from "@/lib/dates";
 
 export const TASK_STATUSES = ["TO_DO", "IN_PROGRESS", "REVIEW", "DONE"] as const;
@@ -180,6 +181,153 @@ export function compareMyTasks(a: TaskSortable, b: TaskSortable): number {
 
 export function sortMyTasks<T extends TaskSortable>(rows: T[]): T[] {
   return [...rows].sort(compareMyTasks);
+}
+
+/** What the Project sort needs on top of TaskSortable. A task with no
+ * `projectName` is personal — the same test `taskRowSubtitle` uses to print
+ * "Personal" — so this is the whole of the personal-versus-project axis. */
+export type TaskGroupable = TaskSortable & {
+  clientName: string | null;
+  projectName: string | null;
+};
+
+export const MY_TASK_SORTS = ["DUE_DATE", "PRIORITY", "PROJECT"] as const;
+export type MyTaskSort = (typeof MY_TASK_SORTS)[number];
+
+export const MY_TASK_SORT_LABEL: Record<MyTaskSort, string> = {
+  DUE_DATE: "Due date",
+  PRIORITY: "Priority",
+  PROJECT: "Project",
+};
+
+/** Highest priority first, then the due-date order as the tiebreak.
+ *
+ * Delegating the tiebreak to `compareMyTasks` rather than comparing dates
+ * again here is what keeps the two sorts from drifting: there is exactly one
+ * definition of "dated before undated, then earliest first". */
+export function compareMyTasksByPriority(a: TaskSortable, b: TaskSortable): number {
+  const rank = TASK_PRIORITY_RANK[a.priority] - TASK_PRIORITY_RANK[b.priority];
+  return rank !== 0 ? rank : compareMyTasks(a, b);
+}
+
+/** Client, then project, then the due-date order — with personal work last.
+ *
+ * Personal tasks sort to the end rather than the start deliberately: this
+ * page is scanned top-down, and client work is what the studio is accountable
+ * for. Grouping them at all is the point of the sort, so which end they land
+ * on is a presentation call, not a correctness one — it is recorded here so
+ * it is not re-litigated as a bug.
+ *
+ * A personal task never compares its names: both are null, so falling through
+ * to the name comparison would be a no-op that only obscures the intent. */
+export function compareMyTasksByProject(a: TaskGroupable, b: TaskGroupable): number {
+  const aPersonal = a.projectName === null;
+  const bPersonal = b.projectName === null;
+  if (aPersonal !== bPersonal) return aPersonal ? 1 : -1;
+
+  if (!aPersonal) {
+    const byClient = (a.clientName ?? "").localeCompare(b.clientName ?? "");
+    if (byClient !== 0) return byClient;
+    const byProject = (a.projectName ?? "").localeCompare(b.projectName ?? "");
+    if (byProject !== 0) return byProject;
+  }
+
+  return compareMyTasks(a, b);
+}
+
+/** The one entry point the pages use. `null` means the default, matching how
+ * `parseTaskStatusFilter` treats an absent param — so a bare /my-tasks URL
+ * and ?sort=DUE_DATE produce the same list, and neither has to be special-
+ * cased at the call site.
+ *
+ * `sortMyTasks` is left alone rather than absorbed into this: /team calls it
+ * for the member cards and has no sort axis of its own, so giving it an
+ * optional parameter it never passes would only invite someone to add one. */
+export function sortMyTasksBy<T extends TaskGroupable>(rows: T[], sort: MyTaskSort | null): T[] {
+  switch (sort) {
+    case "PRIORITY":
+      return [...rows].sort(compareMyTasksByPriority);
+    case "PROJECT":
+      return [...rows].sort(compareMyTasksByProject);
+    default:
+      return sortMyTasks(rows);
+  }
+}
+
+export function parseMyTaskSort(raw: string | string[] | undefined): MyTaskSort | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  return (MY_TASK_SORTS as readonly string[]).includes(value) ? (value as MyTaskSort) : null;
+}
+
+/** One member's section on the admin All Tasks page. `id` is null for the
+ * single synthetic group holding work nobody is assigned to. */
+export type AssigneeGroup<T> = {
+  id: string | null;
+  name: string;
+  initials: string;
+  tasks: T[];
+};
+
+export const UNASSIGNED_GROUP_NAME = "Unassigned";
+
+type Assignable = { assignees: Array<{ id: string; name: string }> };
+
+/** Files every task under each of its assignees, for the admin view of who is
+ * carrying what.
+ *
+ * Four rules, three of which exist because the obvious implementation drops
+ * work silently — and on the one page whose entire purpose is that nothing is
+ * being dropped:
+ *
+ * 1. **Every active member gets a group, even an empty one.** Same invariant
+ *    as `listTeamCards`: "nobody has anything for Dana" is a fact an admin
+ *    wants stated, not inferred from an absence.
+ * 2. **A task with several assignees appears under each of them.** It is
+ *    genuinely on both their plates, and picking one arbitrarily would tell
+ *    the other person's section a lie. Row counts therefore sum to more than
+ *    the task count, which is correct rather than double-counting.
+ * 3. **Work assigned to a deactivated member keeps a group**, appended after
+ *    the active ones and named from the task's own assignee record — the same
+ *    rule `mergeAssigneeMembers` applies to the assignee picker. Stranded work
+ *    is exactly what this page exists to surface; dropping it would hide the
+ *    problem at the moment someone is deactivated.
+ * 4. **Unassigned work gets a trailing group**, present only when it is
+ *    non-empty. Nobody's section would otherwise contain it, and unassigned
+ *    work is the first thing an admin scanning this page is looking for.
+ */
+export function groupTasksByAssignee<T extends Assignable>(
+  rows: T[],
+  members: ReadonlyArray<{ id: string; name: string }>
+): AssigneeGroup<T>[] {
+  const groups = new Map<string, AssigneeGroup<T>>();
+  for (const m of members) {
+    groups.set(m.id, { id: m.id, name: m.name, initials: clientInitials(m.name), tasks: [] });
+  }
+
+  const unassigned: T[] = [];
+  for (const row of rows) {
+    if (row.assignees.length === 0) {
+      unassigned.push(row);
+      continue;
+    }
+    for (const a of row.assignees) {
+      let group = groups.get(a.id);
+      if (!group) {
+        // A deactivated assignee: absent from `members`, appended here in
+        // first-encounter order, which follows the row order the caller sorted.
+        group = { id: a.id, name: a.name, initials: clientInitials(a.name), tasks: [] };
+        groups.set(a.id, group);
+      }
+      group.tasks.push(row);
+    }
+  }
+
+  const result = [...groups.values()];
+  if (unassigned.length > 0) {
+    result.push({ id: null, name: UNASSIGNED_GROUP_NAME, initials: "—", tasks: unassigned });
+  }
+  return result;
 }
 
 /** The list default is "open only", so DONE is opt-in. `null` means that

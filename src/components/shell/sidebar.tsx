@@ -8,21 +8,28 @@ import type { IconName } from "@/lib/icons";
 
 /** Settings sits below a rule in the design — it configures the app rather
  * than being a place inside it — so it carries `ruleAbove` instead of being
- * a second array nobody would remember to keep in order. */
+ * a second array nobody would remember to keep in order.
+ *
+ * `adminOnly` hides a row from members. It is presentation only: /all-tasks
+ * guards itself server-side, because a nav that omits a link is not access
+ * control — anyone can type the URL. */
 export const NAV_ITEMS: ReadonlyArray<{
   href: string;
   label: string;
   icon: IconName;
   ruleAbove?: boolean;
+  adminOnly?: boolean;
 }> = [
   { href: "/dashboard", label: "Dashboard", icon: "space_dashboard" },
   { href: "/my-tasks", label: "My Tasks", icon: "check_circle" },
+  { href: "/all-tasks", label: "All Tasks", icon: "checklist", adminOnly: true },
   { href: "/clients", label: "Clients", icon: "business_center" },
   { href: "/projects", label: "Projects", icon: "layers" },
   { href: "/calendar", label: "Calendar", icon: "calendar_month" },
   { href: "/team", label: "Team", icon: "groups" },
   { href: "/vault", label: "Vault", icon: "lock" },
   { href: "/announcements", label: "Announcements", icon: "campaign" },
+  { href: "/feedback", label: "Feedback", icon: "feedback" },
   { href: "/invoices", label: "Invoices", icon: "receipt_long" },
   { href: "/settings", label: "Settings", icon: "settings", ruleAbove: true },
 ];
@@ -41,14 +48,17 @@ const ROW =
  * posting to a Server Action, not an onClick. */
 export function Sidebar({
   myTaskCount,
+  isAdmin,
   collapsed,
   toggleAction,
 }: {
   myTaskCount: number;
+  isAdmin: boolean;
   collapsed: boolean;
   toggleAction: () => Promise<void>;
 }) {
   const pathname = usePathname();
+  const items = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <aside
@@ -81,7 +91,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex flex-1 flex-col gap-px overflow-y-auto px-2 py-2.5">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <div key={item.href} className="contents">

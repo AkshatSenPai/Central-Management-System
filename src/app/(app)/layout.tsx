@@ -84,6 +84,7 @@ export default async function AppLayout({
     <div className="flex h-screen">
       <Sidebar
         myTaskCount={myTaskCount}
+        isAdmin={session.user.role === "ADMIN"}
         collapsed={collapsed}
         toggleAction={toggleSidebarAction}
       />

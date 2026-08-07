@@ -1,25 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/page-header";
+import { SectionCard } from "@/components/ui/section-card";
 import { Icon } from "@/components/ui/icon";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { Badge } from "@/components/ui/badge";
 import { ThemeControl } from "@/components/settings/theme-control";
+import { ActivityExportForm } from "@/components/settings/activity-export-form";
 import { clientInitials } from "@/lib/client";
 import type { IconName } from "@/lib/icons";
-
-/** A titled panel, matching the design's Settings sections. */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
-      <h2 className="border-b border-[var(--border)] px-4 py-3 text-[13.5px] font-bold tracking-[-0.01em] text-[var(--text)]">
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
 
 /** A destination row: what it is, what it does, and where it goes.
  *
@@ -68,11 +59,22 @@ export default async function SettingsPage() {
   const name = session.user.name ?? "";
   const isAdmin = session.user.role === "ADMIN";
 
+  // Only the export form needs these, so they are not fetched for a member.
+  // Deactivated members are included in the picker on purpose: their past
+  // actions are still in the log, and an export that cannot be filtered to
+  // someone who has left is missing exactly the history most worth having.
+  const [clients, members] = isAdmin
+    ? await Promise.all([
+        prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+        prisma.user.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      ])
+    : [[], []];
+
   return (
     <div className="mx-auto max-w-[720px] space-y-5 px-6 pb-10 pt-5">
       <PageHeader title="Settings" subtitle="Your account, and how the app looks." />
 
-      <Section title="Account">
+      <SectionCard title="Account" flush>
         <div className="flex items-center gap-3 p-4">
           <InitialsAvatar initials={clientInitials(name)} shape="circle" size={40} />
           <div className="min-w-0 flex-1">
@@ -83,13 +85,13 @@ export default async function SettingsPage() {
               Members is or is not listed below. */}
           <Badge kind={isAdmin ? "strong" : "neutral"}>{isAdmin ? "Admin" : "Member"}</Badge>
         </div>
-      </Section>
+      </SectionCard>
 
-      <Section title="Appearance">
+      <SectionCard title="Appearance" flush>
         <ThemeControl />
-      </Section>
+      </SectionCard>
 
-      <Section title="Manage">
+      <SectionCard title="Manage" flush>
         <LinkRow
           href="/settings/profile"
           icon="person"
@@ -104,7 +106,19 @@ export default async function SettingsPage() {
             description="Invite people, change roles, deactivate accounts"
           />
         ) : null}
-      </Section>
+      </SectionCard>
+
+      {/* Admin-only, and lower on the page than Manage because it is a
+          reporting tool rather than a setting. The dashboard already shows
+          everyone a recent-activity feed; a whole-history bulk export of who
+          did what is a different capability and is scoped accordingly — the
+          Route Handler refuses a non-admin on its own, so this is not the
+          only thing standing in the way. */}
+      {isAdmin ? (
+        <SectionCard title="Activity export">
+          <ActivityExportForm clients={clients} members={members} />
+        </SectionCard>
+      ) : null}
     </div>
   );
 }

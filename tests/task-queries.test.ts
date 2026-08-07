@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import {
   listAssignedTasks,
+  listAllTasks,
   listProjectTasks,
   getTaskDetail,
   listTasksInRange,
@@ -180,6 +181,77 @@ describe("listAssignedTasks", () => {
     const rows = await listAssignedTasks(db, { userId: "u1", status: "ALL" });
     expect(rows.find((r) => r.id === "open")?.overdue).toBe(true);
     expect(rows.find((r) => r.id === "done")?.overdue).toBe(false);
+  });
+});
+
+describe("listAllTasks", () => {
+  // The defining difference from listAssignedTasks, and the reason the admin
+  // page's own guard is the only thing standing between a member and every
+  // task in the studio. If an assignee constraint ever appears here the page
+  // silently narrows; if one ever disappears from listAssignedTasks, /my-tasks
+  // silently widens. Asserted on the whole where clause so neither can happen
+  // unnoticed.
+  it("applies no assignee constraint at all", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAllTasks(db);
+    expect((findManyArgs[0] as { where: Record<string, unknown> }).where).toEqual({
+      status: { not: "DONE" },
+    });
+  });
+
+  it("excludes DONE by default, drops the constraint for ALL, and filters to one status", async () => {
+    const base = fakeDb({ tasks: [taskRow()] });
+    await listAllTasks(base.db);
+    expect((base.findManyArgs[0] as { where: { status?: unknown } }).where.status).toEqual({
+      not: "DONE",
+    });
+
+    const all = fakeDb({ tasks: [taskRow()] });
+    await listAllTasks(all.db, { status: "ALL" });
+    expect((all.findManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty(
+      "status"
+    );
+
+    const done = fakeDb({ tasks: [taskRow({ status: "DONE" })] });
+    await listAllTasks(done.db, { status: "DONE" });
+    expect((done.findManyArgs[0] as { where: { status?: unknown } }).where.status).toBe("DONE");
+  });
+
+  // Unassigned work is the first thing an admin opens this page to find, so
+  // it must survive the query rather than being filtered out with the rest.
+  it("returns tasks that have no assignee", async () => {
+    const { db } = fakeDb({ tasks: [taskRow({ id: "orphan", assignees: [] })] });
+    const rows = await listAllTasks(db);
+    expect(rows.map((r) => r.id)).toEqual(["orphan"]);
+    expect(rows[0].assignees).toEqual([]);
+  });
+
+  it("issues exactly one db call whatever the row count", async () => {
+    const many = fakeDb({ tasks: [taskRow({ id: "a" }), taskRow({ id: "b" }), taskRow({ id: "c" })] });
+    await listAllTasks(many.db);
+    expect(many.callsByDelegate()).toEqual({ task: 1 });
+  });
+
+  it("honours the sort argument", async () => {
+    const urgentLater = taskRow({
+      id: "urgent",
+      dueDate: new Date("2026-09-01T00:00:00.000Z"),
+      priority: "URGENT",
+    });
+    const lowSooner = taskRow({
+      id: "low",
+      dueDate: new Date("2026-08-01T00:00:00.000Z"),
+      priority: "LOW",
+    });
+
+    const byDue = fakeDb({ tasks: [urgentLater, lowSooner] });
+    expect((await listAllTasks(byDue.db)).map((r) => r.id)).toEqual(["low", "urgent"]);
+
+    const byPriority = fakeDb({ tasks: [urgentLater, lowSooner] });
+    expect((await listAllTasks(byPriority.db, { sort: "PRIORITY" })).map((r) => r.id)).toEqual([
+      "urgent",
+      "low",
+    ]);
   });
 });
 

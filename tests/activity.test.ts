@@ -6,6 +6,7 @@ import {
   describeActivity,
   formatNameList,
   listClientActivity,
+  listActivityForExport,
   type ActivityDb,
 } from "@/lib/activity";
 
@@ -360,5 +361,117 @@ describe("listClientActivity", () => {
     const { db, calls } = fakeReadDb([]);
     await listClientActivity(db, { clientId: "c1", limit: 5 });
     expect((calls[0] as { take: number }).take).toBe(5);
+  });
+});
+
+function fakeExportDb(rows: unknown[], clients: Array<{ id: string; name: string }> = []) {
+  const logCalls: unknown[] = [];
+  const clientCalls: unknown[] = [];
+  const db = {
+    activityLog: {
+      findMany: async (args: unknown) => {
+        logCalls.push(args);
+        return rows;
+      },
+    },
+    client: {
+      findMany: async (args: unknown) => {
+        clientCalls.push(args);
+        return clients;
+      },
+    },
+  } as unknown as PrismaClient;
+  return { db, logCalls, clientCalls };
+}
+
+const exportRow = {
+  id: "a1",
+  action: "client.created",
+  entityType: "CLIENT",
+  entityId: "c1",
+  clientId: "c1",
+  meta: { name: "Harlow & Fitch" },
+  at: new Date("2026-08-03T12:00:00.000Z"),
+  actor: { id: "u1", name: "Sarah Whitfield" },
+};
+
+const FROM = new Date("2026-08-01T00:00:00.000Z");
+const TO = new Date("2026-08-08T00:00:00.000Z");
+
+describe("listActivityForExport", () => {
+  // Every other reader here caps its rows because it renders a panel. This
+  // one is an audit trail, and a silently truncated audit trail is worse than
+  // none — the date range is the only bound.
+  it("applies no row limit", async () => {
+    const { db, logCalls } = fakeExportDb([exportRow], [{ id: "c1", name: "Harlow & Fitch" }]);
+    await listActivityForExport(db, { from: FROM, to: TO });
+    expect(logCalls[0]).not.toHaveProperty("take");
+  });
+
+  it("queries a half-open window, ascending", async () => {
+    const { db, logCalls } = fakeExportDb([]);
+    await listActivityForExport(db, { from: FROM, to: TO });
+    expect(logCalls[0]).toMatchObject({
+      where: { at: { gte: FROM, lt: TO } },
+      orderBy: { at: "asc" },
+    });
+  });
+
+  it("adds a client or actor filter only when given one", async () => {
+    const none = fakeExportDb([]);
+    await listActivityForExport(none.db, { from: FROM, to: TO });
+    expect((none.logCalls[0] as { where: Record<string, unknown> }).where).toEqual({
+      at: { gte: FROM, lt: TO },
+    });
+
+    const scoped = fakeExportDb([]);
+    await listActivityForExport(scoped.db, { from: FROM, to: TO, clientId: "c1", actorId: "u1" });
+    expect((scoped.logCalls[0] as { where: Record<string, unknown> }).where).toEqual({
+      at: { gte: FROM, lt: TO },
+      clientId: "c1",
+      actorId: "u1",
+    });
+  });
+
+  it("resolves the client name for a scoped row", async () => {
+    const { db } = fakeExportDb([exportRow], [{ id: "c1", name: "Harlow & Fitch" }]);
+    const rows = await listActivityForExport(db, { from: FROM, to: TO });
+    expect(rows[0]).toMatchObject({
+      actorId: "u1",
+      actorName: "Sarah Whitfield",
+      entityType: "CLIENT",
+      entityId: "c1",
+      clientId: "c1",
+      clientName: "Harlow & Fitch",
+    });
+  });
+
+  // ActivityLog.clientId carries no foreign key, so a row can outlive its
+  // client — client.deleted is exactly such a row, and it is one of the most
+  // worth exporting. It must keep its id and simply have no name.
+  it("keeps a row whose client no longer exists, with a null name", async () => {
+    const { db } = fakeExportDb([{ ...exportRow, clientId: "gone" }], []);
+    const rows = await listActivityForExport(db, { from: FROM, to: TO });
+    expect(rows[0].clientId).toBe("gone");
+    expect(rows[0].clientName).toBeNull();
+  });
+
+  it("carries a null client scope through untouched", async () => {
+    const { db, clientCalls } = fakeExportDb([{ ...exportRow, clientId: null }]);
+    const rows = await listActivityForExport(db, { from: FROM, to: TO });
+    expect(rows[0].clientId).toBeNull();
+    expect(rows[0].clientName).toBeNull();
+    // No ids to resolve, so the second query is skipped entirely.
+    expect(clientCalls).toHaveLength(0);
+  });
+
+  it("resolves client names in one query however many rows share them", async () => {
+    const { db, clientCalls } = fakeExportDb(
+      [exportRow, { ...exportRow, id: "a2" }, { ...exportRow, id: "a3" }],
+      [{ id: "c1", name: "Harlow & Fitch" }]
+    );
+    await listActivityForExport(db, { from: FROM, to: TO });
+    expect(clientCalls).toHaveLength(1);
+    expect((clientCalls[0] as { where: { id: { in: string[] } } }).where.id.in).toEqual(["c1"]);
   });
 });

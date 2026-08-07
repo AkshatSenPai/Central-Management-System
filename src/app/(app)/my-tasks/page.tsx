@@ -2,15 +2,16 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listAssignedTasks } from "@/lib/task-queries";
-import { parseTaskStatusFilter, taskListSummary } from "@/lib/task";
+import { parseMyTaskSort, parseTaskStatusFilter, taskListSummary } from "@/lib/task";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TaskRow } from "@/components/tasks/task-row";
 import { TaskForm } from "@/components/tasks/task-form";
 import { TaskStatusFilter } from "@/components/tasks/task-status-filter";
+import { MyTaskSort } from "@/components/tasks/my-task-sort";
 
 export default async function MyTasksPage(props: {
-  searchParams: Promise<{ status?: string | string[] }>;
+  searchParams: Promise<{ status?: string | string[]; sort?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -18,9 +19,10 @@ export default async function MyTasksPage(props: {
 
   const raw = await props.searchParams;
   const status = parseTaskStatusFilter(raw.status);
+  const sort = parseMyTaskSort(raw.sort);
 
   const [rows, projects, members] = await Promise.all([
-    listAssignedTasks(prisma, { userId, status }),
+    listAssignedTasks(prisma, { userId, status, sort }),
     prisma.project.findMany({
       where: { status: { not: "DONE" } },
       select: { id: true, name: true, clientId: true },
@@ -56,7 +58,9 @@ export default async function MyTasksPage(props: {
         }
       />
 
-      <TaskStatusFilter status={status} />
+      <TaskStatusFilter status={status}>
+        <MyTaskSort sort={sort} />
+      </TaskStatusFilter>
 
       {rows.length === 0 ? (
         <EmptyState message="Nothing assigned to you." />

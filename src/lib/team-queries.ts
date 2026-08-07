@@ -1,11 +1,18 @@
 import type { PrismaClient } from "@prisma/client";
 import { clientInitials } from "@/lib/client";
-import { openTaskSummary, sortMyTasks, type TaskPriority, type TaskStatusFilter } from "@/lib/task";
+import {
+  openTaskSummary,
+  sortMyTasks,
+  type TaskPriority,
+  type TaskStatus,
+  type TaskStatusFilter,
+} from "@/lib/task";
 import { listAssignedTasks, type TaskListRow } from "@/lib/task-queries";
 
 export type TeamCardTask = {
   id: string;
   title: string;
+  status: TaskStatus;
   projectId: string | null;
   projectName: string | null;
   clientId: string | null;
@@ -13,6 +20,11 @@ export type TeamCardTask = {
   dueDate: Date | null;
   priority: TaskPriority;
 };
+
+/** How many `otherOpen` rows a card shows before it stops listing and starts
+ * counting. The badge always carries the true total, so this caps the list
+ * without ever understating the load. */
+export const TEAM_CARD_OTHER_OPEN_LIMIT = 3;
 
 export type TeamCard = {
   id: string;
@@ -22,6 +34,11 @@ export type TeamCard = {
   openTaskCount: number;
   openTaskLabel: string;
   inProgress: TeamCardTask[];
+  /** Open work that is not in flight — TO_DO, REVIEW, and anything added to
+   * the status enum later. Capped at TEAM_CARD_OTHER_OPEN_LIMIT. */
+  otherOpen: TeamCardTask[];
+  /** How many `otherOpen` rows the cap left off. Zero when nothing was cut. */
+  otherOpenExtra: number;
 };
 
 /**
@@ -54,6 +71,8 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
       openTaskCount: 0,
       openTaskLabel: openTaskSummary(0),
       inProgress: [],
+      otherOpen: [],
+      otherOpenExtra: 0,
     });
   }
 
@@ -72,16 +91,30 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
     card.openTaskLabel = openTaskSummary(g._count._all);
   }
 
-  // In Progress detail: only IN_PROGRESS tasks render on the card. One query,
-  // constant regardless of team size, folded and sorted per member in memory.
-  const inProgress = await db.taskAssignee.findMany({
-    where: { userId: { in: ids }, task: { status: "IN_PROGRESS" } },
+  // Open-task detail. This asks for every non-DONE task rather than only
+  // IN_PROGRESS ones, and partitions in memory below.
+  //
+  // It used to ask for IN_PROGRESS alone, which made the card body identical
+  // for a member with nothing assigned and a member with five unstarted
+  // tasks: both rendered "Nothing in progress." That reads as "this person is
+  // free" when the opposite is true, and it was the single most-reported
+  // complaint about /team. Widening the *detail* rather than replacing it
+  // keeps "what is X working on right now?" as the card's primary answer —
+  // listing all open work instead would bury the two things someone is
+  // actually doing under twenty things they are not.
+  //
+  // Still one query, still constant regardless of team size. It returns more
+  // rows than before by exactly the number of open-but-not-started tasks the
+  // team holds, which is the same order of magnitude the badge already counts.
+  const openTasks = await db.taskAssignee.findMany({
+    where: { userId: { in: ids }, task: { status: { not: "DONE" } } },
     select: {
       userId: true,
       task: {
         select: {
           id: true,
           title: true,
+          status: true,
           dueDate: true,
           priority: true,
           project: { select: { id: true, name: true, client: { select: { id: true, name: true } } } },
@@ -91,12 +124,13 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
   });
 
   const byMember = new Map<string, TeamCardTask[]>();
-  for (const row of inProgress) {
+  for (const row of openTasks) {
     if (!cards.has(row.userId)) continue;
     const list = byMember.get(row.userId) ?? [];
     list.push({
       id: row.task.id,
       title: row.task.title,
+      status: row.task.status as TaskStatus,
       projectId: row.task.project?.id ?? null,
       projectName: row.task.project?.name ?? null,
       clientId: row.task.project?.client.id ?? null,
@@ -106,9 +140,20 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
     });
     byMember.set(row.userId, list);
   }
+
   for (const [userId, tasks] of byMember) {
     const card = cards.get(userId);
-    if (card) card.inProgress = sortMyTasks(tasks);
+    if (!card) continue;
+    // Partitioned as "IN_PROGRESS versus everything else still open", never
+    // as "IN_PROGRESS versus TO_DO". A status added to the enum later — the
+    // ProjectStatus MAINTENANCE precedent — then lands in otherOpen and stays
+    // on the card, instead of matching neither arm and disappearing from the
+    // body while still counting in the badge.
+    const sorted = sortMyTasks(tasks);
+    card.inProgress = sorted.filter((t) => t.status === "IN_PROGRESS");
+    const rest = sorted.filter((t) => t.status !== "IN_PROGRESS");
+    card.otherOpen = rest.slice(0, TEAM_CARD_OTHER_OPEN_LIMIT);
+    card.otherOpenExtra = rest.length - card.otherOpen.length;
   }
 
   return members.map((m) => cards.get(m.id)!);

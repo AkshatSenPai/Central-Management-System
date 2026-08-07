@@ -21,12 +21,14 @@ export const ICON_NAMES = [
   // Sidebar navigation, one per route, in nav order.
   "space_dashboard",
   "check_circle",
+  "checklist",
   "business_center",
   "layers",
   "calendar_month",
   "groups",
   "lock",
   "campaign",
+  "feedback",
   "receipt_long",
   "settings",
   // Shell chrome.

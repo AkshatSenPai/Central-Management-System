@@ -16,11 +16,20 @@ import {
   capAssignees,
   compareMyTasks,
   sortMyTasks,
+  compareMyTasksByPriority,
+  compareMyTasksByProject,
+  sortMyTasksBy,
+  parseMyTaskSort,
+  MY_TASK_SORTS,
+  MY_TASK_SORT_LABEL,
   parseTaskStatusFilter,
   mergeAssigneeMembers,
   groupTasksByStatus,
+  groupTasksByAssignee,
+  UNASSIGNED_GROUP_NAME,
   taskReference,
   TASK_REFERENCE_PREFIX,
+  type TaskPriority,
   type TaskSortable,
   type TaskStatus,
 } from "@/lib/task";
@@ -356,6 +365,222 @@ describe("sortMyTasks", () => {
     const sorted = sortMyTasks(rows);
     expect(sorted.map((r) => r.id)).toEqual(["earlier", "later"]);
     expect(rows.map((r) => r.id)).toEqual(["later", "earlier"]);
+  });
+});
+
+type GroupableRow = {
+  id: string;
+  dueDate: Date | null;
+  priority: TaskPriority;
+  clientName: string | null;
+  projectName: string | null;
+};
+
+function groupable(id: string, overrides: Partial<Omit<GroupableRow, "id">> = {}): GroupableRow {
+  return {
+    id,
+    dueDate: null,
+    priority: "MEDIUM",
+    clientName: "Harlow & Fitch",
+    projectName: "Brand Guidelines v3",
+    ...overrides,
+  };
+}
+
+const personal = (id: string, overrides: Partial<Omit<GroupableRow, "id">> = {}) =>
+  groupable(id, { clientName: null, projectName: null, ...overrides });
+
+describe("compareMyTasksByPriority", () => {
+  it("puts a higher priority first even when it is due much later", () => {
+    const urgentLater = groupable("u", { dueDate: new Date(`2026-09-01${NOON}`), priority: "URGENT" });
+    const lowSooner = groupable("l", { dueDate: new Date(`2026-08-01${NOON}`), priority: "LOW" });
+    expect(compareMyTasksByPriority(urgentLater, lowSooner)).toBeLessThan(0);
+  });
+
+  // The inversion of compareMyTasks' "due date is dominant" rule is the whole
+  // point of offering this sort, so it is asserted directly rather than
+  // inferred from an ordering.
+  it("inverts compareMyTasks' precedence rather than merely re-ordering ties", () => {
+    const urgentLater = groupable("u", { dueDate: new Date(`2026-09-01${NOON}`), priority: "URGENT" });
+    const lowSooner = groupable("l", { dueDate: new Date(`2026-08-01${NOON}`), priority: "LOW" });
+    expect(compareMyTasks(urgentLater, lowSooner)).toBeGreaterThan(0);
+    expect(compareMyTasksByPriority(urgentLater, lowSooner)).toBeLessThan(0);
+  });
+
+  it("falls through to the due-date order within one priority", () => {
+    const early = groupable("e", { dueDate: new Date(`2026-08-01${NOON}`), priority: "HIGH" });
+    const late = groupable("l", { dueDate: new Date(`2026-08-10${NOON}`), priority: "HIGH" });
+    const undated = groupable("u", { dueDate: null, priority: "HIGH" });
+    expect(compareMyTasksByPriority(early, late)).toBeLessThan(0);
+    expect(compareMyTasksByPriority(late, undated)).toBeLessThan(0);
+  });
+});
+
+describe("compareMyTasksByProject", () => {
+  it("sorts personal work after every project task, whatever its due date", () => {
+    const personalUrgentToday = personal("p", {
+      dueDate: new Date(`2026-08-01${NOON}`),
+      priority: "URGENT",
+    });
+    const projectUndatedLow = groupable("w", { dueDate: null, priority: "LOW" });
+    expect(compareMyTasksByProject(personalUrgentToday, projectUndatedLow)).toBeGreaterThan(0);
+    expect(compareMyTasksByProject(projectUndatedLow, personalUrgentToday)).toBeLessThan(0);
+  });
+
+  it("groups by client first, then by project within a client", () => {
+    const a = groupable("a", { clientName: "Alder", projectName: "Zephyr" });
+    const b = groupable("b", { clientName: "Birch", projectName: "Aurora" });
+    expect(compareMyTasksByProject(a, b)).toBeLessThan(0);
+
+    const early = groupable("e", { clientName: "Alder", projectName: "Aurora" });
+    expect(compareMyTasksByProject(early, a)).toBeLessThan(0);
+  });
+
+  it("falls through to the due-date order inside one project", () => {
+    const early = groupable("e", { dueDate: new Date(`2026-08-01${NOON}`) });
+    const late = groupable("l", { dueDate: new Date(`2026-08-10${NOON}`) });
+    expect(compareMyTasksByProject(early, late)).toBeLessThan(0);
+  });
+
+  it("orders two personal tasks against each other by due date and priority", () => {
+    const early = personal("e", { dueDate: new Date(`2026-08-01${NOON}`) });
+    const late = personal("l", { dueDate: new Date(`2026-08-10${NOON}`) });
+    const undatedUrgent = personal("u", { dueDate: null, priority: "URGENT" });
+    expect(compareMyTasksByProject(early, late)).toBeLessThan(0);
+    expect(compareMyTasksByProject(late, undatedUrgent)).toBeLessThan(0);
+  });
+});
+
+describe("sortMyTasksBy", () => {
+  const MIXED = [
+    groupable("betaLate", { clientName: "Beta", projectName: "P2", dueDate: new Date(`2026-08-20${NOON}`) }),
+    personal("mine", { priority: "URGENT" }),
+    groupable("alphaEarly", { clientName: "Alpha", projectName: "P1", dueDate: new Date(`2026-08-02${NOON}`) }),
+  ];
+
+  it("defaults to the due-date order for null", () => {
+    expect(sortMyTasksBy(MIXED, null).map((r) => r.id)).toEqual(sortMyTasks(MIXED).map((r) => r.id));
+  });
+
+  it("treats DUE_DATE as identical to the default", () => {
+    expect(sortMyTasksBy(MIXED, "DUE_DATE").map((r) => r.id)).toEqual(
+      sortMyTasksBy(MIXED, null).map((r) => r.id)
+    );
+  });
+
+  it("puts the urgent personal task first under PRIORITY and last under PROJECT", () => {
+    expect(sortMyTasksBy(MIXED, "PRIORITY")[0].id).toBe("mine");
+    expect(sortMyTasksBy(MIXED, "PROJECT").at(-1)?.id).toBe("mine");
+  });
+
+  it("groups by client under PROJECT", () => {
+    expect(sortMyTasksBy(MIXED, "PROJECT").map((r) => r.id)).toEqual([
+      "alphaEarly",
+      "betaLate",
+      "mine",
+    ]);
+  });
+
+  it("does not mutate the input array under any sort", () => {
+    const before = MIXED.map((r) => r.id);
+    sortMyTasksBy(MIXED, "PRIORITY");
+    sortMyTasksBy(MIXED, "PROJECT");
+    sortMyTasksBy(MIXED, null);
+    expect(MIXED.map((r) => r.id)).toEqual(before);
+  });
+});
+
+describe("parseMyTaskSort", () => {
+  it("returns null for an absent value, so a bare URL means the default", () => {
+    expect(parseMyTaskSort(undefined)).toBeNull();
+    expect(parseMyTaskSort("")).toBeNull();
+  });
+
+  it("accepts every declared sort", () => {
+    for (const s of MY_TASK_SORTS) expect(parseMyTaskSort(s)).toBe(s);
+  });
+
+  it("rejects an unknown value rather than throwing, falling back to the default", () => {
+    expect(parseMyTaskSort("SOMETHING_ELSE")).toBeNull();
+    expect(parseMyTaskSort("due_date")).toBeNull();
+  });
+
+  it("takes the first entry when the param is repeated", () => {
+    expect(parseMyTaskSort(["PRIORITY", "PROJECT"])).toBe("PRIORITY");
+  });
+
+  it("labels every sort, so the picker cannot render an undefined option", () => {
+    for (const s of MY_TASK_SORTS) expect(MY_TASK_SORT_LABEL[s]).toBeTruthy();
+  });
+});
+
+describe("groupTasksByAssignee", () => {
+  const DANA = { id: "u1", name: "Dana Reeve" };
+  const OMAR = { id: "u2", name: "Omar Silva" };
+  const MEMBERS = [DANA, OMAR];
+
+  const task = (id: string, assignees: Array<{ id: string; name: string }>) => ({ id, assignees });
+
+  it("gives every active member a group, in the order supplied", () => {
+    const groups = groupTasksByAssignee([], MEMBERS);
+    expect(groups.map((g) => g.id)).toEqual(["u1", "u2"]);
+    expect(groups.map((g) => g.name)).toEqual(["Dana Reeve", "Omar Silva"]);
+  });
+
+  // "Nobody has anything for Dana" is a fact this page must state, not one an
+  // admin should have to infer from her section being absent.
+  it("keeps a member with no tasks rather than omitting them", () => {
+    const groups = groupTasksByAssignee([task("t1", [DANA])], MEMBERS);
+    expect(groups.find((g) => g.id === "u2")?.tasks).toEqual([]);
+  });
+
+  it("derives initials for each group", () => {
+    const groups = groupTasksByAssignee([], MEMBERS);
+    expect(groups.find((g) => g.id === "u1")?.initials).toBe("DR");
+  });
+
+  // Filing it under one assignee would tell the other person's section that
+  // the task is not theirs, which is false.
+  it("files a task with two assignees under both", () => {
+    const groups = groupTasksByAssignee([task("shared", [DANA, OMAR])], MEMBERS);
+    expect(groups.find((g) => g.id === "u1")?.tasks.map((t) => t.id)).toEqual(["shared"]);
+    expect(groups.find((g) => g.id === "u2")?.tasks.map((t) => t.id)).toEqual(["shared"]);
+  });
+
+  it("adds a trailing Unassigned group only when some task has no assignee", () => {
+    expect(groupTasksByAssignee([task("t1", [DANA])], MEMBERS).some((g) => g.id === null)).toBe(false);
+
+    const withOrphan = groupTasksByAssignee([task("t1", [DANA]), task("orphan", [])], MEMBERS);
+    const last = withOrphan.at(-1);
+    expect(last?.id).toBeNull();
+    expect(last?.name).toBe(UNASSIGNED_GROUP_NAME);
+    expect(last?.tasks.map((t) => t.id)).toEqual(["orphan"]);
+  });
+
+  // Work stranded on a deactivated account is the single thing this page most
+  // needs to surface. Dropping rows whose assignee is absent from the active
+  // member list would hide it at exactly the moment it is created.
+  it("keeps work assigned to a deactivated member, appended after the active ones", () => {
+    const ghost = { id: "gone", name: "Priya Nair" };
+    const groups = groupTasksByAssignee([task("t1", [DANA]), task("stranded", [ghost])], MEMBERS);
+    expect(groups.map((g) => g.id)).toEqual(["u1", "u2", "gone"]);
+    expect(groups.find((g) => g.id === "gone")?.tasks.map((t) => t.id)).toEqual(["stranded"]);
+    expect(groups.find((g) => g.id === "gone")?.name).toBe("Priya Nair");
+  });
+
+  it("preserves the caller's row order inside each group", () => {
+    const rows = [task("a", [DANA]), task("b", [DANA]), task("c", [DANA])];
+    expect(groupTasksByAssignee(rows, MEMBERS).find((g) => g.id === "u1")?.tasks.map((t) => t.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("returns only the Unassigned group when there are no members at all", () => {
+    const groups = groupTasksByAssignee([task("orphan", [])], []);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].id).toBeNull();
   });
 });
 

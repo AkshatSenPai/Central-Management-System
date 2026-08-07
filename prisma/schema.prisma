@@ -37,6 +37,8 @@ model User {
   announcements   Announcement[]          @relation("AnnouncementAuthor")
   notifications   Notification[]          @relation("NotificationRecipient")
   notified        Notification[]          @relation("NotificationActor")
+  feedback        Feedback[]              @relation("FeedbackAuthor")
+  feedbackHandled Feedback[]              @relation("FeedbackResolver")
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 }
@@ -329,6 +331,74 @@ model Announcement {
 
   @@index([createdAt])
   @@index([pinnedUntil])
+}
+
+/// What a piece of feedback is about. Kept deliberately short — a taxonomy
+/// nobody can choose between is one everybody picks the first option from.
+enum FeedbackKind {
+  SUGGESTION
+  PROBLEM
+  PRAISE
+}
+
+/// Triage state. This exists so the feedback box is not a graveyard: without
+/// it the page is a table nobody has any obligation to read, and the team
+/// learns within a fortnight that submitting is pointless.
+///
+/// DECLINED is not a rejection of the person — it is the honest option that
+/// keeps NEW meaningful. Without it an admin who disagrees with a suggestion
+/// has only "leave it NEW forever", and the queue stops distinguishing
+/// unread from unwanted.
+enum FeedbackStatus {
+  NEW
+  ACKNOWLEDGED
+  PLANNED
+  DONE
+  DECLINED
+}
+
+/// Somewhere for the team to say how the CMS is working for them.
+///
+/// The mirror image of Announcement, which is the same shape pointed the
+/// other way — admin to team rather than team to admin. It is a separate
+/// model rather than a flag on that one: an announcement is broadcast and
+/// has no lifecycle, feedback is a queue and is nothing without one, and the
+/// two have opposite read permissions. Nothing but the word "post" is shared.
+model Feedback {
+  id String @id @default(cuid())
+
+  author   User   @relation("FeedbackAuthor", fields: [authorId], references: [id])
+  authorId String
+
+  kind FeedbackKind   @default(SUGGESTION)
+  body String
+  status FeedbackStatus @default(NEW)
+
+  /// Which account this came from, for the day the CMS is sold as a service
+  /// rather than run for one studio. Nullable and unused today: every row
+  /// written now belongs to the studio running it, and there is no Account
+  /// model yet to point a foreign key at.
+  ///
+  /// Added on the owner's ruling of 2026-08-07, before it is needed, because
+  /// the cost is opposite at the two ends. One nullable column now is free.
+  /// Later it is a migration plus a backfill whose correct value is genuinely
+  /// unknowable — nothing in the row says which tenant a 2026 submission came
+  /// from once there is more than one.
+  accountId String?
+
+  /// Who last moved it out of NEW, and when. Null while it is still NEW.
+  /// Recorded because "acknowledged" with nobody's name against it is how a
+  /// queue quietly becomes everyone-assumed-someone-else's job.
+  resolvedBy   User?     @relation("FeedbackResolver", fields: [resolvedById], references: [id])
+  resolvedById String?
+  resolvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([authorId, createdAt])
+  @@index([accountId])
 }
 
 model CalendarEvent {

@@ -10,7 +10,8 @@ export type ActivityEntityType =
   | "COMMENT"
   | "ATTACHMENT"
   | "ANNOUNCEMENT"
-  | "CALENDAR_EVENT";
+  | "CALENDAR_EVENT"
+  | "FEEDBACK";
 
 /** Stored as a plain String column, never a Prisma enum, so later phases add
  * verbs without a migration. describeActivity must stay total. */
@@ -53,7 +54,10 @@ export type ActivityAction =
   | "announcement.removed"
   | "event.created"
   | "event.updated"
-  | "event.removed";
+  | "event.removed"
+  | "feedback.submitted"
+  | "feedback.triaged"
+  | "feedback.removed";
 
 export type ActivityMeta = Record<string, unknown> | null;
 
@@ -254,6 +258,16 @@ export function describeActivity(entry: {
     // is English, and cancelling a meeting is what actually happened (spec §13).
     case "event.removed":
       return `${who} cancelled ${what}`;
+    // The body is never rendered into the feed. Feedback is visible to its
+    // author and to admins only, and the activity timeline has no such
+    // scoping — quoting it here would leak to every reader what the list
+    // itself withholds. `meta.kind`/`meta.status` carry the shape instead.
+    case "feedback.submitted":
+      return `${who} submitted feedback`;
+    case "feedback.triaged":
+      return `${who} marked feedback ${humanizeEnum(metaString(entry.meta, "status"))}`;
+    case "feedback.removed":
+      return `${who} removed a piece of feedback`;
     default:
       // Forward compatibility: an unrecognised verb renders, never throws.
       return `${who} updated this record`;
@@ -289,6 +303,72 @@ export async function listRecentActivity(
     id: r.id,
     actorName: r.actor.name,
     action: r.action,
+    meta: toMeta(r.meta),
+    at: r.at,
+  }));
+}
+
+/** One row of the activity export. A superset of `ActivityEntry`: the export
+ * carries the columns the on-screen feed has no use for — the entity the row
+ * points at, its client scope, and the raw meta blob. */
+export type ActivityExportRow = ActivityEntry & {
+  actorId: string;
+  entityType: string;
+  entityId: string;
+  clientId: string | null;
+  clientName: string | null;
+};
+
+/** Every logged action in a window, for the CSV export.
+ *
+ * **Unbounded on purpose — there is no `take`.** Every other reader here caps
+ * its rows because it renders a panel; this one answers "what did everyone do
+ * between these two dates", and a silently truncated audit trail is worse than
+ * no audit trail. The date range is the bound.
+ *
+ * Ascending, unlike every other reader, because an exported log is read
+ * forwards: the file opens at the start of the period rather than the end.
+ *
+ * The window is half-open — `gte: from, lt: to` — matching `listTasksInRange`
+ * and `bucketMyTasks`, so an event at exactly midnight lands in one day's
+ * export rather than two. */
+export async function listActivityForExport(
+  db: PrismaClient,
+  input: { from: Date; to: Date; clientId?: string | null; actorId?: string | null }
+): Promise<ActivityExportRow[]> {
+  const where: Prisma.ActivityLogWhereInput = { at: { gte: input.from, lt: input.to } };
+  if (input.clientId) where.clientId = input.clientId;
+  if (input.actorId) where.actorId = input.actorId;
+
+  const rows = await db.activityLog.findMany({
+    where,
+    orderBy: { at: "asc" },
+    include: { actor: { select: { id: true, name: true } } },
+  });
+
+  // One extra query rather than a join: ActivityLog.clientId carries no
+  // foreign key (the same decision Notification.entityId records), so Prisma
+  // has no relation to include and a row whose client has since been deleted
+  // must still export with its id intact.
+  const clientIds = [...new Set(rows.map((r) => r.clientId).filter((id): id is string => !!id))];
+  const clients =
+    clientIds.length > 0
+      ? await db.client.findMany({
+          where: { id: { in: clientIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+  const clientNames = new Map(clients.map((c) => [c.id, c.name]));
+
+  return rows.map((r) => ({
+    id: r.id,
+    actorId: r.actor.id,
+    actorName: r.actor.name,
+    action: r.action,
+    entityType: r.entityType,
+    entityId: r.entityId,
+    clientId: r.clientId,
+    clientName: r.clientId ? (clientNames.get(r.clientId) ?? null) : null,
     meta: toMeta(r.meta),
     at: r.at,
   }));
