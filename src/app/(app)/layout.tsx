@@ -27,9 +27,8 @@ export default async function AppLayout({
   // One round trip, not two: the sidebar's My Tasks count and quick-add's
   // member list are both needed on every screen and neither depends on the
   // other.
-  // One instant for the whole render: the punch state is derived against it,
-  // and the topbar's ticking counter subtracts it from the device clock to
-  // correct for skew. Taking `new Date()` twice would make those disagree.
+  // One instant for the whole render, so presence is derived against a single
+  // clock rather than two calls that could straddle an app-day boundary.
   const now = new Date();
 
   const [members, myTaskCount, notifications, unreadCount, projects, punch] = await Promise.all([
@@ -115,7 +114,6 @@ export default async function AppLayout({
           myTaskCount={myTaskCount}
           isAdmin={session.user.role === "ADMIN"}
           punch={punch}
-          serverNow={now}
         />
         {/* `update`, not `enter`/`exit`. Those two fire when a ViewTransition
             mounts or unmounts; this one lives in the layout and stays mounted

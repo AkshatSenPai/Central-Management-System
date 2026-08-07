@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { getMemberProfile, listTeamCards } from "@/lib/team-queries";
 
-type OpenSessionRow = { startedAt: Date; endedAt: Date | null; resolution: string | null };
+type OpenSessionRow = { startedAt: Date; resolution: string | null };
 type UserRow = {
   id: string;
   name: string;
@@ -70,13 +70,11 @@ const NOW = new Date("2026-08-07T09:00:00.000Z");
 /** Open, started earlier the same app day. */
 const punchedInToday: OpenSessionRow = {
   startedAt: new Date("2026-08-07T04:00:00.000Z"),
-  endedAt: null,
   resolution: null,
 };
 /** Open, but from the previous app day — forgotten, not present. */
 const forgottenYesterday: OpenSessionRow = {
   startedAt: new Date("2026-08-05T04:00:00.000Z"),
-  endedAt: null,
   resolution: null,
 };
 
@@ -394,9 +392,12 @@ describe("listTeamCards", () => {
     const { db, userFindManyArgs } = fakeDb({ users: [userRow()] });
     await listTeamCards(db, NOW);
     const select = (userFindManyArgs[0] as { select: { attendance: unknown } }).select;
+    // No `endedAt`: presence needs only whether the session is open and which
+    // app day it began on. Selecting an end time would be the first step back
+    // towards showing a duration.
     expect(select.attendance).toEqual({
       where: { resolution: null },
-      select: { startedAt: true, endedAt: true, resolution: true },
+      select: { startedAt: true, resolution: true },
       take: 1,
     });
   });

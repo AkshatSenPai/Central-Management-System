@@ -352,40 +352,43 @@ model Announcement {
 /// AttendanceSession, which is the only thing that both enforces and answers
 /// it.
 enum AttendanceResolution {
-  /// Punched out in the moment. The only case where `endedAt` is a
-  /// measurement rather than a claim somebody typed later.
+  /// Punched out deliberately. `endedAt` is the instant they did it.
   PUNCH_OUT
 
-  /// The end time was supplied afterwards, because the punch-out was
-  /// forgotten. `endedAt` is what a human said, not what a clock saw. Any
-  /// surface that totals hours must be able to tell the difference — that is
-  /// why this is an enum and not a `closed Boolean`.
-  CORRECTED
-
-  /// Written off: punched in, never punched out, and nobody knows when they
-  /// left. `endedAt` stays NULL forever and the row contributes zero to every
-  /// total, because a guessed end time is exactly what the owner ruled out on
-  /// 2026-08-07. The row is kept rather than deleted — "Priya was here at
-  /// 09:04" is true and useful; "Monday did not happen" is not.
+  /// Left open and closed for them — they forgot to punch out and the next
+  /// punch-in tidied it up, or an admin deactivated them mid-session.
+  /// `endedAt` stays NULL forever, because nobody knows when they actually
+  /// left and the app does not guess. The row is kept rather than deleted:
+  /// "Priya was here at 09:04" is true and worth keeping.
+  ///
+  /// A third value, CORRECTED, existed for about half an hour on 2026-08-07,
+  /// when a forgotten punch-out prompted for its real end time. The owner then
+  /// ruled that attendance is presence and not hours, which made that question
+  /// pointless — nothing consumes the answer — so the prompt and the value
+  /// both went. No row ever held it.
   DISCARDED
 }
 
-/// One punch-in and its punch-out. Many rows per person per day: lunch splits
-/// the day and that is normal, so a day total is the sum of the pairs, never
-/// the first-to-last span.
+/// One punch-in and its punch-out. Many rows per person per day, because
+/// lunch splits the day and that is normal.
 ///
-/// Deliberately NO reference to Task, and there will not be one (owner ruling,
-/// 2026-08-07). A per-task timer measures only work that happens to have a
-/// task row, and the studio does work that does not — so this model answers
-/// "was this person working", never "on what".
+/// **This records presence, not hours** (owner ruling, 2026-08-07). Nothing in
+/// the app sums these timestamps, displays a duration, or asks anyone to
+/// supply one — a member is simply Active while a session is open and Offline
+/// otherwise. The columns are kept because a session cannot exist without
+/// knowing when it began, and because they cost nothing: if hours are ever
+/// wanted the history will already be here. Do not add a totals view without
+/// checking that ruling still stands.
 ///
-/// A session is attributed WHOLLY to the app day of its `startedAt` and is
-/// never split at midnight. A shift starting 22:00 Tuesday lands entirely on
-/// Tuesday and Wednesday reads zero for it. That is a recorded decision, not
-/// an oversight: splitting one real event into two rows is the same class of
-/// invention as guessing an end time. There is deliberately no `day` column
-/// and no per-day summary table — a second definition of "day" written in SQL
-/// is one that can disagree with `startOfAppDay`.
+/// Deliberately NO reference to Task, and there will not be one (same ruling).
+/// A per-task timer measures only work that happens to have a task row, and
+/// the studio does work that does not — so this model answers "was this person
+/// working", never "on what".
+///
+/// A session belongs to the app day of its `startedAt` and is never split at
+/// midnight, so a 22:00 start belongs to that day whatever time it ends. There
+/// is deliberately no `day` column — a second definition of "day" written in
+/// SQL is one that can disagree with `startOfAppDay`.
 model AttendanceSession {
   id String @id @default(cuid())
 

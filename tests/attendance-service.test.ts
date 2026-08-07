@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import {
-  punchIn,
-  punchOut,
-  correctSession,
-  discardSession,
-} from "@/lib/attendance-service";
+import { punchIn, punchOut } from "@/lib/attendance-service";
 
 type OpenRow = { id: string; startedAt: Date } | null;
 
@@ -13,28 +8,22 @@ type OpenRow = { id: string; startedAt: Date } | null;
  * delegates and the transaction client, so a write is captured whether the
  * service used `db` or `tx`. */
 function fakeDb(
-  parts: {
-    open?: OpenRow;
-    others?: { startedAt: Date; endedAt: Date | null; resolution: string | null }[];
-    createThrows?: unknown;
-    updateManyCount?: number;
-  } = {}
+  parts: { open?: OpenRow; createThrows?: unknown; updateManyCount?: number } = {}
 ) {
   const created: Record<string, unknown>[] = [];
-  const updates: Record<string, unknown>[] = [];
+  const updates: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
   const updateManyArgs: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
   const activity: Record<string, unknown>[] = [];
 
   const delegate = {
     findFirst: async () => parts.open ?? null,
-    findMany: async () => parts.others ?? [],
     create: async (args: { data: Record<string, unknown> }) => {
       if (parts.createThrows) throw parts.createThrows;
       created.push(args.data);
       return { id: "new1", ...args.data };
     },
-    update: async (args: { data: Record<string, unknown> }) => {
-      updates.push(args.data);
+    update: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      updates.push(args);
       return args.data;
     },
     updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
@@ -92,23 +81,28 @@ describe("punchIn", () => {
     if (!result.ok) expect(result.error).toBe("You are already punched in");
   });
 
-  // A session left open from an earlier day blocks today's punch-in, because
-  // the index is scoped to the member alone. That must be a prompt, not a
-  // dead end.
-  it("returns the stale session for resolution instead of erroring", async () => {
-    const { db, created } = fakeDb({ open: { id: "stale", startedAt: TUE_09 } });
+  // Nobody is asked when they left, because nothing counts hours. The stale
+  // session is closed with no end time and a fresh one opens — one tap.
+  it("absorbs a session left open on an earlier day and opens a new one", async () => {
+    const { db, created, updates } = fakeDb({ open: { id: "stale", startedAt: TUE_09 } });
     const result = await punchIn(db, { actorId: "u1", now: WED_10 });
+
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data).toEqual({ needsResolution: { id: "stale", startedAt: TUE_09 } });
-    }
-    expect(created).toHaveLength(0);
+    expect(updates[0].where).toEqual({ id: "stale" });
+    expect(updates[0].data).toMatchObject({ resolution: "DISCARDED", resolvedById: "u1" });
+    // The whole point of the ruling: no end time is ever invented.
+    expect(updates[0].data).not.toHaveProperty("endedAt");
+    expect(created[0]).toMatchObject({ memberId: "u1", startedAt: WED_10 });
   });
 
-  it("writes no ActivityLog row — routine punches would flood the feed", async () => {
-    const { db, activity } = fakeDb({ open: null });
-    await punchIn(db, { actorId: "u1", now: TUE_09 });
-    expect(activity).toHaveLength(0);
+  it("writes no ActivityLog row, for the punch or for the tidy-up", async () => {
+    const fresh = fakeDb({ open: null });
+    await punchIn(fresh.db, { actorId: "u1", now: TUE_09 });
+    expect(fresh.activity).toHaveLength(0);
+
+    const stale = fakeDb({ open: { id: "stale", startedAt: TUE_09 } });
+    await punchIn(stale.db, { actorId: "u1", now: WED_10 });
+    expect(stale.activity).toHaveLength(0);
   });
 });
 
@@ -140,136 +134,5 @@ describe("punchOut", () => {
     const { db, activity } = fakeDb();
     await punchOut(db, { actorId: "u1", now: TUE_15 });
     expect(activity).toHaveLength(0);
-  });
-});
-
-describe("correctSession", () => {
-  it("stores a valid end time and marks it CORRECTED", async () => {
-    const { db, updates } = fakeDb({ open: { id: "s1", startedAt: TUE_09 }, others: [] });
-    // `now` is the next morning: this is a *retroactive* close, so the end
-    // being in the past relative to now is the whole point.
-    const result = await correctSession(db, {
-      sessionId: "s1",
-      date: "2026-08-04",
-      time: "17:00",
-      actorId: "u1",
-      now: WED_10,
-    });
-    expect(result.ok).toBe(true);
-    expect(updates[0]).toMatchObject({ resolution: "CORRECTED", resolvedById: "u1" });
-  });
-
-  // "A hidden control is not a control" — the refusal lives in the query
-  // scope, not in whether the UI rendered a button.
-  it("scopes the lookup to the actor, so another member's session is not found", async () => {
-    const { db, updates } = fakeDb({ open: null });
-    const result = await correctSession(db, {
-      sessionId: "someone-elses",
-      date: "2026-08-04",
-      time: "17:00",
-      actorId: "u1",
-      now: TUE_15,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("That session is not open, or is not yours.");
-    expect(updates).toHaveLength(0);
-  });
-
-  it("refuses an end before the start, with the specific message and no write", async () => {
-    const { db, updates } = fakeDb({ open: { id: "s1", startedAt: TUE_15 }, others: [] });
-    const result = await correctSession(db, {
-      sessionId: "s1",
-      date: "2026-08-04",
-      time: "06:00",
-      actorId: "u1",
-      now: WED_10,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("The end time must be after the start.");
-    expect(updates).toHaveLength(0);
-  });
-
-  it("refuses an unparseable time rather than clamping it", async () => {
-    const { db, updates } = fakeDb({ open: { id: "s1", startedAt: TUE_09 }, others: [] });
-    const result = await correctSession(db, {
-      sessionId: "s1",
-      date: "2026-08-04",
-      time: "25:99",
-      actorId: "u1",
-      now: TUE_15,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("Enter a valid date and time.");
-    expect(updates).toHaveLength(0);
-  });
-
-  // The one double-count this feature could produce: two closed sessions
-  // claiming the same hour. The unique index cannot see it, because both rows
-  // are closed.
-  it("refuses an end that overlaps another recorded session", async () => {
-    const { db, updates } = fakeDb({
-      open: { id: "s1", startedAt: TUE_09 },
-      others: [
-        {
-          startedAt: new Date("2026-08-04T06:00:00.000Z"),
-          endedAt: new Date("2026-08-04T09:00:00.000Z"),
-          resolution: "PUNCH_OUT",
-        },
-      ],
-    });
-    const result = await correctSession(db, {
-      sessionId: "s1",
-      date: "2026-08-04",
-      time: "17:00",
-      actorId: "u1",
-      now: WED_10,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("That overlaps another session you already recorded.");
-    expect(updates).toHaveLength(0);
-  });
-
-  it("records an attendance.corrected activity row with no client scope", async () => {
-    const { db, activity } = fakeDb({ open: { id: "s1", startedAt: TUE_09 }, others: [] });
-    await correctSession(db, {
-      sessionId: "s1",
-      date: "2026-08-04",
-      time: "17:00",
-      actorId: "u1",
-      now: WED_10,
-    });
-    expect(activity[0]).toMatchObject({
-      entityType: "ATTENDANCE",
-      action: "attendance.corrected",
-      clientId: null,
-    });
-  });
-});
-
-describe("discardSession", () => {
-  it("resolves the session without ever giving it an end time", async () => {
-    const { db, updateManyArgs } = fakeDb();
-    const result = await discardSession(db, { sessionId: "s1", actorId: "u1", now: TUE_15 });
-    expect(result.ok).toBe(true);
-    expect(updateManyArgs[0].where).toEqual({ id: "s1", memberId: "u1", resolution: null });
-    expect(updateManyArgs[0].data).toMatchObject({ resolution: "DISCARDED", resolvedById: "u1" });
-    expect(updateManyArgs[0].data).not.toHaveProperty("endedAt");
-  });
-
-  it("refuses somebody else's session", async () => {
-    const { db } = fakeDb({ updateManyCount: 0 });
-    const result = await discardSession(db, { sessionId: "s1", actorId: "u2", now: TUE_15 });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("That session is not open, or is not yours.");
-  });
-
-  it("records an attendance.discarded activity row", async () => {
-    const { db, activity } = fakeDb();
-    await discardSession(db, { sessionId: "s1", actorId: "u1", now: TUE_15 });
-    expect(activity[0]).toMatchObject({
-      entityType: "ATTENDANCE",
-      action: "attendance.discarded",
-      clientId: null,
-    });
   });
 });

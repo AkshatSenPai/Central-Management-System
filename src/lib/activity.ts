@@ -60,9 +60,10 @@ export type ActivityAction =
   | "feedback.triaged"
   | "feedback.removed"
   /* Routine punches are deliberately NOT logged — see attendance-service.ts.
-     Only the three verbs where a human edits history appear here. */
-  | "attendance.corrected"
-  | "attendance.discarded"
+     Nor is the tidy-up when a forgotten session is closed by the next
+     punch-in: that is the app housekeeping, not a person acting. The only
+     attendance event worth an audit row is an admin resolving somebody
+     else's session, which happens on deactivation. */
   | "attendance.orphaned";
 
 export type ActivityMeta = Record<string, unknown> | null;
@@ -277,12 +278,8 @@ export function describeActivity(entry: {
     // Punching in and out is not logged at all — six people clocking in and
     // out for chai and lunch would be thirty rows before noon, and this feed
     // is unscoped. The AttendanceSession table is already a complete,
-    // timestamped audit trail; only the verbs where somebody edits history
-    // afterwards earn a row here.
-    case "attendance.corrected":
-      return `${who} set an end time for a missed punch-out`;
-    case "attendance.discarded":
-      return `${who} discarded an unfinished attendance session`;
+    // timestamped record; only an admin acting on somebody else's session
+    // earns a row here.
     case "attendance.orphaned":
       return `${who} deactivated a member who was still punched in`;
     default:

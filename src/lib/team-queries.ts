@@ -75,7 +75,7 @@ export async function listTeamCards(
       // (and its tests assert) survives untouched.
       attendance: {
         where: { resolution: null },
-        select: { startedAt: true, endedAt: true, resolution: true },
+        select: { startedAt: true, resolution: true },
         take: 1,
       },
     },
