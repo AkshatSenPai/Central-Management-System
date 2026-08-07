@@ -13,6 +13,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buttonClass } from "@/components/ui/button";
 import { cardClass } from "@/components/ui/card";
+import { SectionCard } from "@/components/ui/section-card";
 import { ProjectForm } from "@/components/projects/project-form";
 import { ProjectHealthControl } from "@/components/projects/project-health-control";
 import { ProjectStatusControl } from "@/components/projects/project-status-control";
@@ -154,13 +155,12 @@ export default async function ProjectDetailPage(props: {
         </div>
       </div>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-lg font-medium text-[var(--text)]">Tasks</h2>
-            <span className="text-xs text-[var(--text-3)]">{taskListSummary(tasks)}</span>
-          </div>
-          <div className="flex items-center gap-2">
+      <SectionCard
+        title="Tasks"
+        meta={taskListSummary(tasks)}
+        flush={tasks.length > 0}
+        action={
+          <>
             <Link
               href={`/projects/${project.id}/board`}
               transitionTypes={["nav-forward"]}
@@ -175,24 +175,20 @@ export default async function ProjectDetailPage(props: {
               milestones={{ projectId: project.id, options: milestoneOptions }}
               members={members}
             />
-          </div>
-        </div>
+          </>
+        }
+      >
         {tasks.length === 0 ? (
           <EmptyState message="No tasks yet." />
         ) : (
-          <div className={cardClass({ className: "overflow-hidden" })}>
-            {tasks.map((row) => (
-              <TaskRow key={row.id} row={row} />
-            ))}
-          </div>
+          tasks.map((row) => <TaskRow key={row.id} row={row} />)
         )}
-      </section>
+      </SectionCard>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-medium text-[var(--text)]">Milestones</h2>
-          <MilestoneForm projectId={project.id} clientId={project.clientId} />
-        </div>
+      <SectionCard
+        title="Milestones"
+        action={<MilestoneForm projectId={project.id} clientId={project.clientId} />}
+      >
         {project.milestones.length === 0 ? (
           <EmptyState message="No milestones yet." />
         ) : (
@@ -202,15 +198,9 @@ export default async function ProjectDetailPage(props: {
             milestones={project.milestones}
           />
         )}
-      </section>
+      </SectionCard>
 
-      <section className="space-y-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-lg font-medium text-[var(--text)]">Files</h2>
-          {attachments.length > 0 ? (
-            <span className="text-xs text-[var(--text-3)]">{attachments.length}</span>
-          ) : null}
-        </div>
+      <SectionCard title="Files" meta={attachments.length > 0 ? attachments.length : null}>
         {/* `projectId` repeats `parentId` here, and that is on purpose — see
             AttachmentScope's own comment. Every page fills in every id it
             knows; the action dedupes the resulting paths. */}
@@ -225,7 +215,7 @@ export default async function ProjectDetailPage(props: {
           viewerId={session.user.id}
           viewerIsAdmin={session.user.role === "ADMIN"}
         />
-      </section>
+      </SectionCard>
     </div>
   );
 }

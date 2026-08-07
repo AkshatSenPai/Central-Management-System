@@ -4,10 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { listAllTasks } from "@/lib/task-queries";
 import { groupTasksByAssignee, parseMyTaskSort, parseTaskStatusFilter } from "@/lib/task";
 import { PageHeader } from "@/components/ui/page-header";
-import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { InitialsAvatar } from "@/components/ui/initials-avatar";
-import { TaskRow } from "@/components/tasks/task-row";
+import { MemberTaskGroup } from "@/components/tasks/member-task-group";
 import { TaskStatusFilter } from "@/components/tasks/task-status-filter";
 import { MyTaskSort } from "@/components/tasks/my-task-sort";
 
@@ -42,6 +40,8 @@ export default async function AllTasksPage(props: {
   ]);
 
   const groups = groupTasksByAssignee(rows, members);
+  const loaded = groups.filter((g) => g.tasks.length > 0);
+  const idle = groups.filter((g) => g.tasks.length === 0);
   const unassignedCount = groups.find((g) => g.id === null)?.tasks.length ?? 0;
 
   // Counted off `rows`, not by summing the groups: a task with two assignees
@@ -63,26 +63,29 @@ export default async function AllTasksPage(props: {
       {rows.length === 0 ? (
         <EmptyState message="No tasks match this filter." />
       ) : (
-        <div className="space-y-4">
-          {groups.map((group) => (
-            <SectionCard
+        <div className="space-y-8">
+          {loaded.map((group) => (
+            <MemberTaskGroup
               key={group.id ?? "unassigned"}
-              title={group.name}
-              meta={group.tasks.length > 0 ? group.tasks.length : null}
-              action={
-                group.id ? <InitialsAvatar initials={group.initials} shape="circle" size={28} /> : null
-              }
-              flush={group.tasks.length > 0}
-            >
-              {group.tasks.length === 0 ? (
-                <EmptyState message="Nothing assigned." />
-              ) : (
-                group.tasks.map((row) => <TaskRow key={row.id} row={row} />)
-              )}
-            </SectionCard>
+              id={group.id}
+              name={group.name}
+              initials={group.initials}
+              tasks={group.tasks}
+            />
           ))}
         </div>
       )}
+
+      {/* Members with nothing assigned are named on one line rather than
+          given a block each. Dropping them entirely would lose the fact —
+          "nobody has anything for Dana" is worth stating — but seven empty
+          headers between the blocks that do have work is exactly the
+          "too continuous to scan" problem this page was reported for. */}
+      {idle.length > 0 ? (
+        <p className="text-xs text-[var(--text-3)]">
+          Nothing assigned: {idle.map((g) => g.name).join(", ")}.
+        </p>
+      ) : null}
     </div>
   );
 }
