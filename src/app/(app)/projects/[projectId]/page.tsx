@@ -54,7 +54,7 @@ export default async function ProjectDetailPage(props: {
   const milestoneOptions = project.milestones.map((m) => ({ id: m.id, title: m.title }));
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 sm:p-8">
       <nav className="text-xs text-[var(--text-3)]">
         <Link href="/clients" transitionTypes={["nav-back"]}
           className="hover:text-[var(--text-2)]">
@@ -69,7 +69,7 @@ export default async function ProjectDetailPage(props: {
         <span className="text-[var(--text-2)]">Project</span>
       </nav>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1

@@ -83,7 +83,10 @@ export function Modal({
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      style={{ maxWidth: width }}
+      // min() against the viewport, not the bare width: `w-full` makes a
+      // phone-width dialog, and without the subtraction it would sit
+      // edge-to-edge with no gutter and its rounded corners clipped.
+      style={{ maxWidth: `min(${width}px, 100vw - 24px)` }}
       className="mx-auto mb-5 mt-14 w-full bg-transparent p-0 text-[var(--text)] backdrop:bg-transparent"
     >
       <div className="flex max-h-[calc(100vh-76px)] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)]">

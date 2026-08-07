@@ -81,7 +81,11 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex h-screen">
+    // h-dvh, not h-screen: on a phone 100vh includes the space behind the
+    // browser's collapsing URL bar, so the shell's bottom edge — and anything
+    // pinned to it — would sit off-screen until the bar hides. dvh tracks the
+    // *actual* viewport.
+    <div className="flex h-dvh">
       <Sidebar
         myTaskCount={myTaskCount}
         isAdmin={session.user.role === "ADMIN"}
@@ -97,6 +101,8 @@ export default async function AppLayout({
           projects={projects}
           notifications={notifications}
           unreadCount={unreadCount}
+          myTaskCount={myTaskCount}
+          isAdmin={session.user.role === "ADMIN"}
         />
         {/* `update`, not `enter`/`exit`. Those two fire when a ViewTransition
             mounts or unmounts; this one lives in the layout and stays mounted

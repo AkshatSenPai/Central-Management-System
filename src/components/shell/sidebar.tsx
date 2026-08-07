@@ -63,7 +63,11 @@ export function Sidebar({
   return (
     <aside
       style={{ viewTransitionName: "app-sidebar" }}
-      className={`flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width] duration-150 ${
+      // `hidden md:flex`: below md the rail disappears entirely and the
+      // topbar's <MobileNav> drawer takes over. Even the 60px collapsed rail
+      // is 16% of a 375px phone, and its hover-tooltip affordance does not
+      // exist under touch.
+      className={`hidden shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width] duration-150 md:flex ${
         collapsed ? "w-[60px]" : "w-[232px]"
       }`}
     >

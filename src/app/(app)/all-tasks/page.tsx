@@ -53,7 +53,7 @@ export default async function AllTasksPage(props: {
     (unassignedCount > 0 ? ` · ${unassignedCount} unassigned` : "");
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 sm:p-8">
       <PageHeader title="All Tasks" subtitle={subtitle} />
 
       <TaskStatusFilter status={status}>

@@ -1,5 +1,5 @@
 {
-  "signature": "aae2b9b65ecc18e7",
+  "signature": "61d32cde96b2b985",
   "icons": [
     "add",
     "alternate_email",
@@ -30,6 +30,7 @@
     "lock",
     "logout",
     "mail",
+    "menu",
     "notifications",
     "person",
     "person_add",
@@ -41,5 +42,5 @@
     "visibility",
     "visibility_off"
   ],
-  "bytes": 5996
+  "bytes": 6032
 }

@@ -16,7 +16,7 @@ export default async function ProjectBoardPage(props: {
   const tasks = await listProjectTasks(prisma, projectId);
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 sm:p-8">
       <nav className="text-xs text-[var(--text-3)]">
         <Link href="/clients" transitionTypes={["nav-back"]}
           className="hover:text-[var(--text-2)]">

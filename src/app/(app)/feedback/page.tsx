@@ -46,7 +46,7 @@ export default async function FeedbackPage(props: {
   const open = countOpenFeedback(rows);
 
   return (
-    <div className="mx-auto max-w-[860px] space-y-5 px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[860px] space-y-5 px-4 pb-10 pt-5 sm:px-6">
       <PageHeader
         title="Feedback"
         subtitle={

@@ -24,7 +24,7 @@ function SectionSkeleton({ rows }: { rows: number }) {
 
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-[1240px] px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[1240px] px-4 pb-10 pt-5 sm:px-6">
       <Skeleton className="h-8 w-64" />
       <Skeleton className="mt-2 h-4 w-40" />
       <div className="mt-5 flex flex-wrap items-start gap-5">

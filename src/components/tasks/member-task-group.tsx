@@ -21,10 +21,12 @@ import type { TaskListRow } from "@/lib/task-queries";
  * to "who am I looking at" is always visible, and the next member's bar
  * pushing the previous one off is itself the boundary marker.
  *
- * `-mx-8 px-8` cancels the page's `p-8` so the bar spans the full width and
- * reads as a rule across the page rather than a floating pill. `bg-[var(--bg)]`
- * must stay opaque — rows scroll *underneath* this, and a transparent bar
- * would show them through the text.
+ * The negative margins cancel the page's padding so the bar spans the full
+ * width and reads as a rule across the page rather than a floating pill —
+ * which is why they must mirror the page's `p-4 sm:p-8` exactly, breakpoint
+ * for breakpoint: a mismatch either side shows as a notch in the rule.
+ * `bg-[var(--bg)]` must stay opaque — rows scroll *underneath* this, and a
+ * transparent bar would show them through the text.
  *
  * The avatar leads rather than trailing, unlike the earlier version of this
  * page: the eye starts at the left edge, so that is where the identity
@@ -45,7 +47,7 @@ export function MemberTaskGroup({
 
   return (
     <section>
-      <header className="sticky top-0 z-20 -mx-8 mb-3 flex items-center gap-2.5 border-b border-[var(--border)] bg-[var(--bg)] px-8 py-2.5">
+      <header className="sticky top-0 z-20 -mx-4 mb-3 flex items-center gap-2.5 border-b border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 sm:-mx-8 sm:px-8">
         <InitialsAvatar initials={initials} shape="circle" size={26} />
         {id ? (
           <Link

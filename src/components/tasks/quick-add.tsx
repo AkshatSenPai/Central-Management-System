@@ -105,15 +105,20 @@ export function QuickAdd({
           setCreatedId(null);
         }}
         aria-expanded={open}
+        aria-label="Quick add"
         size="none"
-        className="h-8 gap-1.5 rounded-lg px-3 text-[13px] font-semibold"
+        className="h-8 gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold sm:px-3"
       >
         <Icon name="add" size="sm" />
-        Quick add
+        {/* Icon-only below sm — the label competes with the search box for a
+            phone topbar's width, and the aria-label keeps the name. */}
+        <span className="hidden sm:inline">Quick add</span>
       </Button>
 
       {open ? (
-        <div className="absolute right-0 z-20 mt-2 w-[22rem] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-lg)]">
+        // Same viewport-pinning-below-sm treatment as the notification bell,
+        // for the same reason: 22rem does not fit a phone when right-anchored.
+        <div className="fixed inset-x-3 top-16 z-40 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-lg)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:z-20 sm:mt-2 sm:w-[22rem]">
           <form key={attempt} action={formAction} className="space-y-3">
             {/* createTaskAction rejects a missing or invalid status. */}
             <input type="hidden" name="status" value="TO_DO" />

@@ -51,7 +51,7 @@ export default async function DashboardPage() {
   const firstName = (session.user.name ?? "").split(/\s+/)[0];
 
   return (
-    <div className="mx-auto max-w-[1240px] px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[1240px] px-4 pb-10 pt-5 sm:px-6">
       {/* Above the greeting, because a pinned notice is the one thing on this
           screen that somebody deliberately put in front of everyone. */}
       {pinned ? (

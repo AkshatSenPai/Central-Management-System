@@ -2,6 +2,7 @@
 
 import { QuickAdd } from "@/components/tasks/quick-add";
 import { AccountMenu } from "@/components/shell/account-menu";
+import { MobileNav } from "@/components/shell/mobile-nav";
 import { NotificationBell } from "@/components/shell/notification-bell";
 import { SearchBox } from "@/components/shell/search-box";
 import type { NotificationRow } from "@/lib/notification-queries";
@@ -20,6 +21,8 @@ export function Topbar({
   projects,
   notifications,
   unreadCount,
+  myTaskCount,
+  isAdmin,
 }: {
   userName: string;
   userEmail: string;
@@ -31,6 +34,11 @@ export function Topbar({
   projects: { id: string; name: string; clientId: string }[];
   notifications: NotificationRow[];
   unreadCount: number;
+  /** For <MobileNav>, which replaces the sidebar below md and needs the same
+   * two facts the sidebar renders from: the My Tasks badge and whether the
+   * admin-only rows show. */
+  myTaskCount: number;
+  isAdmin: boolean;
 }) {
   const initials = userName
     .split(/\s+/)
@@ -42,8 +50,9 @@ export function Topbar({
   return (
     <header
       style={{ viewTransitionName: "app-topbar" }}
-      className="relative z-30 flex h-14 flex-none items-center gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-5"
+      className="relative z-30 flex h-14 flex-none items-center gap-1.5 border-b border-[var(--border)] bg-[var(--surface)] px-3 sm:px-5"
     >
+      <MobileNav myTaskCount={myTaskCount} isAdmin={isAdmin} />
       <SearchBox />
       <QuickAdd members={members} projects={projects} />
       <NotificationBell notifications={notifications} unreadCount={unreadCount} />

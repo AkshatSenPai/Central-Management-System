@@ -44,7 +44,7 @@ export default async function AnnouncementsPage() {
   const isAdmin = session.user.role === "ADMIN";
 
   return (
-    <div className="mx-auto max-w-[840px] space-y-5 px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[840px] space-y-5 px-4 pb-10 pt-5 sm:px-6">
       <PageHeader
         title="Announcements"
         subtitle={announcementSummary(rows.length, pinnedCount)}

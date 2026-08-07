@@ -82,7 +82,11 @@ export function NotificationBell({
       </Button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[376px] overflow-hidden rounded-[11px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)]">
+        <div className="fixed inset-x-3 top-16 z-40 overflow-hidden rounded-[11px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-lg)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+8px)] sm:w-[376px]">
+          {/* Below sm this panel pins to the viewport instead of the trigger:
+              376px is wider than a phone, and right-aligning it to a bell that
+              sits mid-topbar would push it off the left edge. Still a child of
+              rootRef, so the click-outside close is untouched. */}
           <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3.5 py-2.5">
             <div className="flex items-center gap-2">
               <span className="text-[13.5px] font-semibold text-[var(--text)]">Notifications</span>

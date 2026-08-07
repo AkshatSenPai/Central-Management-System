@@ -29,7 +29,7 @@ export default async function SearchPage(props: {
 
   if (!term) {
     return (
-      <div className="mx-auto max-w-[840px] space-y-5 px-6 pb-10 pt-5">
+      <div className="mx-auto max-w-[840px] space-y-5 px-4 pb-10 pt-5 sm:px-6">
         <PageHeader title="Search" subtitle="Clients, projects and tasks." />
         <EmptyState message="Type at least two characters in the search box above." />
       </div>
@@ -40,7 +40,7 @@ export default async function SearchPage(props: {
   const grouped = groupHits(hits);
 
   return (
-    <div className="mx-auto max-w-[840px] space-y-5 px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[840px] space-y-5 px-4 pb-10 pt-5 sm:px-6">
       <PageHeader title="Search" subtitle={searchSummary(hits.length, term)} />
 
       {hits.length === 0 ? (

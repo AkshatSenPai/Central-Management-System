@@ -15,8 +15,17 @@ export function TaskRow({ row }: { row: TaskListRow }) {
   const { shown, extra } = capAssignees(row.assignees);
 
   return (
-    <div className="grid grid-cols-[2fr_auto_auto_auto] items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)]">
-      <Link href={`/tasks/${row.id}`} transitionTypes={["nav-forward"]} className="min-w-0">
+    // flex-wrap, not the old grid-cols-[2fr_auto_auto_auto]: on a phone the
+    // three auto columns plus gaps left the 2fr title ~60px, and min-w-0 let
+    // it shrink to an ellipsis after two characters. `basis-full` gives the
+    // title the whole first line below sm; the controls wrap onto their own
+    // line. From sm up, `flex-1` restores exactly the old shape.
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)]">
+      <Link
+        href={`/tasks/${row.id}`}
+        transitionTypes={["nav-forward"]}
+        className="min-w-0 basis-full sm:basis-0 sm:flex-1"
+      >
         <p className="truncate text-sm font-medium text-[var(--text)]">{row.title}</p>
         {/* Overdue is carried on the row, so it has to be visible: the
             milestone strip on the same screen already renders an overdue

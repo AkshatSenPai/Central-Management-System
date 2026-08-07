@@ -82,7 +82,7 @@ export default async function CalendarPage(props: {
   ]);
 
   return (
-    <div className="space-y-5 px-6 pb-10 pt-5">
+    <div className="space-y-5 px-4 pb-10 pt-5 sm:px-6">
       <PageHeader
         title={calendarTitle(view, anchor)}
         subtitle={calendarPeriodSummary(rows.length, events.length)}

@@ -112,7 +112,12 @@ function MonthView({
 }) {
   const weeks = monthGrid(anchor);
   return (
-    <div className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+    // overflow-x-auto with a min-width inside: seven ~46px columns on a phone
+    // would leave every title one truncated character, so the month pans
+    // sideways instead. The min-w sits on the inner div, not here — a min-w
+    // on the scroll container itself would widen the page, not the content.
+    <div className="overflow-x-auto rounded-[10px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+      <div className="min-w-[640px]">
       <div className="grid grid-cols-7 border-b border-[var(--border)]">
         {WEEKDAY_LABELS.map((label) => (
           <span
@@ -167,6 +172,7 @@ function MonthView({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

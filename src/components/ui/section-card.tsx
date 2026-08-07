@@ -45,7 +45,11 @@ export function SectionCard({
   // against a `${` is silently dropped from the build — no error, just a rule
   // that never existed. See AGENTS.md.
   const frame = className ? `overflow-hidden ${className}` : "overflow-hidden";
-  const body = flush ? "" : "p-4";
+  // `overflow-x-auto` on the flush body: a full-bleed list that is genuinely
+  // wider than a phone (the members table, the project-row grid) scrolls
+  // sideways inside the card instead of being clipped by the frame's
+  // overflow-hidden. Costs nothing when the content fits.
+  const body = flush ? "overflow-x-auto" : "p-4";
 
   return (
     <section className={cardClass({ className: frame })}>

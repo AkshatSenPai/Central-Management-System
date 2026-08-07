@@ -21,7 +21,11 @@ export function ProjectRow({ row, showClient = false }: { row: ProjectListRow; s
     <Link
       href={`/projects/${row.id}`}
       transitionTypes={["nav-forward"]}
-      className={`grid items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)] ${
+      // min-w keeps the five columns legible on a phone: the parent (the
+      // projects page's list, or a SectionCard flush body) is a horizontal
+      // scroll container, so the row scrolls sideways instead of the 2fr name
+      // column being crushed to an ellipsis.
+      className={`grid min-w-[560px] items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)] ${
         showClient
           ? "grid-cols-[2fr_1fr_1.4fr_auto_auto]"
           : "grid-cols-[2fr_1.4fr_auto_auto]"

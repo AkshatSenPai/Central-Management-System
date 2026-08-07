@@ -18,7 +18,7 @@ export default async function ProfilePage() {
   // link on Settings visibly changed the page's width — which is most of why
   // it read as "plain out there" next to the page it came from.
   return (
-    <div className="mx-auto max-w-[720px] space-y-5 px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[720px] space-y-5 px-4 pb-10 pt-5 sm:px-6">
       <PageHeader title="My profile" subtitle={user.email} />
 
       <SectionCard title="Details">

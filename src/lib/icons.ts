@@ -32,6 +32,7 @@ export const ICON_NAMES = [
   "receipt_long",
   "settings",
   // Shell chrome.
+  "menu",
   "search",
   "notifications",
   "expand_more",

@@ -21,7 +21,7 @@ export default async function MemberProfilePage(props: {
   if (!profile) notFound();
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 sm:p-8">
       <nav className="text-xs text-[var(--text-3)]">
         <Link href="/team" transitionTypes={["nav-back"]}
           className="hover:text-[var(--text-2)]">

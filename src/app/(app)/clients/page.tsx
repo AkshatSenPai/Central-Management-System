@@ -21,7 +21,7 @@ export default async function ClientsPage() {
   ]);
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 sm:p-8">
       <PageHeader
         title="Clients"
         subtitle={clientListSummary(rows)}
@@ -31,9 +31,12 @@ export default async function ClientsPage() {
       {rows.length === 0 ? (
         <EmptyState message="No clients yet." actionLabel="Add your first client." />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+          {/* overflow-x-auto above + a min-width on every row: on a phone the
+              four-column table pans sideways rather than crushing the contact
+              column into an unreadable sliver. Same treatment as /projects. */}
           <div
-            className={`grid ${COLUMNS} gap-4 border-b border-[var(--border)] px-4 py-2.5 text-[11px] font-semibold tracking-wide text-[var(--text-3)]`}
+            className={`grid ${COLUMNS} min-w-[560px] gap-4 border-b border-[var(--border)] px-4 py-2.5 text-[11px] font-semibold tracking-wide text-[var(--text-3)]`}
           >
             <span>Client</span>
             <span>Status</span>
@@ -45,7 +48,7 @@ export default async function ClientsPage() {
             <Link
               key={row.id}
               href={`/clients/${row.id}`}
-              className={`grid ${COLUMNS} items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)]`}
+              className={`grid ${COLUMNS} min-w-[560px] items-center gap-4 border-b border-[var(--border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-2)]`}
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <InitialsAvatar initials={row.initials} shape="square" />

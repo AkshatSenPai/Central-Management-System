@@ -71,7 +71,7 @@ export default async function SettingsPage() {
     : [[], []];
 
   return (
-    <div className="mx-auto max-w-[720px] space-y-5 px-6 pb-10 pt-5">
+    <div className="mx-auto max-w-[720px] space-y-5 px-4 pb-10 pt-5 sm:px-6">
       <PageHeader title="Settings" subtitle="Your account, and how the app looks." />
 
       <SectionCard title="Account" flush>

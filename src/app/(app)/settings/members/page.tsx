@@ -22,7 +22,7 @@ export default async function MembersPage() {
   ]);
 
   return (
-    <div className="space-y-5 p-8">
+    <div className="space-y-5 p-4 sm:p-8">
       <PageHeader title="Members" subtitle="Invite and manage your team." />
 
       <SectionCard title="Invite someone">
@@ -32,7 +32,10 @@ export default async function MembersPage() {
       {/* `flush` because the table draws its own row separators and should
           reach the card's edge, like every other row list in the app. */}
       <SectionCard title="Team" meta={members.length} flush>
-        <table className="w-full text-left text-sm text-[var(--text)]">
+        {/* min-w so the five columns stay readable on a phone — the flush
+            SectionCard body is a horizontal scroll container, so the table
+            pans instead of wrapping every cell. */}
+        <table className="w-full min-w-[560px] text-left text-sm text-[var(--text)]">
           <thead className="border-b border-[var(--border)] text-xs text-[var(--text-3)]">
             <tr>
               <th className="px-4 py-2 font-medium">Name</th>

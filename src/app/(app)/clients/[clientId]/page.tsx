@@ -47,7 +47,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const websiteLabel = client.website?.replace(/^https?:\/\//i, "").replace(/\/$/, "");
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 p-4 sm:p-8">
       <nav className="text-xs text-[var(--text-3)]">
         <Link href="/clients" transitionTypes={["nav-back"]}
           className="hover:text-[var(--text-2)]">
@@ -57,7 +57,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <span className="text-[var(--text-2)]">{client.name}</span>
       </nav>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="flex items-start gap-3">
           <InitialsAvatar initials={client.initials} shape="square" size={44} />
           <div>

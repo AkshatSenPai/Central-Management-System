@@ -26,9 +26,13 @@ export function InviteForm() {
 
   return (
     <div className="max-w-md space-y-3">
-      <form action={formAction} className="flex gap-2">
+      {/* flex-wrap + basis-full: on a phone the email field takes the whole
+          first line and the role/Invite pair drop beneath it, instead of the
+          three fighting over ~310px and the button being clipped by the
+          card's overflow-hidden frame. */}
+      <form action={formAction} className="flex flex-wrap gap-2">
         <Field
-          className="flex-1"
+          className="min-w-0 flex-1 basis-full sm:basis-auto"
           name="email"
           type="email"
           required
