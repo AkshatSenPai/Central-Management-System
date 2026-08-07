@@ -35,6 +35,7 @@ export const ICON_NAMES = [
   "menu",
   "search",
   "notifications",
+  "schedule",
   "expand_more",
   "light_mode",
   "dark_mode",
@@ -69,7 +70,7 @@ export const ICON_NAMES = [
  *   more_horiz     — the design uses it for row overflow menus. This app has
  *                    no overflow menus; member row actions are two labelled
  *                    buttons, which is better at that count.
- *   push_pin, schedule — Phases 3c and 6.
+ *   push_pin       — Phase 3c.
  *
  * `notifications`, `search` and `attach_file` were all on this list and have
  * since earned their place back, as the features they label were built. The
@@ -81,6 +82,11 @@ export const ICON_NAMES = [
  * It arrives now, in the same commit as the upload control and the file list
  * that render it and `download`, because gate 7 would have failed on either
  * of them a moment sooner.
+ *
+ * `schedule` is the same story with a longer gap: listed here for Phase 6's
+ * time tracking, removed when that never came, and earned back on 2026-08-07
+ * by attendance — which is emphatically not the feature it was first reserved
+ * for. Per-task timers were dropped; this labels a punch clock.
  *
  * Each was on this list until gate 7 asked where it was rendered and there
  * was no honest answer. That is the gate working, not the gate being

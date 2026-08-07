@@ -14,15 +14,36 @@ type FakeParts = {
   /** Error thrown by $transaction — lets a test simulate a serialization
    * conflict (P2034) or other transaction failure. */
   transactionError?: unknown;
+  /** Rows the orphan sweep claims to have closed. Non-zero simulates
+   * deactivating somebody who was still punched in. */
+  openSessionCount?: number;
 };
 
 function fakeDb(parts: FakeParts) {
   const updates: Record<string, unknown>[] = [];
   const transactionOptions: unknown[] = [];
+  /** Attendance rows closed as a side effect of deactivation. */
+  const orphaned: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
+  const activity: Record<string, unknown>[] = [];
   const findUnique = async () => parts.target ?? null;
   const update = async (args: { data: Record<string, unknown> }) => {
     updates.push(args.data);
     return args.data;
+  };
+  // Deactivating a punched-in member closes their open session in the same
+  // transaction, so both paths of setMemberActive now need these two
+  // delegates on the tx client.
+  const attendanceSession = {
+    updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      orphaned.push(args);
+      return { count: parts.openSessionCount ?? 0 };
+    },
+  };
+  const activityLog = {
+    create: async (args: { data: Record<string, unknown> }) => {
+      activity.push(args.data);
+      return args.data;
+    },
   };
   const db = {
     user: {
@@ -30,6 +51,8 @@ function fakeDb(parts: FakeParts) {
       update,
       count: async () => parts.activeAdminCount ?? 1,
     },
+    attendanceSession,
+    activityLog,
     $transaction: async (fn: (tx: unknown) => Promise<void>, options?: unknown) => {
       transactionOptions.push(options);
       if (parts.transactionError) throw parts.transactionError;
@@ -39,11 +62,13 @@ function fakeDb(parts: FakeParts) {
           update,
           count: async () => parts.postUpdateActiveAdminCount ?? parts.activeAdminCount ?? 1,
         },
+        attendanceSession,
+        activityLog,
       };
       return fn(tx);
     },
   } as unknown as PrismaClient;
-  return { db, updates, transactionOptions };
+  return { db, updates, transactionOptions, orphaned, activity };
 }
 
 const serializationConflict = () =>
@@ -73,6 +98,44 @@ describe("setMemberActive", () => {
     const result = await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
     expect(result.ok).toBe(true);
     expect(updates[0]).toEqual({ active: false });
+  });
+
+  // Attendance is owner-only by ruling, and a deactivated member is signed
+  // out and drops off the Team page — so an open session left behind would be
+  // unresolvable by anyone, forever. It is discarded rather than closed at
+  // this instant, because nobody knows when they actually stopped working.
+  it("discards a deactivated member's open session without inventing an end time", async () => {
+    const { db, orphaned } = fakeDb({ target: member, openSessionCount: 1 });
+    await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
+    expect(orphaned).toHaveLength(1);
+    expect(orphaned[0].where).toEqual({ memberId: "m1", resolution: null });
+    expect(orphaned[0].data).toMatchObject({ resolution: "DISCARDED", resolvedById: "a1" });
+    expect(orphaned[0].data).not.toHaveProperty("endedAt");
+  });
+
+  it("logs the orphaned session, since somebody other than its owner resolved it", async () => {
+    const { db, activity } = fakeDb({ target: member, openSessionCount: 1 });
+    await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
+    expect(activity[0]).toMatchObject({
+      actorId: "a1",
+      entityType: "ATTENDANCE",
+      action: "attendance.orphaned",
+      clientId: null,
+    });
+  });
+
+  it("logs nothing when the deactivated member had no open session", async () => {
+    const { db, activity } = fakeDb({ target: member, openSessionCount: 0 });
+    await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
+    expect(activity).toHaveLength(0);
+  });
+
+  // Reactivating must not touch attendance — there is no session to close,
+  // and sweeping on the way back in would discard a fresh punch.
+  it("does not touch attendance when reactivating", async () => {
+    const { db, orphaned } = fakeDb({ target: { ...member, active: false }, openSessionCount: 1 });
+    await setMemberActive(db, { targetId: "m1", active: true, actorId: "a1" });
+    expect(orphaned).toHaveLength(0);
   });
 
   it("reactivates a deactivated member", async () => {

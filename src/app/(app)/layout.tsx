@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { listNotifications, countUnreadNotifications } from "@/lib/notification-queries";
+import { getPunchState } from "@/lib/attendance-queries";
 
 /** The sidebar's collapsed preference. A cookie rather than localStorage
  * because the server has to know it: localStorage is unreadable during a
@@ -26,7 +27,12 @@ export default async function AppLayout({
   // One round trip, not two: the sidebar's My Tasks count and quick-add's
   // member list are both needed on every screen and neither depends on the
   // other.
-  const [members, myTaskCount, notifications, unreadCount, projects] = await Promise.all([
+  // One instant for the whole render: the punch state is derived against it,
+  // and the topbar's ticking counter subtracts it from the device clock to
+  // correct for skew. Taking `new Date()` twice would make those disagree.
+  const now = new Date();
+
+  const [members, myTaskCount, notifications, unreadCount, projects, punch] = await Promise.all([
     prisma.user.findMany({
       where: { active: true },
       select: { id: true, name: true },
@@ -57,6 +63,11 @@ export default async function AppLayout({
       select: { id: true, name: true, clientId: true },
       orderBy: { name: "asc" },
     }),
+    // The punch control is in the topbar, so this runs on every authenticated
+    // page — the same cost, and the same caveat, as the project list above.
+    // It is exactly one query and joins this Promise.all rather than adding a
+    // round trip.
+    getPunchState(prisma, session.user.id, now),
   ]);
 
   async function signOutAction() {
@@ -103,6 +114,8 @@ export default async function AppLayout({
           unreadCount={unreadCount}
           myTaskCount={myTaskCount}
           isAdmin={session.user.role === "ADMIN"}
+          punch={punch}
+          serverNow={now}
         />
         {/* `update`, not `enter`/`exit`. Those two fire when a ViewTransition
             mounts or unmounts; this one lives in the layout and stays mounted

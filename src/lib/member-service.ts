@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { ActionResult, ok, err } from "@/lib/action-result";
 import { generateTemporaryPassword, hashPassword } from "@/lib/password";
+import { orphanOpenSessionFor } from "@/lib/attendance-service";
 
 /** Internal sentinel thrown inside a transaction when the post-update recount
  * shows zero active admins remain — caught and mapped to the friendly guard
@@ -36,6 +37,16 @@ export async function setMemberActive(
 
   const reducesActiveAdmins = !input.active && target.role === "ADMIN" && target.active;
 
+  // Deactivating someone who is still punched in must close their session in
+  // the same transaction. They are about to be signed out by
+  // `refreshTokenFromDb` and to vanish from `listTeamCards` (which filters to
+  // active members), so an open row left behind is unresolvable by anyone
+  // afterwards — attendance is owner-only by ruling, and the owner is gone.
+  // It is discarded rather than closed at this instant because nobody knows
+  // when they actually stopped working.
+  const isDeactivation = !input.active && target.active;
+  const now = new Date();
+
   if (reducesActiveAdmins) {
     // Fast friendly path: catches the common case cheaply.
     if ((await countActiveAdmins(db)) <= 1) {
@@ -50,6 +61,13 @@ export async function setMemberActive(
           where: { id: input.targetId },
           data: { active: input.active },
         });
+        if (isDeactivation) {
+          await orphanOpenSessionFor(tx, {
+            memberId: input.targetId,
+            actorId: input.actorId,
+            now,
+          });
+        }
         const remaining = await tx.user.count({ where: { role: "ADMIN", active: true } });
         if (remaining < 1) throw new AdminInvariantError();
       }, SERIALIZABLE);
@@ -63,9 +81,16 @@ export async function setMemberActive(
     return ok(undefined);
   }
 
-  await db.user.update({
-    where: { id: input.targetId },
-    data: { active: input.active },
+  // A transaction on this path too, now that it may write two rows: the user
+  // update and the orphaned session must land together or not at all.
+  await db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: input.targetId },
+      data: { active: input.active },
+    });
+    if (isDeactivation) {
+      await orphanOpenSessionFor(tx, { memberId: input.targetId, actorId: input.actorId, now });
+    }
   });
   return ok(undefined);
 }

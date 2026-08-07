@@ -77,7 +77,14 @@ export function MemberCard({ card }: { card: TeamCard }) {
             {card.title ? <p className="truncate text-xs text-[var(--text-3)]">{card.title}</p> : null}
           </div>
         </Link>
-        <Badge kind="neutral">{card.openTaskLabel}</Badge>
+        {/* Wraps, because two badges plus a name do not fit the 3-up grid on
+            a narrow window or a phone. */}
+        <div className="flex flex-none flex-wrap items-center justify-end gap-1.5">
+          <Badge kind={card.presenceBadge} dot>
+            {card.presenceLabel}
+          </Badge>
+          <Badge kind="neutral">{card.openTaskLabel}</Badge>
+        </div>
       </div>
 
       {hasNothingAssigned ? (

@@ -4,8 +4,10 @@ import { QuickAdd } from "@/components/tasks/quick-add";
 import { AccountMenu } from "@/components/shell/account-menu";
 import { MobileNav } from "@/components/shell/mobile-nav";
 import { NotificationBell } from "@/components/shell/notification-bell";
+import { PunchControl } from "@/components/shell/punch-control";
 import { SearchBox } from "@/components/shell/search-box";
 import type { NotificationRow } from "@/lib/notification-queries";
+import type { PunchState } from "@/lib/attendance-queries";
 
 /** `z-30` and `relative` because the popovers escape this header; without a
  * stacking context of its own the page content below can paint over them.
@@ -23,6 +25,8 @@ export function Topbar({
   unreadCount,
   myTaskCount,
   isAdmin,
+  punch,
+  serverNow,
 }: {
   userName: string;
   userEmail: string;
@@ -34,6 +38,12 @@ export function Topbar({
   projects: { id: string; name: string; clientId: string }[];
   notifications: NotificationRow[];
   unreadCount: number;
+  /** The viewer's own attendance. Fetched in the layout's existing
+   * Promise.all — the topbar itself fetches nothing. */
+  punch: PunchState;
+  /** The server's clock at render, so the ticking counter can correct for a
+   * device clock that disagrees with it. */
+  serverNow: Date;
   /** For <MobileNav>, which replaces the sidebar below md and needs the same
    * two facts the sidebar renders from: the My Tasks badge and whether the
    * admin-only rows show. */
@@ -55,6 +65,12 @@ export function Topbar({
       <MobileNav myTaskCount={myTaskCount} isAdmin={isAdmin} />
       <SearchBox />
       <QuickAdd members={members} projects={projects} />
+      <PunchControl
+        openSince={punch.openSince}
+        unresolved={punch.unresolved}
+        closedMs={punch.closedMs}
+        serverNow={serverNow}
+      />
       <NotificationBell notifications={notifications} unreadCount={unreadCount} />
       <AccountMenu
         userName={userName}

@@ -2,7 +2,14 @@ import { describe, it, expect } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { getMemberProfile, listTeamCards } from "@/lib/team-queries";
 
-type UserRow = { id: string; name: string; title: string | null };
+type OpenSessionRow = { startedAt: Date; endedAt: Date | null; resolution: string | null };
+type UserRow = {
+  id: string;
+  name: string;
+  title: string | null;
+  /** At most one row — the partial unique index guarantees it. */
+  attendance: OpenSessionRow[];
+};
 type GroupRow = { userId: string; _count: { _all: number } };
 type OpenTaskRow = {
   userId: string;
@@ -56,8 +63,22 @@ function fakeDb(parts: { users?: UserRow[]; groups?: GroupRow[]; openTasks?: Ope
 const DUE = new Date("2026-08-14T00:00:00.000Z");
 
 function userRow(overrides: Partial<UserRow> = {}): UserRow {
-  return { id: "u1", name: "Dana Reeve", title: "Designer", ...overrides };
+  return { id: "u1", name: "Dana Reeve", title: "Designer", attendance: [], ...overrides };
 }
+
+const NOW = new Date("2026-08-07T09:00:00.000Z");
+/** Open, started earlier the same app day. */
+const punchedInToday: OpenSessionRow = {
+  startedAt: new Date("2026-08-07T04:00:00.000Z"),
+  endedAt: null,
+  resolution: null,
+};
+/** Open, but from the previous app day — forgotten, not present. */
+const forgottenYesterday: OpenSessionRow = {
+  startedAt: new Date("2026-08-05T04:00:00.000Z"),
+  endedAt: null,
+  resolution: null,
+};
 
 function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
   return { userId: "u1", _count: { _all: 3 }, ...overrides };
@@ -342,6 +363,42 @@ describe("listTeamCards", () => {
     expect(cards[0].inProgress).toEqual([]);
     expect(cards[0].otherOpen).toEqual([]);
     expect(cards[0].otherOpenExtra).toBe(0);
+  });
+
+  // The presence dot rides along on the member query. These three assertions
+  // are the N+1 guard: if presence ever becomes its own call, the delegate
+  // counts asserted above change and this suite fails loudly.
+  it("reports a member with an open session started today as Active", async () => {
+    const { db } = fakeDb({ users: [userRow({ id: "u1", attendance: [punchedInToday] })] });
+    const cards = await listTeamCards(db, NOW);
+    expect(cards[0].presenceLabel).toBe("Active");
+  });
+
+  it("reports a member with no attendance rows as Offline, never undefined", async () => {
+    const { db } = fakeDb({ users: [userRow({ id: "u1", attendance: [] })] });
+    const cards = await listTeamCards(db, NOW);
+    expect(cards[0].presenceLabel).toBe("Offline");
+    expect(cards[0].presenceBadge).toBeTruthy();
+  });
+
+  // Someone who forgot to punch out on Wednesday is not at their desk on
+  // Friday. The row stays open — it is never auto-closed — but it stops
+  // claiming presence at the day roll.
+  it("reports a session left open from an earlier day as Offline", async () => {
+    const { db } = fakeDb({ users: [userRow({ id: "u1", attendance: [forgottenYesterday] })] });
+    const cards = await listTeamCards(db, NOW);
+    expect(cards[0].presenceLabel).toBe("Offline");
+  });
+
+  it("asks for at most one open session per member on the member query", async () => {
+    const { db, userFindManyArgs } = fakeDb({ users: [userRow()] });
+    await listTeamCards(db, NOW);
+    const select = (userFindManyArgs[0] as { select: { attendance: unknown } }).select;
+    expect(select.attendance).toEqual({
+      where: { resolution: null },
+      select: { startedAt: true, endedAt: true, resolution: true },
+      take: 1,
+    });
   });
 
   it("carries the job title and initials for each member", async () => {

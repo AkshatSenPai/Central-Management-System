@@ -1,4 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
+import type { BadgeKind } from "@/lib/badges";
+import { presenceOf } from "@/lib/attendance";
 import { clientInitials } from "@/lib/client";
 import {
   openTaskSummary,
@@ -39,6 +41,12 @@ export type TeamCard = {
   otherOpen: TeamCardTask[];
   /** How many `otherOpen` rows the cap left off. Zero when nothing was cut. */
   otherOpenExtra: number;
+  /** "Active" or "Offline". A binary on purpose: to everyone else a colleague
+   * is present or not, with no start time, elapsed count or day total — those
+   * are the member's own, in the topbar. Broadcasting "punched in 9 hours ago"
+   * would turn a forgotten punch-out into a daily public embarrassment. */
+  presenceLabel: string;
+  presenceBadge: BadgeKind;
 };
 
 /**
@@ -49,11 +57,28 @@ export type TeamCard = {
  * so a member absent from both the group-by and the findMany results still
  * renders correctly and <MemberCard> never null-checks.
  */
-export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
+export async function listTeamCards(
+  db: PrismaClient,
+  now: Date = new Date()
+): Promise<TeamCard[]> {
   const members = await db.user.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, title: true },
+    select: {
+      id: true,
+      name: true,
+      title: true,
+      // Presence rides along on the member query rather than becoming a
+      // fourth call. The partial unique index means there is at most one open
+      // row per member, so `take: 1` is the whole set, not a sample — and the
+      // three-queries-regardless-of-team-size contract this file documents
+      // (and its tests assert) survives untouched.
+      attendance: {
+        where: { resolution: null },
+        select: { startedAt: true, endedAt: true, resolution: true },
+        take: 1,
+      },
+    },
   });
   if (members.length === 0) return [];
 
@@ -63,6 +88,7 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
   // so a member with no rows in either query still gets a correct card.
   const cards = new Map<string, TeamCard>();
   for (const m of members) {
+    const presence = presenceOf(m.attendance[0] ?? null, now);
     cards.set(m.id, {
       id: m.id,
       name: m.name,
@@ -73,6 +99,8 @@ export async function listTeamCards(db: PrismaClient): Promise<TeamCard[]> {
       inProgress: [],
       otherOpen: [],
       otherOpenExtra: 0,
+      presenceLabel: presence.label,
+      presenceBadge: presence.badge,
     });
   }
 
