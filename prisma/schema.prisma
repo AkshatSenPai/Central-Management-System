@@ -1,5 +1,17 @@
 generator client {
   provider = "prisma-client-js"
+
+  /// For AttendanceSession's partial unique index — "at most one OPEN session
+  /// per member", which is the only thing standing between a double-tapped
+  /// punch button and two concurrent open sessions. Verified on prisma 7.9.1:
+  /// without this flag `@@unique([...], where: {...})` is a validation error;
+  /// with it, `migrate diff` emits
+  ///   CREATE UNIQUE INDEX ... ON "AttendanceSession"("memberId")
+  ///     WHERE ("resolution" IS NULL);
+  /// The alternative was hand-writing that line into migration.sql, which is
+  /// drift the datamodel cannot see and the next `migrate dev` writes a DROP
+  /// for. A preview flag is the cheaper of the two risks.
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -39,6 +51,8 @@ model User {
   notified        Notification[]          @relation("NotificationActor")
   feedback        Feedback[]              @relation("FeedbackAuthor")
   feedbackHandled Feedback[]              @relation("FeedbackResolver")
+  attendance      AttendanceSession[]     @relation("AttendanceMember")
+  attendanceFixed AttendanceSession[]     @relation("AttendanceResolver")
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 }
@@ -333,6 +347,110 @@ model Announcement {
   @@index([pinnedUntil])
 }
 
+/// How an open attendance session stopped being open. NULL is the whole "is
+/// this person at work right now" question — see the partial unique index on
+/// AttendanceSession, which is the only thing that both enforces and answers
+/// it.
+enum AttendanceResolution {
+  /// Punched out in the moment. The only case where `endedAt` is a
+  /// measurement rather than a claim somebody typed later.
+  PUNCH_OUT
+
+  /// The end time was supplied afterwards, because the punch-out was
+  /// forgotten. `endedAt` is what a human said, not what a clock saw. Any
+  /// surface that totals hours must be able to tell the difference — that is
+  /// why this is an enum and not a `closed Boolean`.
+  CORRECTED
+
+  /// Written off: punched in, never punched out, and nobody knows when they
+  /// left. `endedAt` stays NULL forever and the row contributes zero to every
+  /// total, because a guessed end time is exactly what the owner ruled out on
+  /// 2026-08-07. The row is kept rather than deleted — "Priya was here at
+  /// 09:04" is true and useful; "Monday did not happen" is not.
+  DISCARDED
+}
+
+/// One punch-in and its punch-out. Many rows per person per day: lunch splits
+/// the day and that is normal, so a day total is the sum of the pairs, never
+/// the first-to-last span.
+///
+/// Deliberately NO reference to Task, and there will not be one (owner ruling,
+/// 2026-08-07). A per-task timer measures only work that happens to have a
+/// task row, and the studio does work that does not — so this model answers
+/// "was this person working", never "on what".
+///
+/// A session is attributed WHOLLY to the app day of its `startedAt` and is
+/// never split at midnight. A shift starting 22:00 Tuesday lands entirely on
+/// Tuesday and Wednesday reads zero for it. That is a recorded decision, not
+/// an oversight: splitting one real event into two rows is the same class of
+/// invention as guessing an end time. There is deliberately no `day` column
+/// and no per-day summary table — a second definition of "day" written in SQL
+/// is one that can disagree with `startOfAppDay`.
+model AttendanceSession {
+  id String @id @default(cuid())
+
+  /// Never cascades, the same rule as Task.creator and CalendarEvent.creator:
+  /// members are deactivated rather than deleted precisely so history keeps
+  /// its people. Prisma's default for a required relation is RESTRICT, which
+  /// is what this wants — do not "tidy" it into Cascade.
+  member   User   @relation("AttendanceMember", fields: [memberId], references: [id])
+  memberId String
+
+  /// No @default(now()): the service owns this instant, because it is the same
+  /// one it validates against and writes to its ActivityLog row inside a
+  /// transaction, and a database-side default is invisible to that code.
+  /// Matches CalendarEvent.startsAt. The client never supplies it.
+  startedAt DateTime
+
+  /// NULL means one of two very different things, and `resolution` is what
+  /// tells them apart: still working, or written off unfinished. Nothing may
+  /// infer an end from a shift length, a day boundary, or the next punch-in.
+  endedAt DateTime?
+
+  /// NULL exactly while the session is open. This — **not** `endedAt IS NULL` —
+  /// is the openness test, and the distinction is load-bearing: a DISCARDED
+  /// session keeps `endedAt` null forever, so keying openness off `endedAt`
+  /// would leave it occupying the one open slot the index below permits and
+  /// lock that person out of punching in ever again.
+  resolution AttendanceResolution?
+
+  /// When the resolution was made, which is not `endedAt`. A punch-out has the
+  /// two equal; a Friday correction for Thursday evening has them a day apart,
+  /// and "when was this claim made" is the audit question.
+  resolvedAt DateTime?
+
+  /// Normally the member themselves. Optional relation so it nulls rather than
+  /// blocks, the same trade Feedback.resolvedBy makes.
+  resolvedBy   User?   @relation("AttendanceResolver", fields: [resolvedById], references: [id])
+  resolvedById String?
+
+  /// Why a CORRECTED end is what it is, or why a session was written off.
+  /// Plain text, never rendered as markup — the same contract as Comment.body.
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One open session per person, enforced by Postgres rather than by a
+  /// read-then-write in the service, which two taps on a slow connection will
+  /// lose: under READ COMMITTED the second transaction's SELECT cannot see the
+  /// first's uncommitted INSERT.
+  ///
+  /// `@@unique([memberId, resolution])` would NOT do this job — Postgres treats
+  /// NULLs as distinct, so every open row would be permitted. Do not
+  /// "simplify" it into one.
+  ///
+  /// Note Prisma still exposes `memberId` alone in the WhereUniqueInput, so
+  /// `findUnique({ where: { memberId } })` type-checks while being unique only
+  /// among open rows. Never use it as a selector; read the open session with
+  /// `findFirst({ where: { memberId, resolution: null } })`. This index's real
+  /// job is failing the second concurrent punch-in with P2002.
+  @@unique([memberId], where: { resolution: null })
+  /// One member's sessions in a window: the topbar's day total, a week figure,
+  /// a future export. Range column last, matching ActivityLog's [clientId, at].
+  @@index([memberId, startedAt])
+}
+
 /// What a piece of feedback is about. Kept deliberately short — a taxonomy
 /// nobody can choose between is one everybody picks the first option from.
 enum FeedbackKind {
@@ -370,8 +488,8 @@ model Feedback {
   author   User   @relation("FeedbackAuthor", fields: [authorId], references: [id])
   authorId String
 
-  kind FeedbackKind   @default(SUGGESTION)
-  body String
+  kind   FeedbackKind   @default(SUGGESTION)
+  body   String
   status FeedbackStatus @default(NEW)
 
   /// Which account this came from, for the day the CMS is sold as a service
