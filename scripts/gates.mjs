@@ -58,8 +58,25 @@ const TSX = "src/**/*.tsx";
 
 const gates = [
   {
-    name: "1. no dark: variant, no hardcoded colour outside globals.css",
-    run: () => grep(["dark:|#[0-9a-fA-F]{3,6}", "--", TSX, "src/**/*.ts"]),
+    // `email-templates.ts` is exempt, and it is the only exemption.
+    //
+    // This gate exists so the app's colours come from the theme tokens in
+    // globals.css rather than being sprinkled through components. Email is a
+    // different medium and cannot participate: there is no stylesheet to
+    // reference, `var()` is unsupported or stripped by most clients, and a
+    // colour must be a literal hex inside a `style` attribute or it will not
+    // render. Excluding the file is honest; the alternative is either an
+    // unreadable email or a permanently red gate that somebody eventually
+    // deletes.
+    name: "1. no dark: variant, no hardcoded colour outside globals.css (email templates exempt)",
+    run: () =>
+      grep([
+        "dark:|#[0-9a-fA-F]{3,6}",
+        "--",
+        TSX,
+        "src/**/*.ts",
+        ":!src/lib/email-templates.ts",
+      ]),
   },
   {
     name: "2. no raw <button> outside the Button primitive",
