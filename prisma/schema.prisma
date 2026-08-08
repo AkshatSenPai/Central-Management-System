@@ -24,37 +24,38 @@ enum Role {
 }
 
 model User {
-  id              String                  @id @default(cuid())
-  email           String                  @unique
-  name            String
-  passwordHash    String?
-  role            Role                    @default(MEMBER)
-  active          Boolean                 @default(true)
-  title           String?
-  phone           String?
-  avatarUrl       String?
-  emailVerified   DateTime?
-  image           String?
-  accounts        Account[]
-  sessions        Session[]
-  invitesCreated  Invite[]                @relation("InviteCreator")
-  activity        ActivityLog[]           @relation("ActivityActor")
-  clientsLed      Client[]                @relation("ClientAccountLead")
-  tasksCreated    Task[]                  @relation("TaskCreator")
-  taskAssignments TaskAssignee[]
-  eventsCreated   CalendarEvent[]         @relation("CalendarEventCreator")
-  eventAttendance CalendarEventAttendee[]
-  comments        Comment[]               @relation("CommentAuthor")
-  attachments     Attachment[]            @relation("AttachmentUploader")
-  announcements   Announcement[]          @relation("AnnouncementAuthor")
-  notifications   Notification[]          @relation("NotificationRecipient")
-  notified        Notification[]          @relation("NotificationActor")
-  feedback        Feedback[]              @relation("FeedbackAuthor")
-  feedbackHandled Feedback[]              @relation("FeedbackResolver")
-  attendance      AttendanceSession[]     @relation("AttendanceMember")
-  attendanceFixed AttendanceSession[]     @relation("AttendanceResolver")
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  id                String                  @id @default(cuid())
+  email             String                  @unique
+  name              String
+  passwordHash      String?
+  role              Role                    @default(MEMBER)
+  active            Boolean                 @default(true)
+  title             String?
+  phone             String?
+  avatarUrl         String?
+  emailVerified     DateTime?
+  image             String?
+  accounts          Account[]
+  sessions          Session[]
+  invitesCreated    Invite[]                @relation("InviteCreator")
+  activity          ActivityLog[]           @relation("ActivityActor")
+  clientsLed        Client[]                @relation("ClientAccountLead")
+  tasksCreated      Task[]                  @relation("TaskCreator")
+  taskAssignments   TaskAssignee[]
+  eventsCreated     CalendarEvent[]         @relation("CalendarEventCreator")
+  eventAttendance   CalendarEventAttendee[]
+  comments          Comment[]               @relation("CommentAuthor")
+  attachments       Attachment[]            @relation("AttachmentUploader")
+  announcements     Announcement[]          @relation("AnnouncementAuthor")
+  notifications     Notification[]          @relation("NotificationRecipient")
+  notified          Notification[]          @relation("NotificationActor")
+  feedback          Feedback[]              @relation("FeedbackAuthor")
+  feedbackHandled   Feedback[]              @relation("FeedbackResolver")
+  attendance        AttendanceSession[]     @relation("AttendanceMember")
+  attendanceFixed   AttendanceSession[]     @relation("AttendanceResolver")
+  pushSubscriptions PushSubscription[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 }
 
 model Invite {
@@ -345,6 +346,102 @@ model Announcement {
 
   @@index([createdAt])
   @@index([pinnedUntil])
+}
+
+/// One browser's push subscription. A row here is a **delivery route to a
+/// device**, not a record that anything happened — which settles most of the
+/// questions this model raises: routes may be deleted freely, and a stale one
+/// is a bug rather than history. Contrast AttendanceSession, which keeps its
+/// rows precisely because they *are* history.
+///
+/// Push adds reach outside the tab; it is not a new NotificationType. `notify()`
+/// still writes the bell rows inside the caller's transaction — that is what
+/// stops a rolled-back comment telling somebody they were mentioned — and the
+/// Server Action hands the fan-out over these rows to `after()` once the write
+/// is durable, exactly as invites hand email to `sendEmail`. Nothing may push
+/// from inside a transaction, for the reasons written atop `email-sender.ts`.
+model PushSubscription {
+  id String @id @default(cuid())
+
+  /// Cascades, like Session and Notification, and unlike Task.creator or
+  /// AttendanceSession.member. Those RESTRICT because they are history and
+  /// history keeps its people; this is a live route to a browser, and a route
+  /// belonging to a deleted user is one nobody may ever send to again.
+  ///
+  /// **Deactivation is not deletion, and the database cannot see it.** Members
+  /// are deactivated rather than deleted here, so nothing above fires when
+  /// somebody leaves — and their task assignments survive, so a fan-out would
+  /// keep buzzing an ex-colleague's phone long after they were signed out.
+  /// `setMemberActive` therefore deletes that member's rows itself, on both of
+  /// its branches. That is a security rule, not hygiene.
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// The push service's URL for this device — the only thing that identifies a
+  /// device. `p256dh`/`auth` are subordinate key material; `id` is ours, not
+  /// the browser's. Deliberately unindexed: lookups go through `endpointHash`,
+  /// and the 404/410 delete happens by id on a row already in hand.
+  endpoint String
+
+  /// `sha256(endpoint)` as hex, written by the service. The real unique key.
+  ///
+  /// Uniqueness is **global, not per user**, and that is load-bearing. One
+  /// browser profile has one subscription, so when a second person signs in on
+  /// a shared machine their subscribe returns the endpoint the first person is
+  /// already stored under. `@@unique([userId, endpointHash])` would keep both
+  /// rows and quietly deliver the new person's mentions to the old one's
+  /// device. Upsert on this column and let `userId` move: the device belongs to
+  /// whoever subscribed last.
+  ///
+  /// A hash rather than `@unique` on `endpoint` itself because a unique index
+  /// is a btree, a btree entry much over 2704 bytes is refused at INSERT, and
+  /// the Push API sets no maximum endpoint length. Today's endpoints are
+  /// nowhere near that, which is exactly the danger: it would work for years
+  /// and then fail permanently for one person, reading as "push is broken on
+  /// my machine".
+  endpointHash String @unique
+
+  /// The subscription's key material, base64url, exactly as the browser handed
+  /// it over. Both required: a row missing either can never encrypt a payload,
+  /// so the action refuses such a subscription rather than storing a route
+  /// that cannot deliver.
+  ///
+  /// `auth` is a shared secret and both are per-device identifiers, so they are
+  /// **never logged and never sent to the client** — the devices list selects
+  /// id, userAgent and updatedAt, nothing else. Stored plaintext on purpose:
+  /// the sender needs them to encrypt, so encrypting them here would be
+  /// decryptable by this app's own code and buys nothing a database compromise
+  /// would not already have.
+  p256dh String
+  auth   String
+
+  /// The raw user-agent at subscribe time, clamped by the action. Nullable
+  /// because the header can be absent, and a route that works beats a label
+  /// that is missing. Stored raw with "Chrome on Android" derived at render.
+  /// It earns a column because revoking is otherwise unaimable: three rows for
+  /// one person are three opaque URLs, and somebody revoking the phone they
+  /// lost cannot be asked to tell them apart.
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  /// Doubles as "last confirmed by the browser", which is why there is no
+  /// `lastUsedAt` and no `failureCount`. The client re-upserts whenever it
+  /// loads with a live subscription, so this moves for every device that still
+  /// exists.
+  ///
+  /// Dead rows need no counter: a push service answers 404/410/403 for a
+  /// subscription that is gone, and that is definitive on the FIRST failure —
+  /// the sender deletes the row there, inside the same `after()` that tried to
+  /// send. Every other status (429, 5xx, timeout) is transient and must never
+  /// accumulate toward a deletion. This matters more than it looks: there is no
+  /// cron in this app, so any expiry scheme needing a sweeper is one that would
+  /// never run.
+  updatedAt DateTime @updatedAt
+
+  /// The only query there is: every subscription belonging to the recipients of
+  /// one fan-out. Nothing sorts, filters or pages it.
+  @@index([userId])
 }
 
 /// How an open attendance session stopped being open. NULL is the whole "is
