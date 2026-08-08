@@ -47,6 +47,14 @@ const materialSymbols = localFont({
 export const metadata: Metadata = {
   title: "Meridian Ops",
   description: "Internal operations hub",
+  // `apple` is not redundant with the manifest's icons: iOS ignores those
+  // entirely when adding to the home screen, and without an apple-touch-icon
+  // Safari uses a screenshot of the page as the icon. On Android the manifest
+  // wins and this is unused.
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

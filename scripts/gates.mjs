@@ -58,17 +58,21 @@ const TSX = "src/**/*.tsx";
 
 const gates = [
   {
-    // `email-templates.ts` is exempt, and it is the only exemption.
+    // Two files are exempt, and only two. Both are cases where the colour is
+    // consumed somewhere a stylesheet does not reach, so a token is not merely
+    // inconvenient but impossible:
     //
-    // This gate exists so the app's colours come from the theme tokens in
-    // globals.css rather than being sprinkled through components. Email is a
-    // different medium and cannot participate: there is no stylesheet to
-    // reference, `var()` is unsupported or stripped by most clients, and a
-    // colour must be a literal hex inside a `style` attribute or it will not
-    // render. Excluding the file is honest; the alternative is either an
-    // unreadable email or a permanently red gate that somebody eventually
-    // deletes.
-    name: "1. no dark: variant, no hardcoded colour outside globals.css (email templates exempt)",
+    //   email-templates.ts — mail clients strip <style> blocks and never load
+    //     external CSS, so a colour must be a literal hex in a style attribute.
+    //   app/manifest.ts — the manifest is JSON handed to the browser and
+    //     parsed before any stylesheet exists; background_color and theme_color
+    //     paint the install splash screen, and var() there is not a colour.
+    //
+    // The alternative in both cases is a permanently red gate, which is a gate
+    // somebody eventually deletes. Keep this list at two unless a third has the
+    // same "no stylesheet can reach it" property — "it was easier" does not
+    // qualify.
+    name: "1. no dark: variant, no hardcoded colour outside globals.css (email + manifest exempt)",
     run: () =>
       grep([
         "dark:|#[0-9a-fA-F]{3,6}",
@@ -76,6 +80,7 @@ const gates = [
         TSX,
         "src/**/*.ts",
         ":!src/lib/email-templates.ts",
+        ":!src/app/manifest.ts",
       ]),
   },
   {
@@ -139,6 +144,22 @@ const gates = [
     run: () => {
       try {
         execFileSync("node", ["scripts/fetch-icon-font.mjs", "--check"], { encoding: "utf8" });
+        return "";
+      } catch (e) {
+        return (e.stderr || e.stdout || String(e)).trim();
+      }
+    },
+  },
+  {
+    // Same contract as gate 8, for the PWA icons: the mark lives in the
+    // generator script, the PNGs are committed, and this is what stops the two
+    // drifting. A stale home-screen icon is invisible in development — nobody
+    // installs the app to check — and only shows up on somebody's phone weeks
+    // later, still wearing the old logo.
+    name: "10. the committed app icons match scripts/generate-app-icons.mjs",
+    run: () => {
+      try {
+        execFileSync("node", ["scripts/generate-app-icons.mjs", "--check"], { encoding: "utf8" });
         return "";
       } catch (e) {
         return (e.stderr || e.stdout || String(e)).trim();
