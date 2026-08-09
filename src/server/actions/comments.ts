@@ -19,10 +19,23 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pushForNotifications } from "@/lib/push-fanout";
 import { err, type ActionResult } from "@/lib/action-result";
 import { requireUser, AuthError } from "@/server/guards";
 import { addComment, updateComment, removeComment } from "@/lib/comment-service";
+
+/** Hands the notification ids to the push fan-out once the response is sent.
+ *
+ * See the twin in `tasks.ts`. `after()` is the seam: it runs after the
+ * transaction that wrote those rows has committed, so a mention push can never
+ * describe a comment that was rolled back — which is the same guarantee
+ * `notify()` gives the bell, extended to the phone. */
+function pushAfterCommit(notificationIds: string[]): void {
+  if (notificationIds.length === 0) return;
+  after(() => pushForNotifications(prisma, notificationIds));
+}
 
 /** The member list mentions resolve against. Active only: mentioning someone
  * who has left should stay literal text rather than linking to a profile
@@ -42,9 +55,9 @@ function revalidate(taskId: string, projectId: string, clientId: string) {
 }
 
 export async function addCommentAction(
-  _prev: ActionResult<{ id: string }> | null,
+  _prev: ActionResult<{ id: string; notificationIds: string[] }> | null,
   formData: FormData
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; notificationIds: string[] }>> {
   try {
     const user = await requireUser();
     const taskId = String(formData.get("taskId") ?? "");
@@ -59,6 +72,9 @@ export async function addCommentAction(
       String(formData.get("projectId") ?? ""),
       String(formData.get("clientId") ?? "")
     );
+    // ok branch only — pushing before checking would announce a mention in a
+    // comment that was never written.
+    if (result.ok) pushAfterCommit(result.data.notificationIds);
     return result;
   } catch (e) {
     if (e instanceof AuthError) return err(e.message);
@@ -67,9 +83,9 @@ export async function addCommentAction(
 }
 
 export async function updateCommentAction(
-  _prev: ActionResult | null,
+  _prev: ActionResult<{ notificationIds: string[] }> | null,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notificationIds: string[] }>> {
   try {
     const user = await requireUser();
     const result = await updateComment(prisma, {
@@ -83,6 +99,8 @@ export async function updateCommentAction(
       String(formData.get("projectId") ?? ""),
       String(formData.get("clientId") ?? "")
     );
+    // Only people the edit newly mentioned; updateComment already filtered.
+    if (result.ok) pushAfterCommit(result.data.notificationIds);
     return result;
   } catch (e) {
     if (e instanceof AuthError) return err(e.message);

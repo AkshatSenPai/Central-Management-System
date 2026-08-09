@@ -72,7 +72,7 @@ async function loadCommentScope(
 export async function addComment(
   db: PrismaClient,
   input: { taskId: string; body: string; actorId: string; members: readonly Mentionable[] }
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; notificationIds: string[] }>> {
   const parsed = commentSchema.safeParse({ body: input.body });
   if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
 
@@ -107,7 +107,10 @@ export async function addComment(
     // The payoff for storing mentionedUserIds in 3c. Inside the transaction,
     // so a rolled-back comment cannot leave someone told they were mentioned
     // in a comment that does not exist.
-    await notify(tx, {
+    // Carried out so the action can push after the commit. Note the excerpt
+    // stays in `meta` for the bell but never reaches a device: the push body
+    // is built by `describeNotification`, which cannot read that key.
+    const notificationIds = await notify(tx, {
       recipientIds: mentionedUserIds,
       actorId: input.actorId,
       type: "COMMENT_MENTION",
@@ -115,9 +118,9 @@ export async function addComment(
       entityId: input.taskId,
       meta: { name: task.title, excerpt: excerpt(parsed.data.body) },
     });
-    return comment;
+    return { comment, notificationIds };
   });
-  return ok({ id: created.id });
+  return ok({ id: created.comment.id, notificationIds: created.notificationIds });
 }
 
 /** Only the author may edit (spec 3c D3). Not even an admin: an admin editing
@@ -131,7 +134,7 @@ export async function updateComment(
     actorId: string;
     members: readonly Mentionable[];
   }
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notificationIds: string[] }>> {
   const parsed = commentSchema.safeParse({ body: input.body });
   if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "Invalid input");
 
@@ -142,7 +145,7 @@ export async function updateComment(
   // No change, no write and no activity row — the same no-op rule as
   // setChecklistItemDone, and it keeps "edited" off a comment that was opened
   // and saved without being touched.
-  if (scope.comment.body === parsed.data.body) return ok(undefined);
+  if (scope.comment.body === parsed.data.body) return ok({ notificationIds: [] });
 
   const mentionedUserIds = extractMentionedUserIds(parsed.data.body, input.members);
   // Only people the edit *added*. Editing a typo in a comment that already
@@ -151,13 +154,14 @@ export async function updateComment(
   const previouslyMentioned = new Set(scope.comment.mentionedUserIds);
   const newlyMentioned = mentionedUserIds.filter((id) => !previouslyMentioned.has(id));
 
+  let notificationIds: string[] = [];
   try {
     await db.$transaction(async (tx) => {
       await tx.comment.update({
         where: { id: input.commentId },
         data: { body: parsed.data.body, mentionedUserIds, editedAt: new Date() },
       });
-      await notify(tx, {
+      notificationIds = await notify(tx, {
         recipientIds: newlyMentioned,
         actorId: input.actorId,
         type: "COMMENT_MENTION",
@@ -178,7 +182,7 @@ export async function updateComment(
     if (isRowGoneRace(e)) return err("Comment not found");
     throw e;
   }
-  return ok(undefined);
+  return ok({ notificationIds });
 }
 
 /** The author, or an admin (spec 3c D3). `isAdmin` is passed in rather than

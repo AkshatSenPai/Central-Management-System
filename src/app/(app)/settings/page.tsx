@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/icon";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { Badge } from "@/components/ui/badge";
 import { ThemeControl } from "@/components/settings/theme-control";
+import { PushControl } from "@/components/settings/push-control";
 import { ActivityExportForm } from "@/components/settings/activity-export-form";
 import { clientInitials } from "@/lib/client";
 import type { IconName } from "@/lib/icons";
@@ -59,6 +60,12 @@ export default async function SettingsPage() {
   const name = session.user.name ?? "";
   const isAdmin = session.user.role === "ADMIN";
 
+  // Read on the server and passed down rather than referenced in the client
+  // component. NEXT_PUBLIC_ variables are inlined at build time, so reading it
+  // here also means the Notifications section simply does not render in an
+  // environment without keys — see the note at its call site.
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+
   // Only the export form needs these, so they are not fetched for a member.
   // Deactivated members are included in the picker on purpose: their past
   // actions are still in the log, and an export that cannot be filtered to
@@ -90,6 +97,15 @@ export default async function SettingsPage() {
       <SectionCard title="Appearance" flush>
         <ThemeControl />
       </SectionCard>
+
+      {/* Rendered only when VAPID is configured. Without keys the control
+          could offer a toggle that stores a subscription nothing will ever
+          send to — an "on" state that is a lie. An absent section is honest. */}
+      {vapidPublicKey ? (
+        <SectionCard title="Notifications" flush>
+          <PushControl publicKey={vapidPublicKey} />
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Manage" flush>
         <LinkRow

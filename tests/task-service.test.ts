@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import type { TaskPriority, TaskStatus } from "@/lib/task";
 
 // `removeTask` now sweeps its attachments' R2 objects, so `task-service.ts`
-// imports `attachment-service.ts`, which imports `r2.ts` — and `r2.ts`
+// imports `attachment-service.ts`, which imports `r2.ts` Ã¢â‚¬â€ and `r2.ts`
 // constructs its `S3Client` at *module scope*, reading four env vars that do
 // not exist in a test run (`r2.ts:83-97`, and the comment there defending
 // eager construction: an unset variable should fail by name at load, not
@@ -31,23 +31,23 @@ beforeEach(() => {
 });
 
 type FakeParts = {
-  /** Row returned by task.findUnique — loadTaskScope's walk-up target. */
+  /** Row returned by task.findUnique Ã¢â‚¬â€ loadTaskScope's walk-up target. */
   task?: unknown;
-  /** Rows returned by task.findMany — the sibling order query. */
+  /** Rows returned by task.findMany Ã¢â‚¬â€ the sibling order query. */
   siblings?: { order: number }[];
-  /** Row returned by project.findUnique — createTask's own parent lookup. */
+  /** Row returned by project.findUnique Ã¢â‚¬â€ createTask's own parent lookup. */
   project?: unknown;
-  /** Row returned by milestone.findUnique — the pair rule. */
+  /** Row returned by milestone.findUnique Ã¢â‚¬â€ the pair rule. */
   milestone?: unknown;
-  /** Rows returned by user.findMany — resolveAssignees. */
+  /** Rows returned by user.findMany Ã¢â‚¬â€ resolveAssignees. */
   activeUsers?: { id: string; name: string }[];
-  /** Rows returned by taskAssignee.findMany — setTaskAssignees' current set,
+  /** Rows returned by taskAssignee.findMany Ã¢â‚¬â€ setTaskAssignees' current set,
    * carrying names so the remove side never needs an active-user lookup. */
   currentAssignees?: { userId: string; user: { name: string } }[];
-  /** Thrown by task.delete when set — simulates a concurrent P2025 raised
+  /** Thrown by task.delete when set Ã¢â‚¬â€ simulates a concurrent P2025 raised
    * when the row was already gone by the time the transaction ran. */
   taskDeleteError?: unknown;
-  /** Rows returned by attachment.findMany — what `removeTask`'s
+  /** Rows returned by attachment.findMany Ã¢â‚¬â€ what `removeTask`'s
    * `deleteAttachmentObjectsFor` sweep finds under this task. Absent means a
    * task with nothing attached, which is the shape every pre-existing test
    * in this file assumes. */
@@ -88,9 +88,9 @@ function emptySink(): Sink {
 
 /** The Phase 2 fake shape, plus a second capture sink for the transaction
  * client. Reads are shared between `db` and `tx`, but writes go to the sink
- * they were called on — so a write issued on the outer `db` (a
- * non-transactional slip, including `recordActivity(db, …)` instead of
- * `recordActivity(tx, …)`) lands in `dbW` and fails any test asserting it
+ * they were called on Ã¢â‚¬â€ so a write issued on the outer `db` (a
+ * non-transactional slip, including `recordActivity(db, Ã¢â‚¬Â¦)` instead of
+ * `recordActivity(tx, Ã¢â‚¬Â¦)`) lands in `dbW` and fails any test asserting it
  * empty, instead of silently passing. */
 function fakeDb(parts: FakeParts) {
   const dbW = emptySink();
@@ -139,7 +139,7 @@ function fakeDb(parts: FakeParts) {
     },
     attachment: {
       // Returns the fixture regardless of `where`, and the scope is asserted
-      // separately off `args.attachmentFindManyWhere` — the same call
+      // separately off `args.attachmentFindManyWhere` Ã¢â‚¬â€ the same call
       // `tests/attachment-service.test.ts`'s own fake makes, for the reason
       // recorded there: a fake that filtered by `where` itself would hide a
       // sweep that dropped `parentId` and deleted every TASK attachment in
@@ -508,7 +508,7 @@ describe("updateTask", () => {
 
   it("a cross-client project move logs task.updated under the OLD client's id", async () => {
     // taskWithProject's pre-move project (p1) belongs to client c1; whatever
-    // client the new project (p2) belongs to is irrelevant — the row must
+    // client the new project (p2) belongs to is irrelevant Ã¢â‚¬â€ the row must
     // carry the client whose timeline the task is leaving. project2 must
     // exist so the target-project guard lets the move through.
     const { db, txW } = fakeDb({ task: taskWithProject, project: project2 });
@@ -518,7 +518,7 @@ describe("updateTask", () => {
 
   it("errors when moved to a project that does not exist", async () => {
     const { db, txW, dbW } = fakeDb({ task: taskWithProject });
-    // milestoneId is cleared so the pair rule doesn't intercept this first —
+    // milestoneId is cleared so the pair rule doesn't intercept this first Ã¢â‚¬â€
     // the point here is the target project itself is missing.
     const result = await updateTask(db, { ...baseUpdateInput, projectId: "ghost", milestoneId: null });
     expect(result).toEqual({ ok: false, error: "Project not found" });
@@ -542,7 +542,7 @@ describe("updateTask", () => {
 
   // The mirror of the case above, and deliberately NOT symmetric with it. R13
   // narrates a move on the timeline it is leaving, but a personal task has no
-  // timeline to leave — scoping to the pre-move client would write null and
+  // timeline to leave Ã¢â‚¬â€ scoping to the pre-move client would write null and
   // put the row on no timeline at all.
   it("adopting a personal task into a project logs task.updated under the destination client", async () => {
     const { db, txW } = fakeDb({ task: personalTask, project: project1 });
@@ -644,14 +644,14 @@ describe("removeTask", () => {
     expect(result).toEqual({ ok: false, error: "Task not found" });
   });
 
-  // Spec §6:111 — "the one place where a missed code path silently leaks
+  // Spec Ã‚Â§6:111 Ã¢â‚¬â€ "the one place where a missed code path silently leaks
   // storage, and it is the part to review hardest". Until this call site
   // existed, `deleteAttachmentObjectsFor` had no caller at all, so every
   // claim its doc comment makes about running nested inside someone else's
   // transaction was untested reasoning. These are that path's first
   // automated coverage. They cannot prove the objects actually left the
-  // bucket — only a real browser pass listing the prefix can, and that is
-  // task 7's job — but they can prove the sweep is *reached*, with the right
+  // bucket Ã¢â‚¬â€ only a real browser pass listing the prefix can, and that is
+  // task 7's job Ã¢â‚¬â€ but they can prove the sweep is *reached*, with the right
   // scope, on the right sink, and that no ordinary failure skips it.
   describe("the attachment sweep", () => {
     const attachments = [
@@ -671,7 +671,7 @@ describe("removeTask", () => {
     });
 
     // The scope, asserted directly rather than inferred from which rows came
-    // back — the fake returns its fixture regardless of `where`, precisely so
+    // back Ã¢â‚¬â€ the fake returns its fixture regardless of `where`, precisely so
     // a sweep that dropped `parentId` (and would delete every TASK
     // attachment in the database) cannot pass by returning the same rows.
     it("scopes the sweep to this task, by both parentType and parentId", async () => {
@@ -684,7 +684,7 @@ describe("removeTask", () => {
     // whole "leak rather than lie" ruling rests on: a sweep running on the
     // outer `db` would commit row deletions the enclosing transaction could
     // no longer roll back.
-    it("runs inside the transaction — nothing lands on the outer db", async () => {
+    it("runs inside the transaction Ã¢â‚¬â€ nothing lands on the outer db", async () => {
       const { db, dbW, txW } = fakeDb({ task: taskWithProject, attachments });
       await removeTask(db, { taskId: "t1", actorId: "u1" });
       expect(dbW.attachmentsDeleted).toHaveLength(0);
@@ -692,7 +692,7 @@ describe("removeTask", () => {
     });
 
     // The leak-not-lie ruling itself. R2 refuses; the rows go anyway; the
-    // task delete still succeeds. The alternative — abort — would leave rows
+    // task delete still succeeds. The alternative Ã¢â‚¬â€ abort Ã¢â‚¬â€ would leave rows
     // pointing at objects that may already be gone, under a task that no
     // longer exists, and would fail a delete the user asked for because a
     // bucket had a hiccup.
@@ -715,7 +715,7 @@ describe("removeTask", () => {
     // The ordering decision at this call site: the sweep is the LAST
     // statement in the transaction, so it is never reached by a run that is
     // about to roll back for an unrelated reason. A P2025 on `task.delete`
-    // is exactly that run — and if the sweep had been placed first, R2
+    // is exactly that run Ã¢â‚¬â€ and if the sweep had been placed first, R2
     // objects would already be gone by the time the rollback restored the
     // rows that name them.
     it("is never reached when the task delete itself loses a race", async () => {
@@ -762,7 +762,10 @@ describe("setTaskAssignees", () => {
       activeUsers: [{ id: "u3", name: "Sam Ortiz" }],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u3"], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    // Assignees were added, so notify() wrote rows and returned their ids.
+    // This test is about the assignee diff; the ids themselves belong to
+    // tests/notifications.test.ts.
+    expect(result.ok).toBe(true);
     expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1"] } });
     expect(txW.assigneesCreated[0].data).toEqual([{ taskId: "t1", userId: "u3" }]);
     // Guards against dropping `where: { taskId }` from the taskAssignee.findMany
@@ -793,7 +796,7 @@ describe("setTaskAssignees", () => {
       ],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u1"], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    expect(result).toEqual({ ok: true, data: { notificationIds: [] } });
     expect(txW.assigneesDeleted).toHaveLength(0);
     expect(txW.assigneesCreated).toHaveLength(0);
     expect(txW.activity).toHaveLength(0);
@@ -880,14 +883,14 @@ describe("setTaskAssignees", () => {
       ],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u1", "u2"], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    expect(result).toEqual({ ok: true, data: { notificationIds: [] } });
     expect(txW.assigneesDeleted).toHaveLength(0);
     expect(txW.assigneesCreated).toHaveLength(0);
     expect(txW.activity).toHaveLength(0);
     expect(dbW.assigneesDeleted).toHaveLength(0);
     expect(dbW.assigneesCreated).toHaveLength(0);
     // No addedIds at all means resolveAssignees (and its user.findMany) is
-    // never called — u1 never reaches the active-user check.
+    // never called Ã¢â‚¬â€ u1 never reaches the active-user check.
     expect(calls.userFindMany).toBe(0);
   });
 
@@ -906,7 +909,10 @@ describe("setTaskAssignees", () => {
       activeUsers: [{ id: "u3", name: "Sam Ortiz" }],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u1", "u2", "u3"], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    // Assignees were added, so notify() wrote rows and returned their ids.
+    // This test is about the assignee diff; the ids themselves belong to
+    // tests/notifications.test.ts.
+    expect(result.ok).toBe(true);
     expect(txW.assigneesDeleted).toHaveLength(0);
     expect(txW.assigneesCreated[0].data).toEqual([{ taskId: "t1", userId: "u3" }]);
     expect(txW.activity).toHaveLength(1);
@@ -950,7 +956,10 @@ describe("setTaskAssignees", () => {
       ],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2", "u3"], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    // Assignees were added, so notify() wrote rows and returned their ids.
+    // This test is about the assignee diff; the ids themselves belong to
+    // tests/notifications.test.ts.
+    expect(result.ok).toBe(true);
     expect(txW.assigneesCreated[0].data).toEqual([
       { taskId: "t1", userId: "u2" },
       { taskId: "t1", userId: "u3" },
@@ -968,7 +977,7 @@ describe("setTaskAssignees", () => {
       ],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: [], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    expect(result).toEqual({ ok: true, data: { notificationIds: [] } });
     expect(txW.assigneesDeleted[0].where).toEqual({ taskId: "t1", userId: { in: ["u1", "u2"] } });
     expect(txW.activity).toHaveLength(1);
     expect(txW.activity[0]).toMatchObject({ action: "task.unassigned" });
@@ -1006,20 +1015,23 @@ describe("setTaskAssignees", () => {
   });
 
   // These two replace a pair that asserted a P2002 retry. That retry was
-  // removed: `skipDuplicates: true` compiles to INSERT … ON CONFLICT DO
+  // removed: `skipDuplicates: true` compiles to INSERT Ã¢â‚¬Â¦ ON CONFLICT DO
   // NOTHING, so Postgres absorbs a concurrent duplicate rather than raising
-  // P2002 — verified against the real database, where the duplicate insert
+  // P2002 Ã¢â‚¬â€ verified against the real database, where the duplicate insert
   // returned { count: 0 } and only the same insert WITHOUT skipDuplicates
   // threw. The old tests could only ever witness the fake throwing what the
   // fixture told it to.
-  it("relies on skipDuplicates rather than a retry — one insert attempt, ever", async () => {
+  it("relies on skipDuplicates rather than a retry Ã¢â‚¬â€ one insert attempt, ever", async () => {
     const { db, txW } = fakeDb({
       task: taskForAssign,
       currentAssignees: [],
       activeUsers: [{ id: "u2", name: "Jordan Lee" }],
     });
     const result = await setTaskAssignees(db, { taskId: "t1", userIds: ["u2"], actorId: "u1" });
-    expect(result).toEqual({ ok: true, data: undefined });
+    // Assignees were added, so notify() wrote rows and returned their ids.
+    // This test is about the assignee diff; the ids themselves belong to
+    // tests/notifications.test.ts.
+    expect(result.ok).toBe(true);
     expect(txW.assigneesCreated).toHaveLength(1);
     expect(txW.assigneesCreated[0].skipDuplicates).toBe(true);
   });
@@ -1027,13 +1039,13 @@ describe("setTaskAssignees", () => {
   // The race that is actually reachable, and the one the retry never
   // addressed. Two overlapping saves each diff against their own snapshot of
   // `current`; the later one computes `removedIds` from stale data and
-  // deletes a row the earlier save just created. Last writer wins — the
+  // deletes a row the earlier save just created. Last writer wins Ã¢â‚¬â€ the
   // intended semantics of a set replacement, but it must be deliberate
   // rather than accidental, so it is pinned here.
   it("a save diffing against a stale snapshot removes what a concurrent save just added", async () => {
     // This snapshot predates a concurrent save that added u3. u3 is therefore
     // absent from `current`, absent from the submitted set, and so lands in
-    // neither list — the concurrent addition simply survives untouched.
+    // neither list Ã¢â‚¬â€ the concurrent addition simply survives untouched.
     const stale = fakeDb({
       task: taskForAssign,
       currentAssignees: [{ userId: "u1", user: { name: "Alex Kim" } }],
@@ -1058,7 +1070,10 @@ describe("setTaskAssignees", () => {
       userIds: ["u2"],
       actorId: "u1",
     });
-    expect(result).toEqual({ ok: true, data: undefined });
+    // Assignees were added, so notify() wrote rows and returned their ids.
+    // This test is about the assignee diff; the ids themselves belong to
+    // tests/notifications.test.ts.
+    expect(result.ok).toBe(true);
     expect(clobber.txW.assigneesDeleted[0].where).toEqual({
       taskId: "t1",
       userId: { in: ["u1", "u3"] },
@@ -1127,7 +1142,7 @@ describe("notifications (Phase 4)", () => {
     expect(txW.notifications).toEqual([]);
   });
 
-  // entityId carries no foreign key, so nothing cascades — a notification
+  // entityId carries no foreign key, so nothing cascades Ã¢â‚¬â€ a notification
   // about a deleted task would be a link to a 404.
   it("clears a removed task's notifications inside the transaction", async () => {
     const { db, txW } = fakeDb({ task: taskWithProject });

@@ -37,10 +37,13 @@ export function TaskAssigneesForm({
   members: Array<{ id: string; name: string; active: boolean }>;
   selectedIds: string[];
 }) {
-  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    setTaskAssigneesAction,
-    null
-  );
+  // The action's success payload now carries the notification ids the push
+  // fan-out consumed. This form reads only `ok`/`error`, but the generic has
+  // to match or useActionState's state and the action's return disagree.
+  const [state, formAction, pending] = useActionState<
+    ActionResult<{ notificationIds: string[] }> | null,
+    FormData
+  >(setTaskAssigneesAction, null);
 
   return (
     <form action={formAction} className="space-y-2">

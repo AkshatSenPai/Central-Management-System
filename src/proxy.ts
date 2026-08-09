@@ -20,9 +20,13 @@ export default NextAuth(authConfig).auth;
  * Nothing behind these paths is private — the manifest is the app's name,
  * colours and icon list, and the icons are a logo.
  *
- * **A service worker will need the same treatment when push lands.** A worker
- * must be served from the scope it controls and cannot sit behind a redirect,
- * so whatever path it takes must be added to this list in the same change. */
+ * `sw.js` is the service worker, and it landed as that note predicted. A
+ * worker is fetched without credentials and must be served from the scope it
+ * controls, so an auth redirect here does not fail loudly — registration
+ * simply rejects, and push is silently dead on that browser with nothing in
+ * the UI to say so. It caches nothing and contains no data. */
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
+  matcher: [
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw.js).*)",
+  ],
 };

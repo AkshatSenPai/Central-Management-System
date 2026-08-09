@@ -25,8 +25,10 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { pushForNotifications } from "@/lib/push-fanout";
 import { err, type ActionResult } from "@/lib/action-result";
 import { AuthError, requireUser } from "@/server/guards";
 import { taskSchema, checklistItemSchema, TASK_STATUSES } from "@/lib/task";
@@ -40,10 +42,22 @@ import {
 import { addChecklistItem, setChecklistItemDone, removeChecklistItem } from "@/lib/checklist-service";
 import { parseDateInput } from "@/lib/dates";
 
+/** Hands the notification ids to the push fan-out once the response is sent.
+ *
+ * `after()` is the seam, and it is load-bearing rather than an optimisation:
+ * the transaction that wrote those rows has committed by the time this runs,
+ * so a push can never describe a write that was rolled back. It also keeps the
+ * user's request off the push services' latency. Shared by the two actions
+ * here that produce pushable notifications. */
+function pushAfterCommit(notificationIds: string[]): void {
+  if (notificationIds.length === 0) return;
+  after(() => pushForNotifications(prisma, notificationIds));
+}
+
 export async function createTaskAction(
   _prev: ActionResult<{ id: string }> | null,
   formData: FormData
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; notificationIds: string[] }>> {
   try {
     const user = await requireUser();
     const clientId = String(formData.get("clientId") ?? "");
@@ -85,6 +99,10 @@ export async function createTaskAction(
       revalidatePath(`/projects/${projectId}`);
     }
     if (clientId) revalidatePath(`/clients/${clientId}`);
+    // On the ok branch only. Scheduling before checking the result would push
+    // about a task that was never created — the exact inversion of the rule
+    // notify() exists to protect.
+    if (result.ok) pushAfterCommit(result.data.notificationIds);
     return result;
   } catch (e) {
     if (e instanceof AuthError) return err(e.message);
@@ -175,9 +193,9 @@ export async function setTaskStatusAction(formData: FormData): Promise<ActionRes
 }
 
 export async function setTaskAssigneesAction(
-  _prev: ActionResult | null,
+  _prev: ActionResult<{ notificationIds: string[] }> | null,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notificationIds: string[] }>> {
   try {
     const user = await requireUser();
     const taskId = String(formData.get("taskId") ?? "");
@@ -197,6 +215,7 @@ export async function setTaskAssigneesAction(
       revalidatePath(`/projects/${projectId}`);
     }
     if (clientId) revalidatePath(`/clients/${clientId}`);
+    if (result.ok) pushAfterCommit(result.data.notificationIds);
     return result;
   } catch (e) {
     if (e instanceof AuthError) return err(e.message);

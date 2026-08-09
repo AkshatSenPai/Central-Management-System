@@ -107,7 +107,7 @@ function pick<T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K
 export async function createTask(
   db: PrismaClient,
   input: TaskWriteInput & { status: TaskStatus; assigneeIds: string[]; actorId: string }
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; notificationIds: string[] }>> {
   const title = input.title.trim();
   if (!title) return err("Task title is required");
 
@@ -173,7 +173,9 @@ export async function createTask(
     // receiving it, as being handed it a minute later by an edit. Notifying
     // only on the edit path would mean quick-add — the app's fastest way to
     // assign someone something — told them nothing.
-    await notify(tx, {
+    // Carried out of the transaction so the action can push once the write is
+    // durable. Nothing pushes from in here — see notification-service.ts.
+    const notificationIds = await notify(tx, {
       recipientIds: assignees.map((a) => a.id),
       actorId: input.actorId,
       type: "TASK_ASSIGNED",
@@ -181,9 +183,9 @@ export async function createTask(
       entityId: task.id,
       meta: { name: task.title },
     });
-    return task;
+    return { task, notificationIds };
   });
-  return ok({ id: created.id });
+  return ok({ id: created.task.id, notificationIds: created.notificationIds });
 }
 
 export async function updateTask(
@@ -386,7 +388,7 @@ async function attemptTaskAssigneeDiff(
   db: PrismaClient,
   scope: { task: { title: string }; clientId: string | null },
   input: { taskId: string; userIds: string[]; actorId: string }
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notificationIds: string[] }>> {
   const current = await db.taskAssignee.findMany({
     where: { taskId: input.taskId },
     select: { userId: true, user: { select: { name: true } } },
@@ -400,7 +402,7 @@ async function attemptTaskAssigneeDiff(
   // A true set diff, never a blanket delete: an unchanged submission
   // (including one that re-submits a deactivated current assignee — see
   // setTaskAssignees) writes nothing at all and logs nothing.
-  if (addedIds.length === 0 && removedIds.length === 0) return ok(undefined);
+  if (addedIds.length === 0 && removedIds.length === 0) return ok({ notificationIds: [] });
 
   // Only the NEW ids are ever checked against the active-user list; a
   // deactivated id already present in `current` never reaches this call.
@@ -409,7 +411,7 @@ async function attemptTaskAssigneeDiff(
 
   const removedNames = current.filter((row) => removedIds.includes(row.userId)).map((row) => row.user.name);
 
-  await db.$transaction(async (tx) => {
+  const notificationIds = await db.$transaction(async (tx) => {
     // Scoped to exactly the departed ids (R: a true diff) — wiping every
     // row for the task and recreating the survivors would churn rows that
     // never changed at all.
@@ -450,7 +452,7 @@ async function attemptTaskAssigneeDiff(
     // were assigned. Removal deliberately notifies nobody: being taken off a
     // task is not urgent, and a bell that fires on every reshuffle is a bell
     // people learn to ignore.
-    await notify(tx, {
+    return notify(tx, {
       recipientIds: addedIds,
       actorId: input.actorId,
       type: "TASK_ASSIGNED",
@@ -459,7 +461,7 @@ async function attemptTaskAssigneeDiff(
       meta: { name: scope.task.title },
     });
   });
-  return ok(undefined);
+  return ok({ notificationIds });
 }
 
 /** The universal-assignment invariant: any member can assign work to any
@@ -478,7 +480,7 @@ async function attemptTaskAssigneeDiff(
 export async function setTaskAssignees(
   db: PrismaClient,
   input: { taskId: string; userIds: string[]; actorId: string }
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notificationIds: string[] }>> {
   const scope = await loadTaskScope(db, input.taskId);
   if (!scope.ok) return err("Task not found");
 
