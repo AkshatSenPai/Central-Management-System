@@ -122,9 +122,11 @@ function fakeDb(parts: FakeParts) {
       },
     },
     notification: {
-      createMany: async (a: { data: Record<string, unknown>[] }) => {
+      // createManyAndReturn, not createMany: notify() hands the new ids back
+      // so the push fan-out can re-read the exact rows the bell will render.
+      createManyAndReturn: async (a: { data: Record<string, unknown>[] }) => {
         sink.notifications.push(...a.data);
-        return { count: a.data.length };
+        return a.data.map((_, i) => ({ id: `notif${i + 1}` }));
       },
       deleteMany: async (a: Record<string, unknown>) => {
         sink.notificationsCleared.push(a);

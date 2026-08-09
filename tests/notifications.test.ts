@@ -8,15 +8,17 @@ import {
   unreadBadge,
 } from "@/lib/notifications";
 
-/** Captures what notify() hands to createMany, in the shape Prisma would get. */
+/** Captures what notify() hands to createManyAndReturn, in the shape Prisma
+ * would get, and hands back ids the way the real client does — push depends on
+ * those ids, so a fake that returned nothing would hide a broken fan-out. */
 function fakeDb() {
   const created: Record<string, unknown>[] = [];
   const deleted: unknown[] = [];
   const db = {
     notification: {
-      createMany: async (a: { data: Record<string, unknown>[] }) => {
+      createManyAndReturn: async (a: { data: Record<string, unknown>[] }) => {
         created.push(...a.data);
-        return { count: a.data.length };
+        return a.data.map((_, i) => ({ id: `n${created.length - a.data.length + i + 1}` }));
       },
       deleteMany: async (a: unknown) => {
         deleted.push(a);

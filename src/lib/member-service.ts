@@ -67,6 +67,7 @@ export async function setMemberActive(
             actorId: input.actorId,
             now,
           });
+          await tx.pushSubscription.deleteMany({ where: { userId: input.targetId } });
         }
         const remaining = await tx.user.count({ where: { role: "ADMIN", active: true } });
         if (remaining < 1) throw new AdminInvariantError();
@@ -90,6 +91,7 @@ export async function setMemberActive(
     });
     if (isDeactivation) {
       await orphanOpenSessionFor(tx, { memberId: input.targetId, actorId: input.actorId, now });
+      await tx.pushSubscription.deleteMany({ where: { userId: input.targetId } });
     }
   });
   return ok(undefined);

@@ -21,6 +21,7 @@ type FakeParts = {
 
 function fakeDb(parts: FakeParts) {
   const updates: Record<string, unknown>[] = [];
+  const pushDeletes: Record<string, unknown>[] = [];
   const transactionOptions: unknown[] = [];
   /** Attendance rows closed as a side effect of deactivation. */
   const orphaned: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
@@ -45,6 +46,14 @@ function fakeDb(parts: FakeParts) {
       return args.data;
     },
   };
+  // Deactivation also deletes that member's push subscriptions, in the same
+  // transaction. That is a security rule rather than hygiene — see the test.
+  const pushSubscription = {
+    deleteMany: async (args: { where: Record<string, unknown> }) => {
+      pushDeletes.push(args.where);
+      return { count: 0 };
+    },
+  };
   const db = {
     user: {
       findUnique,
@@ -53,6 +62,7 @@ function fakeDb(parts: FakeParts) {
     },
     attendanceSession,
     activityLog,
+    pushSubscription,
     $transaction: async (fn: (tx: unknown) => Promise<void>, options?: unknown) => {
       transactionOptions.push(options);
       if (parts.transactionError) throw parts.transactionError;
@@ -64,11 +74,12 @@ function fakeDb(parts: FakeParts) {
         },
         attendanceSession,
         activityLog,
+        pushSubscription,
       };
       return fn(tx);
     },
   } as unknown as PrismaClient;
-  return { db, updates, transactionOptions, orphaned, activity };
+  return { db, updates, transactionOptions, orphaned, activity, pushDeletes };
 }
 
 const serializationConflict = () =>
@@ -128,6 +139,36 @@ describe("setMemberActive", () => {
     const { db, activity } = fakeDb({ target: member, openSessionCount: 0 });
     await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
     expect(activity).toHaveLength(0);
+  });
+
+  // A security test, not hygiene. Push subscriptions are routes to a device,
+  // and deactivation is not deletion — nothing cascades. A member's task
+  // assignments survive being deactivated, so without this their phone keeps
+  // buzzing with mentions long after they were signed out of the app.
+  it("deletes a deactivated member's push subscriptions", async () => {
+    const { db, pushDeletes } = fakeDb({ target: member });
+    await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
+    expect(pushDeletes).toEqual([{ userId: "m1" }]);
+  });
+
+  // The same rule on the other branch. setMemberActive has two write paths —
+  // the Serializable last-admin backstop and the plain one — and a rule
+  // applied to only one of them is a rule that holds for members but not for
+  // admins, which is the wrong way round.
+  it("deletes them on the last-admin backstop path too", async () => {
+    const { db, pushDeletes } = fakeDb({
+      target: { ...member, role: "ADMIN" },
+      activeAdminCount: 2,
+      postUpdateActiveAdminCount: 1,
+    });
+    await setMemberActive(db, { targetId: "m1", active: false, actorId: "a1" });
+    expect(pushDeletes).toEqual([{ userId: "m1" }]);
+  });
+
+  it("leaves push subscriptions alone when reactivating", async () => {
+    const { db, pushDeletes } = fakeDb({ target: { ...member, active: false } });
+    await setMemberActive(db, { targetId: "m1", active: true, actorId: "a1" });
+    expect(pushDeletes).toEqual([]);
   });
 
   // Reactivating must not touch attendance — there is no session to close,

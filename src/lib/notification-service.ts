@@ -29,6 +29,20 @@ export type NotificationEntity = "TASK" | "COMMENT" | "ANNOUNCEMENT" | "CALENDAR
  *
  * A no-op when nothing is left after those two filters — `createMany` with an
  * empty array is a pointless round trip inside someone's transaction.
+ *
+ * **Returns the ids of the rows it wrote, which is the handle push needs.**
+ * It deliberately returns ids rather than recipient ids: the fan-out re-reads
+ * these exact rows, so the sentence pushed to a phone is built from the same
+ * record the bell renders and the two cannot drift. It also means push never
+ * computes a recipient set of its own, so the actor-drop and dedupe rules above
+ * stay stated exactly once, here.
+ *
+ * **No push logic lives in this function**, and none may. It runs inside the
+ * caller's transaction — that is the whole point of it — and a network call in
+ * that position holds a connection open on a third party's latency and can
+ * deliver a notification about a write that then rolls back. The Server Action
+ * hands these ids to `pushForNotifications` through `after()` once the commit
+ * is durable.
  */
 export async function notify(
   db: NotificationDb,
@@ -41,11 +55,11 @@ export async function notify(
     entityId: string;
     meta?: NotificationMeta;
   }
-): Promise<void> {
+): Promise<string[]> {
   const recipients = [...new Set(input.recipientIds)].filter((id) => id !== input.actorId);
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return [];
 
-  await db.notification.createMany({
+  const created = await db.notification.createManyAndReturn({
     data: recipients.map((recipientId) => ({
       recipientId,
       actorId: input.actorId,
@@ -54,7 +68,9 @@ export async function notify(
       entityId: input.entityId,
       meta: (input.meta ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
     })),
+    select: { id: true },
   });
+  return created.map((row) => row.id);
 }
 
 /** Clears notifications pointing at an entity that no longer exists.
