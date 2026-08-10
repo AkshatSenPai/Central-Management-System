@@ -41,6 +41,8 @@ export type ActivityAction =
   | "task.assigned"
   | "task.unassigned"
   | "task.removed"
+  | "task.dependency_added"
+  | "task.dependency_removed"
   | "checklist.added"
   | "checklist.completed"
   | "checklist.reopened"
@@ -228,6 +230,10 @@ export function describeActivity(entry: {
     }
     case "task.removed":
       return `${who} removed task ${what}`;
+    case "task.dependency_added":
+      return `${who} blocked ${what} on ${metaString(entry.meta, "blocker") ?? "another task"}`;
+    case "task.dependency_removed":
+      return `${who} unblocked ${what} from ${metaString(entry.meta, "blocker") ?? "another task"}`;
     case "checklist.added":
       return `${who} added checklist item ${what}`;
     case "checklist.completed":

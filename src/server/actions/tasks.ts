@@ -36,6 +36,8 @@ import {
   createTask,
   updateTask,
   setTaskStatus,
+  addTaskDependency,
+  removeTaskDependency,
   setTaskAssignees,
   removeTask,
 } from "@/lib/task-service";
@@ -185,6 +187,69 @@ export async function setTaskStatusAction(formData: FormData): Promise<ActionRes
       revalidatePath(`/projects/${projectId}`);
     }
     if (clientId) revalidatePath(`/clients/${clientId}`);
+    return result;
+  } catch (e) {
+    if (e instanceof AuthError) return err(e.message);
+    throw e;
+  }
+}
+
+/** The six paths a task appears on, revalidated together. A dependency
+ * changes what renders on every one of them — the chip is on the board, the
+ * lists and both detail pages — so this is the same set setTaskStatusAction
+ * revalidates, extracted rather than written a third and fourth time. */
+function revalidateTaskSurfaces(taskId: string, projectId: string, clientId: string) {
+  revalidatePath("/my-tasks");
+  revalidatePath("/team");
+  revalidatePath(`/tasks/${taskId}`);
+  if (projectId) {
+    revalidatePath("/projects");
+    revalidatePath(`/projects/${projectId}`);
+  }
+  if (clientId) revalidatePath(`/clients/${clientId}`);
+}
+
+export async function addTaskDependencyAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const blockedTaskId = String(formData.get("taskId") ?? "");
+    const blockerTaskId = String(formData.get("blockerTaskId") ?? "");
+    if (!blockedTaskId || !blockerTaskId) return err("Invalid input");
+
+    const result = await addTaskDependency(prisma, {
+      blockedTaskId,
+      blockerTaskId,
+      actorId: user.id,
+    });
+    revalidateTaskSurfaces(
+      blockedTaskId,
+      String(formData.get("projectId") ?? ""),
+      String(formData.get("clientId") ?? "")
+    );
+    return result;
+  } catch (e) {
+    if (e instanceof AuthError) return err(e.message);
+    throw e;
+  }
+}
+
+export async function removeTaskDependencyAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const blockedTaskId = String(formData.get("taskId") ?? "");
+    const blockerTaskId = String(formData.get("blockerTaskId") ?? "");
+    if (!blockedTaskId || !blockerTaskId) return err("Invalid input");
+
+    const result = await removeTaskDependency(prisma, {
+      blockedTaskId,
+      blockerTaskId,
+      actorId: user.id,
+    });
+    revalidateTaskSurfaces(
+      blockedTaskId,
+      String(formData.get("projectId") ?? ""),
+      String(formData.get("clientId") ?? "")
+    );
     return result;
   } catch (e) {
     if (e instanceof AuthError) return err(e.message);

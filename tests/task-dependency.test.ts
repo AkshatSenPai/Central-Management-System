@@ -10,7 +10,7 @@ vi.mock("@/lib/r2", () => ({
   R2DeleteObjectsError: class extends Error {},
 }));
 
-import { wouldCloseCycle } from "@/lib/task-service";
+import { wouldCloseCycle, addTaskDependency, removeTaskDependency } from "@/lib/task-service";
 
 /** An in-memory edge list. `edges` are [blockedTaskId, blockerTaskId] pairs,
  * read exactly as wouldCloseCycle reads them: "the first waits on the
@@ -100,5 +100,154 @@ describe("wouldCloseCycle", () => {
     expect(await wouldCloseCycle(db, { blockedTaskId: "a", blockerTaskId: "t1" })).toBe(false);
     // t1 -> t2 -> t3 -> t4 -> (empty). Four levels walked, not four per node.
     expect(queries).toBe(4);
+  });
+});
+
+/** Reads for the two task lookups and the cycle walk, plus a capture sink per
+ * client. Writes go to the sink they were called on, so a write issued on the
+ * outer `db` — including recordActivity(db, ...) instead of
+ * recordActivity(tx, ...) — lands in dbW and fails any test asserting it
+ * empty, instead of silently passing. The same trick tests/task-service.test.ts
+ * uses, for the same reason. */
+function fakeDepDb(parts: {
+  edges?: [string, string][];
+  tasks?: Record<string, { id: string; title: string; reference: number }>;
+}) {
+  const edges = parts.edges ?? [];
+  const tasks = parts.tasks ?? {};
+  const empty = () => ({ created: [] as unknown[], deleted: [] as unknown[], activity: [] as Record<string, unknown>[] });
+  const dbW = empty();
+  const txW = empty();
+
+  const reads = {
+    taskDependency: {
+      findMany: async (a: { where: { blockedTaskId: { in: string[] } } }) => {
+        const frontier = new Set(a.where.blockedTaskId.in);
+        return edges
+          .filter(([blocked]) => frontier.has(blocked))
+          .map(([blockedTaskId, blockerTaskId]) => ({ blockedTaskId, blockerTaskId }));
+      },
+    },
+    task: {
+      // loadTaskScope's walk-up.
+      findUnique: async (a: { where: { id: string } }) => {
+        const t = tasks[a.where.id];
+        if (!t) return null;
+        return {
+          id: t.id,
+          title: t.title,
+          description: null,
+          projectId: null,
+          milestoneId: null,
+          status: "TO_DO",
+          priority: "MEDIUM",
+          dueDate: null,
+          project: null,
+        };
+      },
+      // loadDependencyPair reads both ends in one query.
+      findMany: async (a: { where: { id: { in: string[] } } }) =>
+        a.where.id.in.map((id) => tasks[id]).filter(Boolean),
+    },
+  };
+
+  function writes(sink: ReturnType<typeof empty>) {
+    return {
+      taskDependency: {
+        ...reads.taskDependency,
+        create: async (a: unknown) => {
+          sink.created.push(a);
+          return {};
+        },
+        delete: async (a: unknown) => {
+          sink.deleted.push(a);
+          return {};
+        },
+      },
+      activityLog: {
+        create: async (a: { data: Record<string, unknown> }) => {
+          sink.activity.push(a.data);
+          return {};
+        },
+      },
+    };
+  }
+
+  const db = {
+    ...reads,
+    ...writes(dbW),
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ ...reads, ...writes(txW) }),
+  };
+
+  return { db: db as never, txW, dbW };
+}
+
+const TASKS = {
+  a: { id: "a", title: "Campaign", reference: 24 },
+  b: { id: "b", title: "Payment", reference: 18 },
+};
+
+describe("addTaskDependency", () => {
+  it("writes the row and logs, both inside the transaction", async () => {
+    const { db, txW, dbW } = fakeDepDb({ tasks: TASKS });
+    const result = await addTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "b", actorId: "u1" });
+
+    expect(result.ok).toBe(true);
+    expect(txW.created).toHaveLength(1);
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0].action).toBe("task.dependency_added");
+    // Nothing may escape the transaction.
+    expect(dbW.created).toHaveLength(0);
+    expect(dbW.activity).toHaveLength(0);
+  });
+
+  it("names the blocker by reference in the activity meta", async () => {
+    const { db, txW } = fakeDepDb({ tasks: TASKS });
+    await addTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "b", actorId: "u1" });
+    expect(txW.activity[0].meta).toMatchObject({ name: "Campaign", blocker: "MER-018" });
+  });
+
+  it("refuses a cycle and writes nothing", async () => {
+    const { db, txW } = fakeDepDb({ tasks: TASKS, edges: [["b", "a"]] });
+    const result = await addTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "b", actorId: "u1" });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "MER-024 already depends on this task, so this would create a loop.",
+    });
+    expect(txW.created).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+  });
+
+  it("refuses a task blocking itself", async () => {
+    const { db, txW } = fakeDepDb({ tasks: TASKS });
+    const result = await addTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "a", actorId: "u1" });
+    expect(result.ok).toBe(false);
+    expect(txW.created).toHaveLength(0);
+  });
+
+  it("refuses an unknown task", async () => {
+    const { db } = fakeDepDb({ tasks: { a: TASKS.a } });
+    const result = await addTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "ghost", actorId: "u1" });
+    expect(result).toEqual({ ok: false, error: "Task not found" });
+  });
+});
+
+describe("removeTaskDependency", () => {
+  it("deletes the row and logs inside the transaction", async () => {
+    const { db, txW, dbW } = fakeDepDb({ tasks: TASKS, edges: [["a", "b"]] });
+    const result = await removeTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "b", actorId: "u1" });
+
+    expect(result.ok).toBe(true);
+    expect(txW.deleted).toHaveLength(1);
+    expect(txW.activity).toHaveLength(1);
+    expect(txW.activity[0].action).toBe("task.dependency_removed");
+    expect(dbW.deleted).toHaveLength(0);
+  });
+
+  it("refuses an unknown task", async () => {
+    const { db } = fakeDepDb({ tasks: { a: TASKS.a } });
+    const result = await removeTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "ghost", actorId: "u1" });
+    expect(result).toEqual({ ok: false, error: "Task not found" });
   });
 });

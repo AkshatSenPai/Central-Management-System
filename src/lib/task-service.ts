@@ -3,7 +3,7 @@ import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity, fieldDiff } from "@/lib/activity";
 import { notify, clearNotificationsFor } from "@/lib/notification-service";
 import { deleteAttachmentObjectsFor } from "@/lib/attachment-service";
-import { nextTaskOrder, type TaskStatus, type TaskPriority } from "@/lib/task";
+import { nextTaskOrder, taskReference, type TaskStatus, type TaskPriority } from "@/lib/task";
 
 export type TaskWriteInput = {
   title: string;
@@ -69,6 +69,108 @@ export async function wouldCloseCycle(
   }
 
   return true;
+}
+
+/** Both ends in one query, so an unknown id on either side is one "Task not
+ * found" rather than two round trips and two branches. */
+async function loadDependencyPair(
+  db: PrismaClient,
+  blockedTaskId: string,
+  blockerTaskId: string
+): Promise<{
+  blocked: { id: string; title: string; reference: number };
+  blocker: { id: string; title: string; reference: number };
+} | null> {
+  const rows = await db.task.findMany({
+    where: { id: { in: [blockedTaskId, blockerTaskId] } },
+    select: { id: true, title: true, reference: true },
+  });
+  const blocked = rows.find((r) => r.id === blockedTaskId);
+  const blocker = rows.find((r) => r.id === blockerTaskId);
+  if (!blocked || !blocker) return null;
+  return { blocked, blocker };
+}
+
+export async function addTaskDependency(
+  db: PrismaClient,
+  input: { blockedTaskId: string; blockerTaskId: string; actorId: string }
+): Promise<ActionResult> {
+  const pair = await loadDependencyPair(db, input.blockedTaskId, input.blockerTaskId);
+  if (!pair) return err("Task not found");
+
+  const scope = await loadTaskScope(db, input.blockedTaskId);
+  if (!scope.ok) return err("Task not found");
+
+  try {
+    return await db.$transaction(async (tx) => {
+      // Inside the transaction on purpose: two concurrent adds each checked
+      // against a pre-write world can both pass and together close a loop,
+      // and the composite key does not stop that because the two rows are
+      // genuinely different.
+      if (await wouldCloseCycle(tx, input)) {
+        return err(
+          `${taskReference(pair.blocked.reference)} already depends on this task, so this would create a loop.`
+        );
+      }
+
+      await tx.taskDependency.create({
+        data: { blockedTaskId: input.blockedTaskId, blockerTaskId: input.blockerTaskId },
+      });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.blockedTaskId,
+        action: "task.dependency_added",
+        clientId: scope.clientId,
+        meta: { name: pair.blocked.title, blocker: taskReference(pair.blocker.reference) },
+      });
+      return ok(undefined);
+    });
+  } catch (e) {
+    // The composite primary key: the same blocker added twice, which a
+    // double-submitted form produces. The state the caller wanted is already
+    // true, so this is a success, not a collision to report.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return ok(undefined);
+    if (isRowGoneRace(e)) return err("Task not found");
+    throw e;
+  }
+}
+
+export async function removeTaskDependency(
+  db: PrismaClient,
+  input: { blockedTaskId: string; blockerTaskId: string; actorId: string }
+): Promise<ActionResult> {
+  const pair = await loadDependencyPair(db, input.blockedTaskId, input.blockerTaskId);
+  if (!pair) return err("Task not found");
+
+  const scope = await loadTaskScope(db, input.blockedTaskId);
+  if (!scope.ok) return err("Task not found");
+
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.taskDependency.delete({
+        where: {
+          blockedTaskId_blockerTaskId: {
+            blockedTaskId: input.blockedTaskId,
+            blockerTaskId: input.blockerTaskId,
+          },
+        },
+      });
+      await recordActivity(tx, {
+        actorId: input.actorId,
+        entityType: "TASK",
+        entityId: input.blockedTaskId,
+        action: "task.dependency_removed",
+        clientId: scope.clientId,
+        meta: { name: pair.blocked.title, blocker: taskReference(pair.blocker.reference) },
+      });
+    });
+  } catch (e) {
+    // Already gone is the outcome the caller wanted.
+    if (isRowGoneRace(e)) return ok(undefined);
+    throw e;
+  }
+  return ok(undefined);
 }
 
 /** A task knows only its own `projectId`, but every activity row is scoped by
