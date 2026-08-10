@@ -3,7 +3,17 @@ import { ActionResult, ok, err } from "@/lib/action-result";
 import { recordActivity, fieldDiff } from "@/lib/activity";
 import { notify, clearNotificationsFor } from "@/lib/notification-service";
 import { deleteAttachmentObjectsFor } from "@/lib/attachment-service";
-import { nextTaskOrder, taskReference, type TaskStatus, type TaskPriority } from "@/lib/task";
+import {
+  nextTaskOrder,
+  taskReference,
+  isTaskBlocked,
+  unfinishedBlockers,
+  blockedTransitionRefused,
+  blockedRefusalMessage,
+  type BlockerRef,
+  type TaskStatus,
+  type TaskPriority,
+} from "@/lib/task";
 
 export type TaskWriteInput = {
   title: string;
@@ -419,12 +429,41 @@ export async function updateTask(
 
 export async function setTaskStatus(
   db: PrismaClient,
-  input: { taskId: string; status: TaskStatus; actorId: string }
+  input: { taskId: string; status: TaskStatus; actorId: string; isAdmin: boolean }
 ): Promise<ActionResult> {
   const scope = await loadTaskScope(db, input.taskId);
   if (!scope.ok) return err("Task not found");
 
   if (scope.task.status === input.status) return ok(undefined);
+
+  // Sequencing. Read outside the transaction, the same reasoning as the
+  // `interested` query below: a plain read that does not need to be in it,
+  // and holding a transaction open across an extra round trip only hurts
+  // under load.
+  //
+  // The race this accepts is spec §5's: a start can be refused against a
+  // blocker that turned DONE microseconds later. That is a refusal somebody
+  // retries successfully a second later; closing it would mean locking every
+  // blocker row on every status change in the app.
+  const dependencyRows = await db.taskDependency.findMany({
+    where: { blockedTaskId: input.taskId },
+    select: { blocker: { select: { reference: true, status: true } } },
+  });
+  const blockers: BlockerRef[] = dependencyRows.map((d) => d.blocker);
+  const blocked = isTaskBlocked(blockers);
+
+  if (blockedTransitionRefused({ blocked, to: input.status, isAdmin: input.isAdmin })) {
+    return err(blockedRefusalMessage(blockers));
+  }
+
+  // Absent on an ordinary move, present only when an admin actually pushed
+  // past something. An empty array in every row would make "did anyone
+  // override this?" a truthiness check on every reader. References rather
+  // than ids, because a human reads this row in a timeline or a CSV.
+  const overrodeBlockers =
+    blocked && input.isAdmin
+      ? { overrodeBlockers: unfinishedBlockers(blockers).map((b) => taskReference(b.reference)) }
+      : {};
 
   // Spec 5.7: "status change on a task you created or are assigned to". Read
   // before the transaction opens — it is a plain read that does not need to be
@@ -447,7 +486,7 @@ export async function setTaskStatus(
         entityId: input.taskId,
         action: "task.status_changed",
         clientId: scope.clientId,
-        meta: { name: scope.task.title, from: scope.task.status, to: input.status },
+        meta: { name: scope.task.title, from: scope.task.status, to: input.status, ...overrodeBlockers },
       });
       // `notify` drops the actor and deduplicates, so a creator who is also an
       // assignee gets one row, and someone moving their own task gets none.

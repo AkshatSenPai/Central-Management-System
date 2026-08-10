@@ -218,8 +218,15 @@ export function describeActivity(entry: {
       return `${who} created task ${what}`;
     case "task.updated":
       return `${who} updated task ${what}`;
-    case "task.status_changed":
-      return `${who} moved ${what} to ${to}`;
+    case "task.status_changed": {
+      // Present only when an admin pushed past a blocker, so the sentence
+      // says so rather than leaving it in meta_json for whoever opens the
+      // export. Same shape as the assignment verbs' `people`.
+      const overrode = metaNames(entry.meta, "overrodeBlockers");
+      return overrode
+        ? `${who} moved ${what} to ${to}, overriding ${formatNameList(overrode)}`
+        : `${who} moved ${what} to ${to}`;
+    }
     case "task.assigned": {
       const people = metaNames(entry.meta, "people");
       return people ? `${who} assigned ${what} to ${formatNameList(people)}` : `${who} updated task ${what}`;

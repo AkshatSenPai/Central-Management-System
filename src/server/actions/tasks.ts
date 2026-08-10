@@ -178,6 +178,9 @@ export async function setTaskStatusAction(formData: FormData): Promise<ActionRes
       taskId,
       status: status.data,
       actorId: user.id,
+      // From the session, never from formData. A client-supplied override
+      // flag would make the override universal.
+      isAdmin: user.role === "ADMIN",
     });
     revalidatePath("/my-tasks");
     revalidatePath("/team");

@@ -52,6 +52,11 @@ type FakeParts = {
    * task with nothing attached, which is the shape every pre-existing test
    * in this file assumes. */
   attachments?: { id: string; fileKey: string }[];
+  /** Rows returned by taskDependency.findMany — this task's blockers, in the
+   * shape setTaskStatus selects them. Absent means an unblocked task, which
+   * is what every pre-existing test in this file assumes and why none of
+   * them needed touching. */
+  blockers?: { blocker: { reference: number; status: TaskStatus } }[];
 };
 
 type Sink = {
@@ -137,6 +142,9 @@ function fakeDb(parts: FakeParts) {
         return parts.currentAssignees ?? [];
       },
     },
+    taskDependency: {
+      findMany: async () => parts.blockers ?? [],
+    },
     attachment: {
       // Returns the fixture regardless of `where`, and the scope is asserted
       // separately off `args.attachmentFindManyWhere` Ã¢â‚¬â€ the same call
@@ -211,6 +219,9 @@ function fakeDb(parts: FakeParts) {
     milestone: reads.milestone,
     user: reads.user,
     taskAssignee: { ...reads.taskAssignee, ...writers(dbW).taskAssignee },
+    // Read-only here: setTaskStatus only ever asks this table what blocks the
+    // task. The add/remove writes live in tests/task-dependency.test.ts.
+    taskDependency: reads.taskDependency,
     activityLog: writers(dbW).activityLog,
     notification: writers(dbW).notification,
     attachment: { ...reads.attachment, ...writers(dbW).attachment },
@@ -238,6 +249,7 @@ function fakeDb(parts: FakeParts) {
           milestone: reads.milestone,
           user: reads.user,
           taskAssignee: { ...reads.taskAssignee, ...writers(txW).taskAssignee },
+          taskDependency: reads.taskDependency,
           activityLog: writers(txW).activityLog,
           notification: writers(txW).notification,
           attachment: { ...reads.attachment, ...writers(txW).attachment },
@@ -580,7 +592,7 @@ describe("updateTask", () => {
 describe("setTaskStatus", () => {
   it("writes nothing at all when the status is unchanged", async () => {
     const { db, txW, dbW } = fakeDb({ task: taskWithProject });
-    const result = await setTaskStatus(db, { taskId: "t1", status: "TO_DO", actorId: "u1" });
+    const result = await setTaskStatus(db, { taskId: "t1", status: "TO_DO", actorId: "u1", isAdmin: false });
     expect(result).toEqual({ ok: true, data: undefined });
     expect(txW.updated).toHaveLength(0);
     expect(txW.activity).toHaveLength(0);
@@ -589,24 +601,132 @@ describe("setTaskStatus", () => {
 
   it("logs task.status_changed with from and to in meta and the grandparent clientId", async () => {
     const { db, txW } = fakeDb({ task: taskWithProject });
-    await setTaskStatus(db, { taskId: "t1", status: "IN_PROGRESS", actorId: "u1" });
+    await setTaskStatus(db, { taskId: "t1", status: "IN_PROGRESS", actorId: "u1", isAdmin: false });
     expect(txW.activity[0]).toMatchObject({ action: "task.status_changed", clientId: "c1" });
     expect(txW.activity[0].meta).toMatchObject({ from: "TO_DO", to: "IN_PROGRESS" });
   });
 
   it("logs a personal task's status change with a null client scope", async () => {
     const { db, txW } = fakeDb({ task: personalTask });
-    await setTaskStatus(db, { taskId: "t2", status: "DONE", actorId: "u1" });
+    await setTaskStatus(db, { taskId: "t2", status: "DONE", actorId: "u1", isAdmin: false });
     expect(txW.activity[0]).toMatchObject({ action: "task.status_changed", clientId: null });
   });
 
   it("writes the update and the activity row inside the transaction", async () => {
     const { db, txW, dbW } = fakeDb({ task: taskWithProject });
-    await setTaskStatus(db, { taskId: "t1", status: "DONE", actorId: "u1" });
+    await setTaskStatus(db, { taskId: "t1", status: "DONE", actorId: "u1", isAdmin: false });
     expect(txW.updated).toHaveLength(1);
     expect(txW.activity).toHaveLength(1);
     expect(dbW.updated).toHaveLength(0);
     expect(dbW.activity).toHaveLength(0);
+  });
+
+  it("refuses a forward move while blocked, and writes NOTHING", async () => {
+    const { db, txW, dbW } = fakeDb({
+      task: taskWithProject,
+      blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "IN_PROGRESS",
+      actorId: "u1",
+      isAdmin: false,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Blocked by MER-018. Finish it first, or ask an admin to override.",
+    });
+    // A refusal that still logs is a timeline full of things that did not
+    // happen. Both sinks, because either would be a bug.
+    expect(txW.updated).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+    expect(txW.notifications).toHaveLength(0);
+    expect(dbW.updated).toHaveLength(0);
+    expect(dbW.activity).toHaveLength(0);
+  });
+
+  // Spec §5: parking and reopening stay legal, because they are the moves
+  // someone makes BECAUSE they have discovered they are blocked.
+  it("allows a blocked task to move back to TO_DO", async () => {
+    const { db, txW } = fakeDb({
+      task: { ...taskWithProject, status: "IN_PROGRESS" },
+      blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "TO_DO",
+      actorId: "u1",
+      isAdmin: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(txW.updated).toHaveLength(1);
+  });
+
+  it("lets an admin override, and records that they did", async () => {
+    const { db, txW } = fakeDb({
+      task: taskWithProject,
+      blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "DONE",
+      actorId: "u1",
+      isAdmin: true,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(txW.activity[0].meta).toMatchObject({ overrodeBlockers: ["MER-018"] });
+  });
+
+  it("omits overrodeBlockers entirely on an ordinary move", async () => {
+    const { db, txW } = fakeDb({ task: taskWithProject });
+    await setTaskStatus(db, { taskId: "t1", status: "DONE", actorId: "u1", isAdmin: false });
+    // Absent, not []. An empty array in every row would make "did anyone
+    // override this?" a truthiness check on every reader.
+    expect(txW.activity[0].meta).not.toHaveProperty("overrodeBlockers");
+  });
+
+  it("ignores blockers that are already DONE", async () => {
+    const { db, txW } = fakeDb({
+      task: taskWithProject,
+      blockers: [{ blocker: { reference: 18, status: "DONE" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "IN_PROGRESS",
+      actorId: "u1",
+      isAdmin: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(txW.updated).toHaveLength(1);
+  });
+
+  // The reopen ruling in one assertion. A future refactor to a stored
+  // `blocked` column would break this test first: nothing writes to the
+  // dependent when its blocker moves, so its status must be untouched while
+  // its next move is refused.
+  it("re-blocks a started task without moving it when its blocker reopens", async () => {
+    const { db, txW } = fakeDb({
+      task: { ...taskWithProject, status: "IN_PROGRESS" },
+      blockers: [{ blocker: { reference: 18, status: "IN_PROGRESS" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "REVIEW",
+      actorId: "u1",
+      isAdmin: false,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(txW.updated).toHaveLength(0);
   });
 });
 
@@ -1124,7 +1244,7 @@ describe("notifications (Phase 4)", () => {
 
   it("tells the creator and the assignees about a status change, never the actor", async () => {
     const { db, txW, dbW } = fakeDb({ task: taskWithProject });
-    await setTaskStatus(db, { taskId: "t1", status: "IN_PROGRESS", actorId: "u-assignee" });
+    await setTaskStatus(db, { taskId: "t1", status: "IN_PROGRESS", actorId: "u-assignee", isAdmin: false });
 
     // creatorId u-creator and assignee u-assignee are both interested; the
     // actor is the assignee, so only the creator is told.
@@ -1138,7 +1258,7 @@ describe("notifications (Phase 4)", () => {
 
   it("writes no notification when the status did not actually change", async () => {
     const { db, txW } = fakeDb({ task: taskWithProject });
-    await setTaskStatus(db, { taskId: "t1", status: "TO_DO", actorId: "someone" });
+    await setTaskStatus(db, { taskId: "t1", status: "TO_DO", actorId: "someone", isAdmin: false });
     expect(txW.notifications).toEqual([]);
   });
 
