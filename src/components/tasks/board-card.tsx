@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { FormError } from "@/components/ui/form-error";
-import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, capAssignees } from "@/lib/task";
+import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, blockedChipLabel, capAssignees } from "@/lib/task";
 import type { TaskListRow } from "@/lib/task-queries";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
 
@@ -29,6 +29,11 @@ export function BoardCard({
   error?: string | null;
 }) {
   const { shown, extra } = capAssignees(row.assignees);
+  // Null unless something unfinished blocks it. `warn` and not `bad`: a
+  // blocked task is a constraint, not a failure, and `bad` is what overdue
+  // already uses — two different problems reading identically is how a colour
+  // stops meaning anything.
+  const blockedLabel = blockedChipLabel(row.blockers);
   // Dragging has no CSS pseudo-class, so the held state has to be tracked.
   const [dragging, setDragging] = useState(false);
 
@@ -59,6 +64,10 @@ export function BoardCard({
           </p>
         ) : null}
       </Link>
+
+      {/* The card stays draggable. The refusal is what teaches the rule; this
+          is what stops anyone needing to be taught twice. */}
+      {blockedLabel ? <Badge kind="warn">{blockedLabel}</Badge> : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Badge kind={TASK_PRIORITY_BADGE[row.priority]}>{TASK_PRIORITY_LABEL[row.priority]}</Badge>

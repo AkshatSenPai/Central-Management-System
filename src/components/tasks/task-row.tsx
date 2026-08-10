@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
-import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, capAssignees } from "@/lib/task";
+import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, blockedChipLabel, capAssignees } from "@/lib/task";
 import type { TaskListRow } from "@/lib/task-queries";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
 
@@ -13,6 +13,9 @@ import { TaskStatusControl } from "@/components/tasks/task-status-control";
  * is a link, so the status <select> never ends up nested inside an <a>. */
 export function TaskRow({ row }: { row: TaskListRow }) {
   const { shown, extra } = capAssignees(row.assignees);
+  // One derivation, one chip, four surfaces: /my-tasks, /all-tasks and the
+  // project and client task lists all render this row.
+  const blockedLabel = blockedChipLabel(row.blockers);
 
   return (
     // flex-wrap, not the old grid-cols-[2fr_auto_auto_auto]: on a phone the
@@ -41,6 +44,8 @@ export function TaskRow({ row }: { row: TaskListRow }) {
           {row.subtitle}
         </p>
       </Link>
+
+      {blockedLabel ? <Badge kind="warn">{blockedLabel}</Badge> : null}
 
       <TaskStatusControl
         taskId={row.id}
