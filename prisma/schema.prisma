@@ -267,6 +267,13 @@ model Task {
   assignees   TaskAssignee[]
   checklist   ChecklistItem[]
   comments    Comment[]
+
+  /// Sequencing, both directions. `blockedBy` is what this task waits on;
+  /// `blocking` is what waits on it. There is deliberately no `blocked`
+  /// column beside them — see TaskDependency.
+  blockedBy TaskDependency[] @relation("BlockedTask")
+  blocking  TaskDependency[] @relation("BlockerTask")
+
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -283,6 +290,43 @@ model TaskAssignee {
 
   @@id([taskId, userId])
   @@index([userId])
+}
+
+/// "A is blocked by B" — B must reach DONE before A may leave TO_DO.
+///
+/// The edge direction is worth reading twice, because both columns are Tasks
+/// and a reversed pair is a silent logic inversion no type can catch:
+/// `blockedTaskId` is the task that must WAIT, `blockerTaskId` is the task
+/// being waited ON.
+///
+/// Both sides Cascade. A deleted task cannot block anything and cannot be
+/// blocked by anything, so the row is meaningless the moment either end goes
+/// — unlike ActivityLog, which is history and must outlive its subject. The
+/// same reasoning PushSubscription records: this is a live constraint, not a
+/// fact about the past.
+///
+/// **There is deliberately no `blocked` column on Task, and there must never
+/// be one.** Blockedness is derived from these rows' statuses at read time
+/// (`isTaskBlocked`), which is what makes reopening a blocker re-block its
+/// dependents with zero writes and nothing to backfill. A stored flag would
+/// need updating on every status change of every blocker, would drift the
+/// first time one of those writes was missed, and would need a migration to
+/// repair.
+model TaskDependency {
+  blockedTask   Task   @relation("BlockedTask", fields: [blockedTaskId], references: [id], onDelete: Cascade)
+  blockedTaskId String
+  blocker       Task   @relation("BlockerTask", fields: [blockerTaskId], references: [id], onDelete: Cascade)
+  blockerTaskId String
+
+  /// The pair is the identity, so the same blocker cannot be added twice and
+  /// a double-submitted form is a P2002 rather than a duplicate row. Matches
+  /// TaskAssignee's @@id([taskId, userId]).
+  @@id([blockedTaskId, blockerTaskId])
+
+  /// "What does this task block?" — the reverse read that task detail's
+  /// Blocking list needs, and which the primary key's leading column cannot
+  /// serve. Same rule as TaskAssignee's @@index([userId]).
+  @@index([blockerTaskId])
 }
 
 model ChecklistItem {
