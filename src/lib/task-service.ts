@@ -18,6 +18,59 @@ const UPDATABLE_FIELDS = ["title", "description", "projectId", "milestoneId", "p
 
 const MILESTONE_MISMATCH = "That milestone belongs to a different project";
 
+/** Narrow on purpose, the same rule as ActivityDb: a `$transaction` tx
+ * satisfies this, so the cycle walk can run inside the very transaction that
+ * would write the edge. Widening it to PrismaClient would force the check
+ * outside, where two concurrent adds can both pass. */
+export type DependencyReadDb = Pick<PrismaClient, "taskDependency">;
+
+/** A backstop that should be unreachable — a studio's plan is single digits
+ * deep. Hitting it means data this design did not anticipate, so it refuses
+ * rather than continuing. */
+const MAX_DEPENDENCY_DEPTH = 100;
+
+/** Would "blocked waits on blocker" close a loop?
+ *
+ * Walk the depends-on chain from the proposed blocker; if the task being
+ * blocked is reachable, that task is already upstream and the new edge would
+ * close the cycle. A → B → A must never reach the database, because it is a
+ * board with no legal move and no way out from the UI.
+ *
+ * One query per LEVEL, not per node. `seen` is what makes a diamond legal —
+ * A blocked by B and C, both blocked by D, is an ordinary plan, and without
+ * `seen` the walk would revisit D once per path. */
+export async function wouldCloseCycle(
+  db: DependencyReadDb,
+  input: { blockedTaskId: string; blockerTaskId: string }
+): Promise<boolean> {
+  // Caught here rather than in a separate branch: a self-edge is just the
+  // degenerate cycle.
+  if (input.blockedTaskId === input.blockerTaskId) return true;
+
+  const seen = new Set<string>([input.blockerTaskId]);
+  let frontier = [input.blockerTaskId];
+
+  for (let depth = 0; depth < MAX_DEPENDENCY_DEPTH; depth++) {
+    if (frontier.length === 0) return false;
+
+    const rows = await db.taskDependency.findMany({
+      where: { blockedTaskId: { in: frontier } },
+      select: { blockerTaskId: true },
+    });
+
+    const next: string[] = [];
+    for (const row of rows) {
+      if (row.blockerTaskId === input.blockedTaskId) return true;
+      if (seen.has(row.blockerTaskId)) continue;
+      seen.add(row.blockerTaskId);
+      next.push(row.blockerTaskId);
+    }
+    frontier = next;
+  }
+
+  return true;
+}
+
 /** A task knows only its own `projectId`, but every activity row is scoped by
  * *client* — an event logged with the wrong scope never reaches the client
  * timeline. This walks up to the grandparent in ONE query, selecting through
