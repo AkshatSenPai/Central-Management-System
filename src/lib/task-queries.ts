@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { clientInitials } from "@/lib/client";
+import { buildSequences, groupIntoSequences, type Sequence } from "@/lib/sequences";
 import {
   isTaskOverdue,
   sortMyTasksBy,
@@ -370,4 +371,86 @@ export async function listBlockerCandidates(
     value: r.id,
     label: `${taskReference(r.reference)} ${r.title}`,
   }));
+}
+
+/** The Sequences view's data: the viewer's work grouped into dependency
+ * sequences, plus everything of theirs that is in none.
+ *
+ * **Reads every row of TaskDependency**, deliberately (spec §6). It is a
+ * two-column table holding dozens of rows for a six-person studio, so reading
+ * all of it is a few kilobytes and the grouping is trivially exact. The
+ * alternative is either N round trips for N levels, or a recursive CTE Prisma
+ * expresses only through $queryRaw. **At roughly a few thousand dependency
+ * rows this stops being free** and should become that CTE, seeded from the
+ * viewer's task ids — a change to this function alone, because the graph work
+ * lives behind `buildSequences`.
+ *
+ * Takes NO status filter. A sequence with its completed links hidden is
+ * unreadable: the Done task is precisely what says why the next one is ready.
+ * The unsequenced remainder is the exception and takes the list's own default
+ * of open-only — spec §8 for why that asymmetry is deliberate rather than an
+ * oversight to tidy away. */
+export async function listMySequences(
+  db: PrismaClient,
+  input: { userId: string }
+): Promise<{ sequences: Sequence[]; unsequenced: TaskListRow[] }> {
+  const [edges, myTasks] = await Promise.all([
+    db.taskDependency.findMany({ select: { blockedTaskId: true, blockerTaskId: true } }),
+    db.task.findMany({
+      where: { assignees: { some: { userId: input.userId } } },
+      select: { id: true },
+    }),
+  ]);
+
+  const myTaskIds = myTasks.map((t) => t.id);
+  // Grouped twice on purpose, and it is cheap: this pass answers "which task
+  // ids must I SELECT", which has to be known before the tasks exist, and
+  // buildSequences groups again because it must stay callable from a test with
+  // no database. Sharing the result would mean threading group membership
+  // through the pure boundary for no gain — it is set arithmetic over a few
+  // dozen rows.
+  const groups = groupIntoSequences(edges, myTaskIds);
+  const groupedIds = [...new Set(groups.flat())];
+
+  const tasks =
+    groupedIds.length === 0
+      ? []
+      : await db.task.findMany({
+          where: { id: { in: groupedIds } },
+          select: {
+            id: true,
+            reference: true,
+            title: true,
+            status: true,
+            assignees: { select: { user: { select: { id: true, name: true } } } },
+          },
+        });
+
+  const sequences = buildSequences({
+    edges,
+    myTaskIds,
+    tasks: tasks.map((t) => ({
+      id: t.id,
+      reference: t.reference,
+      title: t.title,
+      status: t.status,
+      assignees: mapAssignees(t.assignees),
+    })),
+  });
+
+  const sequencedIds = new Set(sequences.flatMap((s) => s.nodes.map((n) => n.task.id)));
+  const unsequencedRows = await db.task.findMany({
+    where: {
+      assignees: { some: { userId: input.userId } },
+      status: { not: "DONE" },
+      id: { notIn: [...sequencedIds] },
+    },
+    orderBy: { createdAt: "asc" },
+    select: taskRowSelect,
+  });
+
+  return {
+    sequences,
+    unsequenced: unsequencedRows.map((t) => toTaskListRow(t, taskDueLabel(t.dueDate))),
+  };
 }

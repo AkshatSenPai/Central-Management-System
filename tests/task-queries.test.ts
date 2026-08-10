@@ -6,6 +6,7 @@ import {
   listProjectTasks,
   getTaskDetail,
   listTasksInRange,
+  listMySequences,
 } from "@/lib/task-queries";
 
 type TaskRow = {
@@ -481,5 +482,103 @@ describe("blockers on the read models", () => {
     await getTaskDetail(db, "t1");
     // The whole point of taskDetailSelect: no call per section.
     expect(callsByDelegate().task).toBe(1);
+  });
+});
+
+describe("listMySequences", () => {
+  /** Dispatches on the `where` clause, never on call order. Call order is not
+   * stable here: when nothing is linked, listMySequences skips the
+   * grouped-tasks query entirely, so the unsequenced read is the second call
+   * rather than the third. A fake keyed on a counter passes the linked cases
+   * and silently lies about the unlinked one. */
+  function fakeSequenceDb(parts: {
+    deps?: { blockedTaskId: string; blockerTaskId: string }[];
+    myTasks?: { id: string }[];
+    tasks?: unknown[];
+    unsequenced?: unknown[];
+  }) {
+    const findManyArgs: Record<string, unknown>[] = [];
+    const db = {
+      taskDependency: { findMany: async () => parts.deps ?? [] },
+      task: {
+        findMany: async (args: { where: Record<string, unknown> }) => {
+          findManyArgs.push(args);
+          const where = args.where ?? {};
+          if ("status" in where) return parts.unsequenced ?? [];
+          if ("id" in where) return parts.tasks ?? [];
+          return parts.myTasks ?? [];
+        },
+      },
+    } as unknown as PrismaClient;
+
+    const unsequencedArgs = () =>
+      findManyArgs.find((a) => "status" in ((a.where ?? {}) as Record<string, unknown>));
+
+    return { db, findManyArgs, unsequencedArgs };
+  }
+
+  const seqTask = (id: string, reference: number, status = "TO_DO") => ({
+    id,
+    reference,
+    title: `Task ${id}`,
+    status,
+    assignees: [],
+  });
+
+  it("returns an ordered sequence for a linked pair", async () => {
+    const { db } = fakeSequenceDb({
+      deps: [{ blockedTaskId: "a", blockerTaskId: "b" }],
+      myTasks: [{ id: "a" }],
+      tasks: [seqTask("a", 24), seqTask("b", 18, "DONE")],
+    });
+
+    const { sequences } = await listMySequences(db, { userId: "u1" });
+    expect(sequences).toHaveLength(1);
+    expect(sequences[0].nodes.map((n) => n.task.reference)).toEqual([18, 24]);
+  });
+
+  // Spec §8, first half: a DONE task inside a group is what explains why the
+  // next one is ready, so it is always returned regardless of any filter.
+  it("keeps a DONE task inside a sequence", async () => {
+    const { db } = fakeSequenceDb({
+      deps: [{ blockedTaskId: "a", blockerTaskId: "b" }],
+      myTasks: [{ id: "a" }],
+      tasks: [seqTask("a", 24), seqTask("b", 18, "DONE")],
+    });
+
+    const { sequences } = await listMySequences(db, { userId: "u1" });
+    expect(sequences[0].nodes.map((n) => n.state)).toEqual(["done", "ready"]);
+  });
+
+  // Spec §8, second half, and the asymmetry most likely to be "tidied" into
+  // consistency by someone who has not read the reasoning.
+  it("excludes DONE from the unsequenced query", async () => {
+    const { db, unsequencedArgs } = fakeSequenceDb({ myTasks: [{ id: "a" }] });
+    await listMySequences(db, { userId: "u1" });
+    const where = (unsequencedArgs() as { where: Record<string, unknown> }).where;
+    expect(where.status).toEqual({ not: "DONE" });
+  });
+
+  it("returns no sequences and all rows when nothing is linked", async () => {
+    const { db } = fakeSequenceDb({
+      myTasks: [{ id: "a" }],
+      unsequenced: [taskRow({ id: "a" })],
+    });
+
+    const { sequences, unsequenced } = await listMySequences(db, { userId: "u1" });
+    expect(sequences).toEqual([]);
+    expect(unsequenced).toHaveLength(1);
+  });
+
+  it("keeps a sequenced task out of the unsequenced list", async () => {
+    const { db, unsequencedArgs } = fakeSequenceDb({
+      deps: [{ blockedTaskId: "a", blockerTaskId: "b" }],
+      myTasks: [{ id: "a" }],
+      tasks: [seqTask("a", 24), seqTask("b", 18)],
+    });
+
+    await listMySequences(db, { userId: "u1" });
+    const where = (unsequencedArgs() as { where: { id: { notIn: string[] } } }).where;
+    expect([...where.id.notIn].sort()).toEqual(["a", "b"]);
   });
 });
