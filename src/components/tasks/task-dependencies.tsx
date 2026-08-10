@@ -102,7 +102,15 @@ export function TaskDependencies({
 
   return (
     <>
-      <SectionCard title="Blocked by" meta={openCount > 0 ? `${openCount} unfinished` : null}>
+      {/* overflowVisible: this card's body opens a Combobox listbox, and the
+          frame's default overflow-hidden clips it to the card — the options
+          stay in the DOM and pass every scripted check while rendering as an
+          unreadable sliver on screen. */}
+      <SectionCard
+        title="Blocked by"
+        meta={openCount > 0 ? `${openCount} unfinished` : null}
+        overflowVisible
+      >
         {/* Rendered even when empty. A card that appears only when non-empty
             is one nobody discovers — the same reasoning Checklist and Files
             already follow. */}

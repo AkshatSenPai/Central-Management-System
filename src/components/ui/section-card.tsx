@@ -28,6 +28,7 @@ export function SectionCard({
   meta,
   action,
   flush = false,
+  overflowVisible = false,
   className,
   children,
 }: {
@@ -37,6 +38,21 @@ export function SectionCard({
   /** A control pinned to the right of the header, e.g. a "New project" button. */
   action?: ReactNode;
   flush?: boolean;
+  /** Drops the frame's `overflow-hidden` for bodies containing a popover that
+   * must escape the card — the blocker <Combobox> on task detail is the only
+   * one today, and was the first combobox ever placed inside a SectionCard.
+   *
+   * **This is the third thing `overflow-hidden` has silently broken here.** It
+   * kills `position: sticky` in any descendant (why `MemberTaskGroup` exists
+   * rather than reusing this component), and it clips an absolutely-positioned
+   * listbox to the card's bounds — which fails invisibly, because the options
+   * are in the DOM and pass every scripted assertion while being unreadable on
+   * screen. If a card's body opens anything, it needs this.
+   *
+   * Incompatible in spirit with `flush`: the clipping is what keeps full-bleed
+   * rows inside the rounded corners. A padded body has nothing reaching the
+   * corners, so it loses nothing. */
+  overflowVisible?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -44,7 +60,8 @@ export function SectionCard({
   // finds classes by scanning source text, and a literal class written flush
   // against a `${` is silently dropped from the build — no error, just a rule
   // that never existed. See AGENTS.md.
-  const frame = className ? `overflow-hidden ${className}` : "overflow-hidden";
+  const clip = overflowVisible ? "overflow-visible" : "overflow-hidden";
+  const frame = className ? `${clip} ${className}` : clip;
   // `overflow-x-auto` on the flush body: a full-bleed list that is genuinely
   // wider than a phone (the members table, the project-row grid) scrolls
   // sideways inside the card instead of being clipped by the frame's
