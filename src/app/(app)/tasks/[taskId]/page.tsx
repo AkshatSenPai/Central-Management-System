@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getTaskDetail } from "@/lib/task-queries";
+import { getTaskDetail, listBlockerCandidates } from "@/lib/task-queries";
 import { listTaskComments } from "@/lib/comment-queries";
 import { listAttachments } from "@/lib/attachment-queries";
 import { CommentThread } from "@/components/comments/comment-thread";
@@ -23,6 +23,7 @@ import { TaskForm } from "@/components/tasks/task-form";
 import { TaskAssigneesForm } from "@/components/tasks/task-assignees-form";
 import { Checklist } from "@/components/tasks/checklist";
 import { TaskRemoveControl } from "@/components/tasks/task-remove-control";
+import { TaskDependencies } from "@/components/tasks/task-dependencies";
 
 const CHIP = "text-xs text-[var(--text-3)]";
 
@@ -36,7 +37,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
   const task = await getTaskDetail(prisma, taskId);
   if (!task) notFound();
 
-  const [projects, activeMembers, comments, attachments] = await Promise.all([
+  const [projects, activeMembers, comments, attachments, blockerCandidates] = await Promise.all([
     // The options list must still include the task's own project even when
     // that project is DONE — otherwise React's <select> reconciliation
     // (updateOptions) falls back to selecting the first non-disabled option
@@ -56,6 +57,13 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
     }),
     listTaskComments(prisma, taskId),
     listAttachments(prisma, { parentType: "TASK", parentId: taskId }),
+    // Rides the same Promise.all rather than a sequential await: it depends
+    // only on the task, which is already in hand.
+    listBlockerCandidates(prisma, {
+      taskId: task.id,
+      projectId: task.projectId,
+      excludeIds: task.blockers.map((b) => b.id),
+    }),
   ]);
 
   // Only a project task has milestones to offer, and only that project's own.
@@ -167,6 +175,17 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
               <p className="whitespace-pre-wrap text-sm text-[var(--text-2)]">{task.description}</p>
             </SectionCard>
           ) : null}
+
+          {/* Above Checklist on purpose: a dependency is a constraint on the
+              whole task, so it outranks the task's own internals. */}
+          <TaskDependencies
+            taskId={task.id}
+            projectId={task.projectId}
+            clientId={task.clientId}
+            blockers={task.blockers}
+            blocking={task.blocking}
+            candidates={blockerCandidates}
+          />
 
           <SectionCard
             title="Checklist"
