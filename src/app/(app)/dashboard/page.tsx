@@ -13,6 +13,8 @@ import { DashboardTaskRow } from "@/components/dashboard/dashboard-task-row";
 import { WeekStatsCard } from "@/components/dashboard/week-stats";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { PushExplainer } from "@/components/notifications/push-explainer";
+import { WhatsNew } from "@/components/releases/whats-new";
 
 const SWATCH: Record<number, string> = {
   1: "bg-[var(--pj1)]",
@@ -52,6 +54,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pb-10 pt-5 sm:px-6">
+      {/* Both draw nothing until the browser has answered — the modal lives in
+          the top layer, and the bar is absent rather than empty when push is
+          already on. Neither pushes the greeting down for most people. */}
+      <WhatsNew />
+      <div className="mb-5 empty:mb-0">
+        <PushExplainer />
+      </div>
+
       {/* Above the greeting, because a pinned notice is the one thing on this
           screen that somebody deliberately put in front of everyone. */}
       {pinned ? (

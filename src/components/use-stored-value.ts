@@ -66,5 +66,27 @@ export function useStoredValue(key: string) {
     [key]
   );
 
-  return { value, store, ready };
+  /** Record a value **without** touching React state.
+   *
+   * For the first-ever visit, which must be remembered but must not re-render:
+   * `store` calls setState, and this repo lints `react-hooks/set-state-in-effect`,
+   * so an effect cannot use it. Skipping the write is not an option either —
+   * with nothing recorded, `shouldShowRelease` stays false forever and that
+   * person never sees any release note.
+   *
+   * So storage is written and memory is left alone. The value is picked up on
+   * the next load, which is exactly when it should first matter. */
+  const seed = useCallback(
+    (next: string) => {
+      try {
+        window.localStorage.setItem(key, next);
+      } catch {
+        // Private mode. Nothing is remembered, so this browser is greeted once
+        // per visit — annoying, and still better than crashing.
+      }
+    },
+    [key]
+  );
+
+  return { value, store, seed, ready };
 }
