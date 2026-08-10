@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { Icon } from "@/components/ui/icon";
 import { subscribeToPushAction, unsubscribeFromPushAction } from "@/server/actions/push";
+import { pushGateState } from "@/lib/push-gate";
 
 /** What this browser can currently do about push. Derived from the browser
  * every time, never from the database — a toggle rendered from a stored
@@ -26,14 +27,6 @@ const DOT = {
   on: "h-2 w-2 flex-none rounded-full bg-[var(--ok)]",
   off: "h-2 w-2 flex-none rounded-full bg-[var(--text-3)]",
 } as const;
-
-function isIosSafari(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
-
-function isInstalled(): boolean {
-  return window.matchMedia("(display-mode: standalone)").matches;
-}
 
 /** Turns the browser's public key string into the byte array `subscribe()`
  * wants. Base64url, so the two URL-safe characters are swapped back and the
@@ -79,11 +72,13 @@ export function PushControl({ publicKey }: { publicKey: string }) {
    * the only thing that can observe a browser-side revocation, so it is the
    * only thing that can heal the row. */
   const readState = useCallback(async (): Promise<PushState> => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
-    // iOS delivers push only to an installed app, so offering a toggle that
-    // cannot work would just teach somebody the feature is broken.
-    if (isIosSafari() && !isInstalled()) return "needs-install";
-    if (Notification.permission === "denied") return "denied";
+    // The platform rules, shared with the dashboard explainer so they cannot be
+    // enforced in one place and not the other. Everything below this point is
+    // subscription machinery, which belongs only here.
+    const gate = pushGateState();
+    if (gate === "unsupported") return "unsupported";
+    if (gate === "needs-install") return "needs-install";
+    if (gate === "denied") return "denied";
 
     const registration = await navigator.serviceWorker.getRegistration();
     const existing = await registration?.pushManager.getSubscription();
