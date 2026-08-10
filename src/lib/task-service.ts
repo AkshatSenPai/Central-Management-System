@@ -118,8 +118,14 @@ export async function addTaskDependency(
       // and the composite key does not stop that because the two rows are
       // genuinely different.
       if (await wouldCloseCycle(tx, input)) {
+        // Names the BLOCKER — the option that was just picked — not the task
+        // whose page you are on. Naming the latter produces "MER-013 already
+        // depends on this task" while you are looking at MER-013, which reads
+        // as a task depending on itself and tells you nothing about which
+        // pick to avoid. Caught in browser QA; the first unit test asserted
+        // the same wrong string and so agreed with the bug.
         return err(
-          `${taskReference(pair.blocked.reference)} already depends on this task, so this would create a loop.`
+          `${taskReference(pair.blocker.reference)} already depends on this task, so this would create a loop.`
         );
       }
 

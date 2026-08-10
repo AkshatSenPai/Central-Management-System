@@ -207,13 +207,19 @@ describe("addTaskDependency", () => {
     expect(txW.activity[0].meta).toMatchObject({ name: "Campaign", blocker: "MER-018" });
   });
 
-  it("refuses a cycle and writes nothing", async () => {
+  // The message must name the BLOCKER (b, MER-018) — the option just picked —
+  // not the task whose page you are on (a, MER-024). Getting this backwards
+  // renders as "MER-024 already depends on this task" while you are looking
+  // at MER-024, which reads as a task depending on itself. The original
+  // version of this test asserted the wrong end and agreed with the bug;
+  // browser QA is what caught it.
+  it("refuses a cycle, naming the picked task, and writes nothing", async () => {
     const { db, txW } = fakeDepDb({ tasks: TASKS, edges: [["b", "a"]] });
     const result = await addTaskDependency(db, { blockedTaskId: "a", blockerTaskId: "b", actorId: "u1" });
 
     expect(result).toEqual({
       ok: false,
-      error: "MER-024 already depends on this task, so this would create a loop.",
+      error: "MER-018 already depends on this task, so this would create a loop.",
     });
     expect(txW.created).toHaveLength(0);
     expect(txW.activity).toHaveLength(0);
