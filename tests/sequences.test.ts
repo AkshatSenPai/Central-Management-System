@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { groupIntoSequences, orderSequence, sequenceNodeState } from "@/lib/sequences";
+import type { TaskStatus } from "@/lib/task";
+import {
+  buildSequences,
+  groupIntoSequences,
+  orderSequence,
+  sequenceNodeState,
+} from "@/lib/sequences";
 
 /** [blockedTaskId, blockerTaskId] — "the first waits on the second". */
 function edges(pairs: [string, string][]) {
@@ -58,7 +64,7 @@ describe("groupIntoSequences", () => {
   });
 });
 
-function task(id: string, reference: number, status = "TO_DO" as const) {
+function task(id: string, reference: number, status: TaskStatus = "TO_DO") {
   return { id, reference, title: `Task ${id}`, status, assignees: [] };
 }
 
@@ -155,5 +161,80 @@ describe("sequenceNodeState", () => {
   // Conflating these two vocabularies would make that unsayable (spec §12).
   it("can be waiting while already in progress", () => {
     expect(sequenceNodeState({ status: "IN_PROGRESS" }, [{ status: "TO_DO" }])).toBe("waiting");
+  });
+});
+
+describe("buildSequences", () => {
+  const chain = () => ({
+    edges: edges([
+      ["c", "b"],
+      ["b", "a"],
+    ]),
+    tasks: [task("a", 26, "DONE"), task("b", 25), task("c", 24)],
+  });
+
+  it("returns one ordered sequence with a node per task", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["b"] });
+    expect(sequence.nodes.map((n) => n.task.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("states each node from its own blockers", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["b"] });
+    expect(sequence.nodes.map((n) => n.state)).toEqual(["done", "ready", "waiting"]);
+  });
+
+  it("marks which nodes are the viewer's", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["b"] });
+    expect(sequence.nodes.map((n) => n.isMine)).toEqual([false, true, false]);
+  });
+
+  it("names what a waiting node waits on, by reference", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["b"] });
+    const waiting = sequence.nodes.find((n) => n.task.id === "c");
+    expect(waiting?.waitingOn).toEqual([25]);
+  });
+
+  it("marks exactly one node as up next", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["b", "c"] });
+    const up = sequence.nodes.filter((n) => n.isUpNext);
+    expect(up).toHaveLength(1);
+    // b is ready; c is the viewer's too but is waiting on b.
+    expect(up[0].task.id).toBe("b");
+  });
+
+  it("marks nothing up next when every task of the viewer's is waiting", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["c"] });
+    expect(sequence.nodes.some((n) => n.isUpNext)).toBe(false);
+    expect(sequence.actionable).toBe(false);
+  });
+
+  it("is actionable when the viewer has something ready", () => {
+    const [sequence] = buildSequences({ ...chain(), myTaskIds: ["b"] });
+    expect(sequence.actionable).toBe(true);
+  });
+
+  // Spec §5: what the viewer can act on sorts first. This is the "what can I
+  // start" half of the view doing its job.
+  it("sorts actionable sequences above the rest", () => {
+    const built = buildSequences({
+      edges: edges([
+        ["b", "a"],
+        ["d", "c"],
+      ]),
+      tasks: [
+        task("a", 10, "TO_DO"), // unfinished -> b waits
+        task("b", 11),
+        task("c", 12, "DONE"), // done -> d is ready
+        task("d", 13),
+      ],
+      myTaskIds: ["b", "d"],
+    });
+    expect(built).toHaveLength(2);
+    expect(built[0].actionable).toBe(true);
+    expect(built[0].nodes.some((n) => n.task.id === "d")).toBe(true);
+  });
+
+  it("returns nothing when the viewer has no dependencies", () => {
+    expect(buildSequences({ edges: [], tasks: [task("a", 1)], myTaskIds: ["a"] })).toEqual([]);
   });
 });

@@ -141,3 +141,85 @@ export function sequenceNodeState(
   if (task.status === "DONE") return "done";
   return isTaskBlocked(blockers) ? "waiting" : "ready";
 }
+
+export type SequenceNode = {
+  task: SequenceTask;
+  state: SequenceNodeState;
+  isMine: boolean;
+  /** True on at most ONE node per sequence: the first in order that is the
+   * viewer's and ready. At most one, so the marker means something. */
+  isUpNext: boolean;
+  /** References of the blockers still unfinished — what "waiting on MER-025"
+   * renders from. Empty unless the state is `waiting`. */
+  waitingOn: number[];
+};
+
+export type Sequence = {
+  /** Stable across renders: the lowest task id in the group. Not an index —
+   * sequences reorder, and a React key that reorders remounts the wrong
+   * rows. */
+  id: string;
+  nodes: SequenceNode[];
+  /** The viewer has something ready here. Drives both the sort and the
+   * header. */
+  actionable: boolean;
+};
+
+/** Groups → ordered → stated → sorted. The one function the query calls.
+ *
+ * Sequences the viewer can act on come first (spec §5) — that is the "what can
+ * I start" half — then the rest, each broken by lowest reference so the order
+ * is stable between renders. */
+export function buildSequences(input: {
+  edges: SequenceEdge[];
+  tasks: SequenceTask[];
+  myTaskIds: string[];
+}): Sequence[] {
+  const byId = new Map(input.tasks.map((t) => [t.id, t]));
+  const mine = new Set(input.myTaskIds);
+
+  const sequences = groupIntoSequences(input.edges, input.myTaskIds).map((group) => {
+    const groupTasks = group
+      .map((id) => byId.get(id))
+      .filter((t): t is SequenceTask => Boolean(t));
+    const ordered = orderSequence(input.edges, groupTasks);
+    const inGroup = new Set(groupTasks.map((t) => t.id));
+
+    // Blockers per task, restricted to this group and resolved to tasks.
+    const blockersOf = new Map<string, SequenceTask[]>(groupTasks.map((t) => [t.id, []]));
+    for (const edge of input.edges) {
+      if (!inGroup.has(edge.blockedTaskId) || !inGroup.has(edge.blockerTaskId)) continue;
+      (blockersOf.get(edge.blockedTaskId) as SequenceTask[]).push(
+        byId.get(edge.blockerTaskId) as SequenceTask
+      );
+    }
+
+    let upNextTaken = false;
+    const nodes: SequenceNode[] = ordered.map((task) => {
+      const blockers = blockersOf.get(task.id) ?? [];
+      const state = sequenceNodeState(task, blockers);
+      const isMine = mine.has(task.id);
+      const isUpNext = !upNextTaken && isMine && state === "ready";
+      if (isUpNext) upNextTaken = true;
+      return {
+        task,
+        state,
+        isMine,
+        isUpNext,
+        waitingOn:
+          state === "waiting"
+            ? blockers.filter((b) => b.status !== "DONE").map((b) => b.reference)
+            : [],
+      };
+    });
+
+    return { id: [...group].sort()[0], nodes, actionable: upNextTaken };
+  });
+
+  const lowestReference = (s: Sequence) => Math.min(...s.nodes.map((n) => n.task.reference));
+
+  return sequences.sort((a, b) => {
+    if (a.actionable !== b.actionable) return a.actionable ? -1 : 1;
+    return lowestReference(a) - lowestReference(b);
+  });
+}
