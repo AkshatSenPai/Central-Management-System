@@ -355,3 +355,66 @@ export function groupTasksByStatus<T extends { status: TaskStatus }>(
   for (const row of rows) grouped[row.status].push(row);
   return grouped;
 }
+
+/** A blocker as every surface needs it: the reference to name it by, and the
+ * status that decides whether it still blocks. */
+export type BlockerRef = { reference: number; status: TaskStatus };
+
+/** Blockedness is DERIVED, never stored. This is the whole definition, and it
+ * is deliberately one line: a stored flag would have to be updated on every
+ * status change of every blocker and would drift the first time one of those
+ * writes was missed. Deriving it is also what makes reopening a blocker
+ * re-block its dependents with no writes at all. */
+export function isTaskBlocked(blockers: { status: TaskStatus }[]): boolean {
+  return blockers.some((b) => b.status !== "DONE");
+}
+
+/** Only these block, so only these are ever described. A DONE blocker is
+ * history, not a constraint, and must not appear in a chip or a count. */
+export function unfinishedBlockers<T extends { status: TaskStatus }>(blockers: T[]): T[] {
+  return blockers.filter((b) => b.status !== "DONE");
+}
+
+/** While blocked, a task may move TO `TO_DO` and nowhere else; an admin may
+ * move it anywhere. Parking and reopening stay legal because they are the two
+ * moves someone makes precisely BECAUSE they have discovered they are
+ * blocked — refusing those would be perverse. */
+export function blockedTransitionRefused(input: {
+  blocked: boolean;
+  to: TaskStatus;
+  isAdmin: boolean;
+}): boolean {
+  if (!input.blocked) return false;
+  if (input.isAdmin) return false;
+  return input.to !== "TO_DO";
+}
+
+/** "Blocked by MER-018", "Blocked by MER-018 +2", or null when nothing
+ * unfinished blocks it.
+ *
+ * **Never a bare "Blocked".** `ProjectHealth.BLOCKED` already owns that word
+ * as a manual field on the project form, and the two render on the same
+ * screen — the project detail page shows the health badge above the task
+ * list. The preposition is what keeps them distinguishable, and it costs
+ * nothing because the reference is the useful part anyway. */
+export function blockedChipLabel(blockers: BlockerRef[]): string | null {
+  const open = unfinishedBlockers(blockers);
+  if (open.length === 0) return null;
+  const lead = `Blocked by ${taskReference(open[0].reference)}`;
+  return open.length === 1 ? lead : `${lead} +${open.length - 1}`;
+}
+
+/** The refusal a member sees. Names the leading blocker and the way past it;
+ * the detail page lists them all, so a toast naming every reference would be
+ * a wall nobody reads.
+ *
+ * Only called when a move was actually refused, which is only when at least
+ * one blocker is unfinished — so `open[0]` always exists. */
+export function blockedRefusalMessage(blockers: BlockerRef[]): string {
+  const open = unfinishedBlockers(blockers);
+  const lead = taskReference(open[0].reference);
+  if (open.length === 1) {
+    return `Blocked by ${lead}. Finish it first, or ask an admin to override.`;
+  }
+  return `Blocked by ${lead} and ${open.length - 1} more. Finish them first, or ask an admin to override.`;
+}

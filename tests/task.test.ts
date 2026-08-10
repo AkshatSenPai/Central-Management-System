@@ -28,6 +28,11 @@ import {
   groupTasksByAssignee,
   UNASSIGNED_GROUP_NAME,
   taskReference,
+  isTaskBlocked,
+  unfinishedBlockers,
+  blockedChipLabel,
+  blockedRefusalMessage,
+  blockedTransitionRefused,
   TASK_REFERENCE_PREFIX,
   type TaskPriority,
   type TaskSortable,
@@ -717,5 +722,112 @@ describe("taskReference", () => {
 
   it("uses the studio prefix", () => {
     expect(taskReference(1).startsWith(`${TASK_REFERENCE_PREFIX}-`)).toBe(true);
+  });
+});
+
+describe("isTaskBlocked", () => {
+  it("is false with no blockers at all", () => {
+    expect(isTaskBlocked([])).toBe(false);
+  });
+
+  it("is false when every blocker is DONE", () => {
+    expect(isTaskBlocked([{ status: "DONE" }, { status: "DONE" }])).toBe(false);
+  });
+
+  it("is true when any blocker is not DONE", () => {
+    expect(isTaskBlocked([{ status: "DONE" }, { status: "REVIEW" }])).toBe(true);
+  });
+
+  // REVIEW is not DONE. Named because "nearly finished" is exactly the case
+  // someone will argue should count, and it must not.
+  it("treats REVIEW as unfinished", () => {
+    expect(isTaskBlocked([{ status: "REVIEW" }])).toBe(true);
+  });
+});
+
+describe("unfinishedBlockers", () => {
+  it("keeps only what still blocks", () => {
+    expect(
+      unfinishedBlockers([
+        { status: "DONE" as const, reference: 1 },
+        { status: "TO_DO" as const, reference: 2 },
+      ])
+    ).toEqual([{ status: "TO_DO", reference: 2 }]);
+  });
+});
+
+describe("blockedTransitionRefused", () => {
+  it("refuses a forward move while blocked", () => {
+    expect(blockedTransitionRefused({ blocked: true, to: "IN_PROGRESS", isAdmin: false })).toBe(true);
+    expect(blockedTransitionRefused({ blocked: true, to: "REVIEW", isAdmin: false })).toBe(true);
+    expect(blockedTransitionRefused({ blocked: true, to: "DONE", isAdmin: false })).toBe(true);
+  });
+
+  // Spec §5: parking and reopening are the two moves someone makes BECAUSE
+  // they have discovered they are blocked. Refusing them would be perverse.
+  it("always allows a move to TO_DO, even while blocked", () => {
+    expect(blockedTransitionRefused({ blocked: true, to: "TO_DO", isAdmin: false })).toBe(false);
+  });
+
+  it("allows everything when not blocked", () => {
+    expect(blockedTransitionRefused({ blocked: false, to: "DONE", isAdmin: false })).toBe(false);
+  });
+
+  it("allows an admin through a block", () => {
+    expect(blockedTransitionRefused({ blocked: true, to: "DONE", isAdmin: true })).toBe(false);
+  });
+});
+
+describe("blockedChipLabel", () => {
+  it("is null when nothing unfinished blocks it", () => {
+    expect(blockedChipLabel([])).toBeNull();
+    expect(blockedChipLabel([{ reference: 18, status: "DONE" }])).toBeNull();
+  });
+
+  it("names the single blocker", () => {
+    expect(blockedChipLabel([{ reference: 18, status: "TO_DO" }])).toBe("Blocked by MER-018");
+  });
+
+  // The DONE one is not counted in the overflow — only unfinished blockers
+  // block, so only they are described.
+  it("counts only unfinished blockers in the overflow", () => {
+    const label = blockedChipLabel([
+      { reference: 18, status: "TO_DO" },
+      { reference: 22, status: "IN_PROGRESS" },
+      { reference: 30, status: "DONE" },
+    ]);
+    expect(label).toBe("Blocked by MER-018 +1");
+  });
+
+  // Never a bare "Blocked" — ProjectHealth.BLOCKED already owns that word.
+  it("always names the blocker rather than saying only Blocked", () => {
+    expect(blockedChipLabel([{ reference: 18, status: "TO_DO" }])).not.toBe("Blocked");
+  });
+});
+
+describe("blockedRefusalMessage", () => {
+  it("names one blocker and how to get past it", () => {
+    expect(blockedRefusalMessage([{ reference: 18, status: "TO_DO" }])).toBe(
+      "Blocked by MER-018. Finish it first, or ask an admin to override."
+    );
+  });
+
+  it("pluralises past one", () => {
+    expect(
+      blockedRefusalMessage([
+        { reference: 18, status: "TO_DO" },
+        { reference: 22, status: "TO_DO" },
+      ])
+    ).toBe("Blocked by MER-018 and 1 more. Finish them first, or ask an admin to override.");
+  });
+
+  // A DONE blocker must not be counted in the message either.
+  it("describes only the unfinished ones", () => {
+    expect(
+      blockedRefusalMessage([
+        { reference: 18, status: "TO_DO" },
+        { reference: 22, status: "DONE" },
+      ])
+    ).toBe("Blocked by MER-018. Finish it first, or ask an admin to override.");
   });
 });
