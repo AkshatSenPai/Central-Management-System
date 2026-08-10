@@ -552,6 +552,7 @@ describe("getMemberProfile", () => {
           projectId: "p1",
           project: { name: "Brand Guidelines v3", clientId: "c1", client: { name: "Harlow & Fitch" } },
           assignees: [{ user: { id: "u1", name: "Dana Reeve" } }],
+          blockedBy: [],
         },
       ],
       projectRows: [projectRow("p1", "Brand Guidelines v3")],

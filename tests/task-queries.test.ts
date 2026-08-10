@@ -17,6 +17,7 @@ type TaskRow = {
   projectId: string | null;
   project: { name: string; clientId: string; client: { name: string } } | null;
   assignees: { user: { id: string; name: string } }[];
+  blockedBy: { blocker: { reference: number; status: string } }[];
 };
 
 type DetailRow = {
@@ -33,6 +34,8 @@ type DetailRow = {
   creator: { id: string; name: string };
   assignees: { user: { id: string; name: string } }[];
   checklist: { id: string; title: string; done: boolean; order: number }[];
+  blockedBy: { blocker: { id: string; reference: number; title: string; status: string } }[];
+  blocking: { blockedTask: { id: string; reference: number; title: string; status: string } }[];
 };
 
 function fakeDb(parts: { tasks?: TaskRow[]; detail?: unknown }) {
@@ -71,6 +74,9 @@ function taskRow(overrides: Partial<TaskRow> = {}): TaskRow {
     projectId: "p1",
     project: { name: "Brand Guidelines v3", clientId: "c1", client: { name: "Harlow & Fitch" } },
     assignees: [],
+    // Unblocked by default, so every pre-existing fixture keeps meaning what
+    // it meant before sequencing existed.
+    blockedBy: [],
     ...overrides,
   };
 }
@@ -90,6 +96,8 @@ function detailRow(overrides: Partial<DetailRow> = {}): DetailRow {
     creator: { id: "creator1", name: "Alex Chen" },
     assignees: [],
     checklist: [],
+    blockedBy: [],
+    blocking: [],
     ...overrides,
   };
 }
@@ -422,5 +430,56 @@ describe("listTasksInRange", () => {
     const rows = await listTasksInRange(db, { from: FROM, to: TO });
     expect(rows[0]).toMatchObject({ id: "t1", dueDate: DUE });
     expect(rows[0].subtitle).toBeTruthy();
+  });
+});
+
+describe("blockers on the read models", () => {
+  it("carries blockers onto every list row", async () => {
+    const { db } = fakeDb({
+      tasks: [taskRow({ blockedBy: [{ blocker: { reference: 18, status: "TO_DO" } }] })],
+    });
+
+    const rows = await listAssignedTasks(db, { userId: "u1" });
+    expect(rows[0].blockers).toEqual([{ reference: 18, status: "TO_DO" }]);
+  });
+
+  // Not pre-filtered in the query: a row that arrived with the DONE ones
+  // already stripped could not tell "no dependencies" from "all satisfied".
+  it("carries satisfied blockers through too, and lets the pure helpers filter", async () => {
+    const { db } = fakeDb({
+      tasks: [taskRow({ blockedBy: [{ blocker: { reference: 18, status: "DONE" } }] })],
+    });
+
+    const rows = await listAssignedTasks(db, { userId: "u1" });
+    expect(rows[0].blockers).toEqual([{ reference: 18, status: "DONE" }]);
+  });
+
+  it("reports a task with no dependencies as unblocked", async () => {
+    const { db } = fakeDb({ tasks: [taskRow()] });
+    const rows = await listAssignedTasks(db, { userId: "u1" });
+    expect(rows[0].blockers).toEqual([]);
+  });
+
+  it("reads both directions on task detail", async () => {
+    const { db } = fakeDb({
+      detail: detailRow({
+        blockedBy: [{ blocker: { id: "b", reference: 18, title: "Payment", status: "TO_DO" } }],
+        blocking: [{ blockedTask: { id: "c", reference: 30, title: "Launch", status: "TO_DO" } }],
+      }),
+    });
+
+    const detail = await getTaskDetail(db, "t1");
+    expect(detail?.blockers).toEqual([
+      { id: "b", reference: 18, title: "Payment", status: "TO_DO" },
+    ]);
+    // The reverse direction, read through @@index([blockerTaskId]).
+    expect(detail?.blocking[0].reference).toBe(30);
+  });
+
+  it("still reads both directions in ONE query", async () => {
+    const { db, callsByDelegate } = fakeDb({ detail: detailRow() });
+    await getTaskDetail(db, "t1");
+    // The whole point of taskDetailSelect: no call per section.
+    expect(callsByDelegate().task).toBe(1);
   });
 });

@@ -21,6 +21,7 @@ function task(id: string, dueDate: Date | null, extra: Partial<TaskListRow> = {}
     clientName: null,
     subtitle: "",
     assignees: [],
+    blockers: [],
     ...extra,
   };
 }

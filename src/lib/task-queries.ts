@@ -4,12 +4,25 @@ import {
   isTaskOverdue,
   sortMyTasksBy,
   taskDueLabel,
+  taskReference,
   taskRowSubtitle,
+  type BlockerRef,
   type MyTaskSort,
   type TaskPriority,
   type TaskStatus,
   type TaskStatusFilter,
 } from "@/lib/task";
+
+/** A task at the other end of a dependency, in the shape both directions
+ * render: the reference to name it, the title to recognise it, the status to
+ * tell whether it still blocks. One definition so "Blocked by" and "Blocking"
+ * cannot drift apart. */
+export type DependencyTask = {
+  id: string;
+  reference: number;
+  title: string;
+  status: TaskStatus;
+};
 
 export type TaskListRow = {
   id: string;
@@ -24,6 +37,10 @@ export type TaskListRow = {
   clientName: string | null;
   subtitle: string;
   assignees: Array<{ id: string; name: string; initials: string }>;
+  /** Every blocker, including the DONE ones. The pure helpers filter — a row
+   * that arrived pre-filtered could not tell "no dependencies" from "all
+   * satisfied", and the second is worth showing on detail. */
+  blockers: BlockerRef[];
 };
 
 /** The shape every list query selects, whatever its where/orderBy — shared so
@@ -38,6 +55,9 @@ const taskRowSelect = {
   projectId: true,
   project: { select: { name: true, clientId: true, client: { select: { name: true } } } },
   assignees: { select: { user: { select: { id: true, name: true } } } },
+  // Shared, so /my-tasks, /all-tasks and the project and client task lists
+  // all get the chip from this one line.
+  blockedBy: { select: { blocker: { select: { reference: true, status: true } } } },
 } as const;
 
 /** Status and priority are the enum unions, not plain strings — Prisma
@@ -52,6 +72,7 @@ type TaskRowSource = {
   projectId: string | null;
   project: { name: string; clientId: string; client: { name: string } } | null;
   assignees: { user: { id: string; name: string } }[];
+  blockedBy: { blocker: { reference: number; status: TaskStatus } }[];
 };
 
 function mapAssignees(rows: { user: { id: string; name: string } }[]) {
@@ -72,6 +93,7 @@ function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
     clientName: t.project?.client.name ?? null,
     subtitle,
     assignees: mapAssignees(t.assignees),
+    blockers: t.blockedBy.map((d) => d.blocker),
   };
 }
 
@@ -249,6 +271,12 @@ export type TaskDetail = {
   checklist: Array<{ id: string; title: string; done: boolean; order: number }>;
   checklistDone: number;
   checklistTotal: number;
+  /** What this task waits on. */
+  blockers: DependencyTask[];
+  /** What waits on this task — the same table read backwards. Present because
+   * the person about to reopen or delete a task is exactly the person who
+   * needs to know what depends on it. */
+  blocking: DependencyTask[];
 };
 
 const taskDetailSelect = {
@@ -271,6 +299,12 @@ const taskDetailSelect = {
     // rejects. Only the sort directions need pinning to their literal type.
     orderBy: [{ order: "asc" as const }, { createdAt: "asc" as const }],
     select: { id: true, title: true, done: true, order: true },
+  },
+  blockedBy: {
+    select: { blocker: { select: { id: true, reference: true, title: true, status: true } } },
+  },
+  blocking: {
+    select: { blockedTask: { select: { id: true, reference: true, title: true, status: true } } },
   },
 };
 
@@ -304,5 +338,36 @@ export async function getTaskDetail(db: PrismaClient, taskId: string): Promise<T
     checklist: task.checklist,
     checklistDone: task.checklist.filter((c) => c.done).length,
     checklistTotal: task.checklist.length,
+    blockers: task.blockedBy.map((d) => d.blocker),
+    blocking: task.blocking.map((d) => d.blockedTask),
   };
+}
+
+/** Options for the blocker picker: every task except this one and the ones
+ * already blocking it, with the current project's tasks first so the common
+ * case sits at the top of an unfiltered list. Dependencies may cross projects
+ * (owner ruling) — the meeting, the payment and the campaign do not
+ * necessarily share one.
+ *
+ * Tasks that would close a cycle are deliberately NOT filtered out. Deciding
+ * that per candidate is a graph walk each, on every render of the page; they
+ * are refused on submit instead, with a message naming the other end. */
+export async function listBlockerCandidates(
+  db: PrismaClient,
+  input: { taskId: string; projectId: string | null; excludeIds: string[] }
+): Promise<Array<{ value: string; label: string }>> {
+  const rows = await db.task.findMany({
+    where: { id: { notIn: [input.taskId, ...input.excludeIds] } },
+    select: { id: true, reference: true, title: true, projectId: true },
+    orderBy: { reference: "desc" },
+  });
+
+  const sameProject = input.projectId ? rows.filter((r) => r.projectId === input.projectId) : [];
+  const sameProjectIds = new Set(sameProject.map((r) => r.id));
+  const rest = rows.filter((r) => !sameProjectIds.has(r.id));
+
+  return [...sameProject, ...rest].map((r) => ({
+    value: r.id,
+    label: `${taskReference(r.reference)} ${r.title}`,
+  }));
 }
