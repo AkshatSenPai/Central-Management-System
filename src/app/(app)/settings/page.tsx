@@ -122,6 +122,16 @@ export default async function SettingsPage() {
             description="Invite people, change roles, deactivate accounts"
           />
         ) : null}
+        {/* The page guards itself as well — a nav that omits a link is
+            presentation, not access control. */}
+        {isAdmin ? (
+          <LinkRow
+            href="/settings/attendance"
+            icon="schedule"
+            title="Attendance"
+            description="Punch in and punch out times, by member and day"
+          />
+        ) : null}
       </SectionCard>
 
       {/* Admin-only, and lower on the page than Manage because it is a
