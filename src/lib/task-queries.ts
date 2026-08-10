@@ -3,6 +3,8 @@ import { clientInitials } from "@/lib/client";
 import { buildSequences, groupIntoSequences, type Sequence } from "@/lib/sequences";
 import {
   isTaskOverdue,
+  MY_TASK_SCOPE_CLIENT,
+  MY_TASK_SCOPE_PERSONAL,
   sortMyTasksBy,
   taskDueLabel,
   taskReference,
@@ -114,11 +116,23 @@ function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
  * wherever the collation feels like. */
 export async function listAssignedTasks(
   db: PrismaClient,
-  input: { userId: string; status?: TaskStatusFilter | null; sort?: MyTaskSort | null }
+  input: {
+    userId: string;
+    status?: TaskStatusFilter | null;
+    sort?: MyTaskSort | null;
+    scope?: string | null;
+  }
 ): Promise<TaskListRow[]> {
   const where: Prisma.TaskWhereInput = { assignees: { some: { userId: input.userId } } };
   if (!input.status) where.status = { not: "DONE" };
   else if (input.status !== "ALL") where.status = input.status;
+
+  // In the where clause, not in memory. Unlike the Project *sort*, whose
+  // personal-last rule has no SQL expression, this one is exactly
+  // `projectId IS NULL` and belongs in the query.
+  if (input.scope === MY_TASK_SCOPE_PERSONAL) where.projectId = null;
+  else if (input.scope === MY_TASK_SCOPE_CLIENT) where.projectId = { not: null };
+  else if (input.scope) where.projectId = input.scope;
 
   const tasks = await db.task.findMany({
     where,

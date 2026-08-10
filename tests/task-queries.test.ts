@@ -582,3 +582,43 @@ describe("listMySequences", () => {
     expect([...where.id.notIn].sort()).toEqual(["a", "b"]);
   });
 });
+
+describe("listAssignedTasks scope filter", () => {
+  it("filters to personal work with projectId null", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAssignedTasks(db, { userId: "u1", scope: "PERSONAL" });
+    expect((findManyArgs[0] as { where: { projectId?: unknown } }).where.projectId).toBeNull();
+  });
+
+  it("filters to client work with projectId not null", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAssignedTasks(db, { userId: "u1", scope: "CLIENT" });
+    expect((findManyArgs[0] as { where: { projectId?: unknown } }).where.projectId).toEqual({
+      not: null,
+    });
+  });
+
+  it("filters to one project by id", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAssignedTasks(db, { userId: "u1", scope: "p1" });
+    expect((findManyArgs[0] as { where: { projectId?: unknown } }).where.projectId).toBe("p1");
+  });
+
+  it("applies no project constraint without a scope", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAssignedTasks(db, { userId: "u1" });
+    expect((findManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty(
+      "projectId"
+    );
+  });
+
+  // The scope narrows; it must not disturb the status rule that was already
+  // there. Both clauses have to survive together.
+  it("applies the scope alongside the status filter", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAssignedTasks(db, { userId: "u1", status: "DONE", scope: "PERSONAL" });
+    const where = (findManyArgs[0] as { where: Record<string, unknown> }).where;
+    expect(where.status).toBe("DONE");
+    expect(where.projectId).toBeNull();
+  });
+});

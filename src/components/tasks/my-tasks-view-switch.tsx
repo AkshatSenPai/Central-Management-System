@@ -13,15 +13,20 @@ export function MyTasksViewSwitch({
   view,
   status,
   sort,
+  scope,
 }: {
   view: "list" | "sequences";
   status: string;
   sort: string;
+  scope: string;
 }) {
   function href(target: "list" | "sequences") {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (sort) params.set("sort", sort);
+    // Carried even though the Sequences view ignores it, so switching there
+    // and back restores exactly the list the person left.
+    if (scope) params.set("scope", scope);
     if (target === "sequences") params.set("view", "sequences");
     const query = params.toString();
     return query ? `/my-tasks?${query}` : "/my-tasks";

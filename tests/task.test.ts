@@ -20,6 +20,7 @@ import {
   compareMyTasksByProject,
   sortMyTasksBy,
   parseMyTaskSort,
+  parseMyTaskScope,
   MY_TASK_SORTS,
   MY_TASK_SORT_LABEL,
   parseTaskStatusFilter,
@@ -875,5 +876,26 @@ describe("blockedRefusalMessage", () => {
         { reference: 22, status: "DONE" },
       ])
     ).toBe("Blocked by MER-018. Finish it first, or ask an admin to override.");
+  });
+});
+
+describe("parseMyTaskScope", () => {
+  it("returns null for absent, empty or the all-work keyword", () => {
+    expect(parseMyTaskScope(undefined)).toBeNull();
+    expect(parseMyTaskScope("")).toBeNull();
+    expect(parseMyTaskScope("ALL")).toBeNull();
+  });
+
+  it("passes the two keywords through", () => {
+    expect(parseMyTaskScope("CLIENT")).toBe("CLIENT");
+    expect(parseMyTaskScope("PERSONAL")).toBe("PERSONAL");
+  });
+
+  it("passes a project id through unchanged", () => {
+    expect(parseMyTaskScope("cms7mcyt600058ku3fv20ue4l")).toBe("cms7mcyt600058ku3fv20ue4l");
+  });
+
+  it("takes the first of a repeated parameter", () => {
+    expect(parseMyTaskScope(["PERSONAL", "CLIENT"])).toBe("PERSONAL");
   });
 });

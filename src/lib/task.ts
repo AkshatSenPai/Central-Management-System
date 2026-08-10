@@ -436,3 +436,22 @@ export function blockedRefusalMessage(blockers: BlockerRef[]): string {
   }
   return `Blocked by ${lead} and ${open.length - 1} more. Finish them first, or ask an admin to override.`;
 }
+
+export const MY_TASK_SCOPE_ALL = "ALL";
+export const MY_TASK_SCOPE_CLIENT = "CLIENT";
+export const MY_TASK_SCOPE_PERSONAL = "PERSONAL";
+
+/** The /my-tasks scope filter: one of the two keywords, a project id, or null
+ * for everything.
+ *
+ * Null rather than "ALL" so the caller's check is `if (scope)`, and an absent
+ * parameter, an empty one and the all-work option are all one case.
+ *
+ * A project id is passed through unvalidated. An id matching no project simply
+ * returns no rows, which is the honest outcome and costs no round trip — and
+ * validating would mean this pure function needed the project list. */
+export function parseMyTaskScope(raw: string | string[] | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || value === MY_TASK_SCOPE_ALL) return null;
+  return value;
+}

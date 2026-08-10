@@ -2,13 +2,19 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listAssignedTasks, listMySequences } from "@/lib/task-queries";
-import { parseMyTaskSort, parseTaskStatusFilter, taskListSummary } from "@/lib/task";
+import {
+  parseMyTaskScope,
+  parseMyTaskSort,
+  parseTaskStatusFilter,
+  taskListSummary,
+} from "@/lib/task";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TaskRow } from "@/components/tasks/task-row";
 import { TaskForm } from "@/components/tasks/task-form";
 import { TaskStatusFilter } from "@/components/tasks/task-status-filter";
 import { MyTaskSort } from "@/components/tasks/my-task-sort";
+import { MyTaskScope } from "@/components/tasks/my-task-scope";
 import { MyTasksViewSwitch } from "@/components/tasks/my-tasks-view-switch";
 import { TaskSequences } from "@/components/tasks/task-sequences";
 
@@ -20,6 +26,7 @@ export default async function MyTasksPage(props: {
   searchParams: Promise<{
     status?: string | string[];
     sort?: string | string[];
+    scope?: string | string[];
     view?: string | string[];
   }>;
 }) {
@@ -30,6 +37,7 @@ export default async function MyTasksPage(props: {
   const raw = await props.searchParams;
   const status = parseTaskStatusFilter(raw.status);
   const sort = parseMyTaskSort(raw.sort);
+  const scope = parseMyTaskScope(raw.scope);
   // Anything that is not "sequences" is the list, so a mistyped parameter
   // lands on the view that has always been there rather than a blank page.
   const view = first(raw.view) === "sequences" ? "sequences" : "list";
@@ -37,7 +45,9 @@ export default async function MyTasksPage(props: {
   const [projects, members] = await Promise.all([
     prisma.project.findMany({
       where: { status: { not: "DONE" } },
-      select: { id: true, name: true, clientId: true },
+      // The client's name comes along for the scope picker's option labels;
+      // TaskForm ignores it.
+      select: { id: true, name: true, clientId: true, client: { select: { name: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.user.findMany({
@@ -47,7 +57,8 @@ export default async function MyTasksPage(props: {
     }),
   ]);
 
-  const listRows = view === "list" ? await listAssignedTasks(prisma, { userId, status, sort }) : [];
+  const listRows =
+    view === "list" ? await listAssignedTasks(prisma, { userId, status, sort, scope }) : [];
   const sequenceData = view === "sequences" ? await listMySequences(prisma, { userId }) : null;
 
   // The default view is open-only — listAssignedTasks applies status: { not: "DONE" }
@@ -76,7 +87,12 @@ export default async function MyTasksPage(props: {
         }
       />
 
-      <MyTasksViewSwitch view={view} status={first(raw.status)} sort={first(raw.sort)} />
+      <MyTasksViewSwitch
+        view={view}
+        status={first(raw.status)}
+        sort={first(raw.sort)}
+        scope={first(raw.scope)}
+      />
 
       {view === "sequences" && sequenceData ? (
         /* No filter controls here on purpose: listMySequences ignores the
@@ -89,6 +105,14 @@ export default async function MyTasksPage(props: {
         <>
           <TaskStatusFilter status={status}>
             <MyTaskSort sort={sort} />
+            <MyTaskScope
+              scope={scope}
+              projects={projects.map((p) => ({
+                id: p.id,
+                name: p.name,
+                clientName: p.client.name,
+              }))}
+            />
           </TaskStatusFilter>
 
           {listRows.length === 0 ? (
