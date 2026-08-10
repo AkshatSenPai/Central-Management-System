@@ -8,6 +8,9 @@ import {
   isSameAppDay,
   isStale,
   presenceOf,
+  sessionDuration,
+  dayTotal,
+  formatDuration,
   type AttendanceResolution,
   type AttendanceSessionLike,
 } from "@/lib/attendance";
@@ -119,5 +122,100 @@ describe("presenceOf", () => {
   it("exposes only a label and a badge — never a time or a total", () => {
     const result = presenceOf(session({ startedAt: TUE_09_00 }), TUE_15_30);
     expect(Object.keys(result).sort()).toEqual(["badge", "label"]);
+  });
+});
+
+const at = (iso: string) => new Date(iso);
+
+describe("sessionDuration", () => {
+  it("measures a closed session", () => {
+    expect(
+      sessionDuration({
+        startedAt: at("2026-08-08T09:00:00.000Z"),
+        endedAt: at("2026-08-08T11:30:00.000Z"),
+        resolution: "PUNCH_OUT",
+      })
+    ).toBe(2.5 * 60 * 60 * 1000);
+  });
+
+  // THE rule of this feature. A DISCARDED session keeps a null endedAt
+  // forever, because the app never invents an end time. Returning 0 would
+  // flow silently into a sum and under-report every forgotten punch-out.
+  it("is null, never 0, for a session that never ended", () => {
+    expect(
+      sessionDuration({
+        startedAt: at("2026-08-08T09:00:00.000Z"),
+        endedAt: null,
+        resolution: "DISCARDED",
+      })
+    ).toBeNull();
+  });
+
+  it("is null for a session still open", () => {
+    expect(
+      sessionDuration({
+        startedAt: at("2026-08-08T09:00:00.000Z"),
+        endedAt: null,
+        resolution: null,
+      })
+    ).toBeNull();
+  });
+});
+
+describe("dayTotal", () => {
+  it("sums closed sessions", () => {
+    expect(
+      dayTotal([
+        {
+          startedAt: at("2026-08-08T09:00:00.000Z"),
+          endedAt: at("2026-08-08T10:00:00.000Z"),
+          resolution: "PUNCH_OUT",
+        },
+        {
+          startedAt: at("2026-08-08T11:00:00.000Z"),
+          endedAt: at("2026-08-08T12:30:00.000Z"),
+          resolution: "PUNCH_OUT",
+        },
+      ])
+    ).toEqual({ ms: 2.5 * 60 * 60 * 1000, unclosed: 0 });
+  });
+
+  it("counts an unclosed session separately rather than as zero", () => {
+    expect(
+      dayTotal([
+        {
+          startedAt: at("2026-08-08T09:00:00.000Z"),
+          endedAt: at("2026-08-08T10:00:00.000Z"),
+          resolution: "PUNCH_OUT",
+        },
+        { startedAt: at("2026-08-08T11:00:00.000Z"), endedAt: null, resolution: "DISCARDED" },
+      ])
+    ).toEqual({ ms: 60 * 60 * 1000, unclosed: 1 });
+  });
+
+  // The case that must never render as "0h": a day whose only session was
+  // left open is not a day of zero work, it is a day with no punch-out.
+  it("reports zero milliseconds and a count when nothing closed", () => {
+    expect(
+      dayTotal([{ startedAt: at("2026-08-08T09:00:00.000Z"), endedAt: null, resolution: "DISCARDED" }])
+    ).toEqual({ ms: 0, unclosed: 1 });
+  });
+
+  it("is zero and empty for no sessions at all", () => {
+    expect(dayTotal([])).toEqual({ ms: 0, unclosed: 0 });
+  });
+});
+
+describe("formatDuration", () => {
+  it("renders minutes under an hour", () => {
+    expect(formatDuration(45 * 60 * 1000)).toBe("45m");
+  });
+
+  it("renders exact hours without minutes", () => {
+    expect(formatDuration(3 * 60 * 60 * 1000)).toBe("3h");
+  });
+
+  it("renders hours and minutes", () => {
+    expect(formatDuration(6 * 60 * 60 * 1000 + 10 * 60 * 1000)).toBe("6h 10m");
   });
 });

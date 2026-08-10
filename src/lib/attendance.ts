@@ -4,20 +4,32 @@ import { startOfAppDay } from "@/lib/dates";
 /** Pure attendance rules — no Prisma, no session, so every predicate here
  * unit-tests without a database.
  *
- * **Attendance is presence, not hours** (owner ruling, 2026-08-07). Punch in
- * and you are Active; punch out and you are Offline. Nothing sums a duration,
- * displays one, or asks anybody to supply one.
+ * **Presence first, hours second.** The 2026-08-07 ruling was that attendance
+ * records presence and that nothing sums a duration — which is why this file
+ * once said, in as many words, that it had no `sessionMs`, no day total and no
+ * `formatDuration`. On 2026-08-10 the owner reversed that second half for an
+ * admin view, so those functions now exist. The comment was rewritten rather
+ * than extended: one that confidently contradicts the code beneath it is worse
+ * than none.
  *
- * That single decision is why this file has no `sessionMs`, no day total, no
- * `formatDuration` and no end-time validation. It also removed the whole
- * forgotten-punch-out correction flow: that existed to make a *duration*
- * accurate, and asking "when did you finish?" is pointless when the answer
- * feeds nothing. A stale session is closed on the next punch-in instead.
+ * What did **not** change, and still governs everything below:
  *
- * The rows still carry `startedAt` and `endedAt`, because a session cannot
- * exist without knowing when it began and those columns cost nothing. They are
- * the record; no surface reads them as a number. If hours are ever wanted, the
- * history is there — which is the reason not to drop the columns. */
+ * - **The app never invents an end time.** A forgotten punch-out is absorbed by
+ *   the next punch-in as DISCARDED, with `endedAt` left null forever, because
+ *   nobody knows when that person actually left.
+ * - **A session with no end therefore has no duration.** `sessionDuration`
+ *   returns null, never 0, and `dayTotal` counts those separately. A zero would
+ *   flow into a sum and quietly under-report every forgotten punch-out — the
+ *   one way this feature can lie.
+ * - **Attendance never references `Task`**, and nothing derives a per-task
+ *   duration from it. That ruling stands; per-task timers are dropped, not
+ *   deferred.
+ * - **Presence is still the whole of what one member sees about another.** The
+ *   durations here are for the admin grid, not for `/team`.
+ *
+ * The forgotten-punch-out *correction* flow stays deleted. It existed to make a
+ * duration accurate by asking "when did you finish?", and the answer would now
+ * be an invented end time — which is the one rule that did not move. */
 
 export const ATTENDANCE_RESOLUTIONS = ["PUNCH_OUT", "DISCARDED"] as const;
 export type AttendanceResolution = (typeof ATTENDANCE_RESOLUTIONS)[number];
@@ -89,4 +101,48 @@ export function presenceOf(
     label: active ? PRESENCE_LABEL.active : PRESENCE_LABEL.offline,
     badge: active ? PRESENCE_BADGE.active : PRESENCE_BADGE.offline,
   };
+}
+
+/** Adds the end to `AttendanceSessionLike`. Still **no member id**: like the
+ * type it extends, these rules must not be able to grow an access-control
+ * decision by accident. */
+export type AttendanceSpanLike = AttendanceSessionLike & { endedAt: Date | null };
+
+/** Milliseconds between the punches, or **null when there was no punch-out**.
+ *
+ * Null and never 0, and this is the load-bearing line of the whole feature. A
+ * DISCARDED session keeps a null `endedAt` forever by the ruling above, so a
+ * zero here would be summed silently and under-report every forgotten
+ * punch-out. Returning null forces every caller to decide what to do about it. */
+export function sessionDuration(span: AttendanceSpanLike): number | null {
+  if (span.endedAt === null) return null;
+  return span.endedAt.getTime() - span.startedAt.getTime();
+}
+
+/** What can be summed, and a count of what cannot. Never collapses the two:
+ * `{ ms: 0, unclosed: 1 }` is a day with no punch-out, which is a different
+ * claim from a day of no work. */
+export function dayTotal(spans: AttendanceSpanLike[]): { ms: number; unclosed: number } {
+  let ms = 0;
+  let unclosed = 0;
+  for (const span of spans) {
+    const duration = sessionDuration(span);
+    if (duration === null) unclosed += 1;
+    else ms += duration;
+  }
+  return { ms, unclosed };
+}
+
+/** "6h 10m", "3h", "45m".
+ *
+ * A caller with `ms === 0` and unclosed sessions must render the no-punch-out
+ * marker instead of calling this — "0h" would be exactly the lie the null in
+ * `sessionDuration` exists to prevent. */
+export function formatDuration(ms: number): string {
+  const minutes = Math.round(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest}m`;
+  if (rest === 0) return `${hours}h`;
+  return `${hours}h ${rest}m`;
 }
