@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { TASK_STATUSES, TASK_STATUS_LABEL, type TaskStatus } from "@/lib/task";
 import { setTaskStatusAction } from "@/server/actions/tasks";
 import { SelectField } from "@/components/ui/field";
@@ -21,20 +21,44 @@ export function TaskStatusControl({
   status: TaskStatus;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function run(formData: FormData) {
     setError(null);
     try {
-      const result = await setTaskStatusAction(formData);
-      if (!result.ok) setError(result.error);
+      let result = await setTaskStatusAction(formData);
+
+      // The move did not land; an admin may confirm and retry. Asking here
+      // rather than server-side is what makes the override a deliberate act
+      // — the server re-reads the role on the retry, so this prompt grants
+      // nothing on its own.
+      if (!result.ok && result.needsOverride) {
+        if (!window.confirm(result.error)) {
+          // Nothing was written, so the <select> is showing a status the task
+          // does not have. reset() restores it to defaultValue.
+          formRef.current?.reset();
+          return;
+        }
+        formData.set("override", "1");
+        result = await setTaskStatusAction(formData);
+      }
+
+      if (!result.ok) {
+        setError(result.error);
+        // Same reason: a refused move leaves the select on the value the
+        // server rejected. revalidatePath cannot fix it, because the status
+        // is unchanged so `key` is unchanged and the field never remounts.
+        formRef.current?.reset();
+      }
     } catch {
       setError("Something went wrong — try again");
+      formRef.current?.reset();
     }
   }
 
   return (
     <div className="flex flex-col gap-1">
-      <form action={run}>
+      <form action={run} ref={formRef}>
         <input type="hidden" name="taskId" value={taskId} />
         {projectId ? <input type="hidden" name="projectId" value={projectId} /> : null}
         {clientId ? <input type="hidden" name="clientId" value={clientId} /> : null}

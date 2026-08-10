@@ -666,7 +666,11 @@ describe("setTaskStatus", () => {
     expect(txW.updated).toHaveLength(1);
   });
 
-  it("lets an admin override, and records that they did", async () => {
+  // An admin's FIRST attempt does not land. Without this the override
+  // applies in silence, which is indistinguishable from the constraint not
+  // existing — the confusion that sent the owner back to ask whether the
+  // feature worked at all.
+  it("asks an admin before overriding, and writes nothing yet", async () => {
     const { db, txW } = fakeDb({
       task: taskWithProject,
       blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
@@ -679,8 +683,55 @@ describe("setTaskStatus", () => {
       isAdmin: true,
     });
 
+    expect(result).toEqual({
+      ok: false,
+      error: "MER-018 isn't finished yet. Move anyway?",
+      needsOverride: true,
+    });
+    expect(txW.updated).toHaveLength(0);
+    expect(txW.activity).toHaveLength(0);
+  });
+
+  it("lets an admin override once confirmed, and records that they did", async () => {
+    const { db, txW } = fakeDb({
+      task: taskWithProject,
+      blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "DONE",
+      actorId: "u1",
+      isAdmin: true,
+      override: true,
+    });
+
     expect(result.ok).toBe(true);
     expect(txW.activity[0].meta).toMatchObject({ overrodeBlockers: ["MER-018"] });
+  });
+
+  // The confirmation is a claim about the human, not about their rights. A
+  // member sending override: true must still be refused outright, and must
+  // never be offered the prompt.
+  it("refuses a member even when they claim to have confirmed", async () => {
+    const { db, txW } = fakeDb({
+      task: taskWithProject,
+      blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
+    });
+
+    const result = await setTaskStatus(db, {
+      taskId: "t1",
+      status: "DONE",
+      actorId: "u1",
+      isAdmin: false,
+      override: true,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Blocked by MER-018. Finish it first, or ask an admin to override.",
+    });
+    expect(txW.updated).toHaveLength(0);
   });
 
   it("omits overrodeBlockers entirely on an ordinary move", async () => {

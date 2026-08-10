@@ -62,7 +62,19 @@ export function Board({ rows }: { rows: TaskListRow[] }) {
         if (row.clientId) fd.set("clientId", row.clientId);
 
         try {
-          const result = await setTaskStatusAction(fd);
+          let result = await setTaskStatusAction(fd);
+
+          // An admin dropping a blocked card is asked before it lands. On
+          // cancel nothing was written, so the optimistic move unwinds by
+          // itself for the reason documented above — the revalidated refetch
+          // returns the original status.
+          if (!result.ok && result.needsOverride) {
+            if (window.confirm(result.error)) {
+              fd.set("override", "1");
+              result = await setTaskStatusAction(fd);
+            }
+          }
+
           if (result.ok) {
             setErrors((prev) => {
               const next = { ...prev };

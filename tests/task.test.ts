@@ -32,7 +32,8 @@ import {
   unfinishedBlockers,
   blockedChipLabel,
   blockedRefusalMessage,
-  blockedTransitionRefused,
+  blockedMoveNeedsPermission,
+  blockedOverridePrompt,
   TASK_REFERENCE_PREFIX,
   type TaskPriority,
   type TaskSortable,
@@ -756,52 +757,97 @@ describe("unfinishedBlockers", () => {
   });
 });
 
-describe("blockedTransitionRefused", () => {
-  it("refuses a forward move while blocked", () => {
-    expect(blockedTransitionRefused({ blocked: true, to: "IN_PROGRESS", isAdmin: false })).toBe(true);
-    expect(blockedTransitionRefused({ blocked: true, to: "REVIEW", isAdmin: false })).toBe(true);
-    expect(blockedTransitionRefused({ blocked: true, to: "DONE", isAdmin: false })).toBe(true);
+describe("blockedMoveNeedsPermission", () => {
+  it("catches every forward move while blocked", () => {
+    expect(blockedMoveNeedsPermission({ blocked: true, to: "IN_PROGRESS" })).toBe(true);
+    expect(blockedMoveNeedsPermission({ blocked: true, to: "REVIEW" })).toBe(true);
+    expect(blockedMoveNeedsPermission({ blocked: true, to: "DONE" })).toBe(true);
   });
 
   // Spec §5: parking and reopening are the two moves someone makes BECAUSE
   // they have discovered they are blocked. Refusing them would be perverse.
   it("always allows a move to TO_DO, even while blocked", () => {
-    expect(blockedTransitionRefused({ blocked: true, to: "TO_DO", isAdmin: false })).toBe(false);
+    expect(blockedMoveNeedsPermission({ blocked: true, to: "TO_DO" })).toBe(false);
   });
 
   it("allows everything when not blocked", () => {
-    expect(blockedTransitionRefused({ blocked: false, to: "DONE", isAdmin: false })).toBe(false);
+    expect(blockedMoveNeedsPermission({ blocked: false, to: "DONE" })).toBe(false);
   });
 
-  it("allows an admin through a block", () => {
-    expect(blockedTransitionRefused({ blocked: true, to: "DONE", isAdmin: true })).toBe(false);
+  // It deliberately knows nothing about roles. Refuse-vs-confirm is the
+  // service's decision, and folding isAdmin in here previously hid the
+  // admin's silent-success case entirely.
+  it("takes no view on who is asking", () => {
+    expect(blockedMoveNeedsPermission.length).toBe(1);
+  });
+});
+
+describe("blockedOverridePrompt", () => {
+  it("asks about one blocker", () => {
+    expect(blockedOverridePrompt([{ reference: 27, status: "TO_DO" }])).toBe(
+      "MER-027 isn't finished yet. Move anyway?"
+    );
+  });
+
+  it("asks about several", () => {
+    expect(
+      blockedOverridePrompt([
+        { reference: 27, status: "TO_DO" },
+        { reference: 29, status: "IN_PROGRESS" },
+      ])
+    ).toBe("MER-027 and 1 more aren't finished yet. Move anyway?");
+  });
+
+  it("counts only the unfinished ones", () => {
+    expect(
+      blockedOverridePrompt([
+        { reference: 27, status: "TO_DO" },
+        { reference: 29, status: "DONE" },
+      ])
+    ).toBe("MER-027 isn't finished yet. Move anyway?");
   });
 });
 
 describe("blockedChipLabel", () => {
   it("is null when nothing unfinished blocks it", () => {
-    expect(blockedChipLabel([])).toBeNull();
-    expect(blockedChipLabel([{ reference: 18, status: "DONE" }])).toBeNull();
+    expect(blockedChipLabel([], "TO_DO")).toBeNull();
+    expect(blockedChipLabel([{ reference: 18, status: "DONE" }], "TO_DO")).toBeNull();
   });
 
   it("names the single blocker", () => {
-    expect(blockedChipLabel([{ reference: 18, status: "TO_DO" }])).toBe("Blocked by MER-018");
+    expect(blockedChipLabel([{ reference: 18, status: "TO_DO" }], "TO_DO")).toBe("Blocked by MER-018");
   });
 
   // The DONE one is not counted in the overflow — only unfinished blockers
   // block, so only they are described.
   it("counts only unfinished blockers in the overflow", () => {
-    const label = blockedChipLabel([
-      { reference: 18, status: "TO_DO" },
-      { reference: 22, status: "IN_PROGRESS" },
-      { reference: 30, status: "DONE" },
-    ]);
+    const label = blockedChipLabel(
+      [
+        { reference: 18, status: "TO_DO" },
+        { reference: 22, status: "IN_PROGRESS" },
+        { reference: 30, status: "DONE" },
+      ],
+      "TO_DO"
+    );
     expect(label).toBe("Blocked by MER-018 +1");
   });
 
   // Never a bare "Blocked" — ProjectHealth.BLOCKED already owns that word.
   it("always names the blocker rather than saying only Blocked", () => {
-    expect(blockedChipLabel([{ reference: 18, status: "TO_DO" }])).not.toBe("Blocked");
+    expect(blockedChipLabel([{ reference: 18, status: "TO_DO" }], "TO_DO")).not.toBe("Blocked");
+  });
+
+  // A finished task no longer asks "can I start this yet", so the chip goes
+  // — even though the blocker is genuinely still unfinished. That it was
+  // completed out of order lives in the activity log instead.
+  it("is null on a DONE task even with an unfinished blocker", () => {
+    expect(blockedChipLabel([{ reference: 27, status: "TO_DO" }], "DONE")).toBeNull();
+  });
+
+  it("still shows on IN_PROGRESS and REVIEW", () => {
+    const blockers = [{ reference: 27, status: "TO_DO" as const }];
+    expect(blockedChipLabel(blockers, "IN_PROGRESS")).toBe("Blocked by MER-027");
+    expect(blockedChipLabel(blockers, "REVIEW")).toBe("Blocked by MER-027");
   });
 });
 

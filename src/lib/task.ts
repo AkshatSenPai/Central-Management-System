@@ -379,14 +379,25 @@ export function unfinishedBlockers<T extends { status: TaskStatus }>(blockers: T
  * move it anywhere. Parking and reopening stay legal because they are the two
  * moves someone makes precisely BECAUSE they have discovered they are
  * blocked — refusing those would be perverse. */
-export function blockedTransitionRefused(input: {
-  blocked: boolean;
-  to: TaskStatus;
-  isAdmin: boolean;
-}): boolean {
-  if (!input.blocked) return false;
-  if (input.isAdmin) return false;
-  return input.to !== "TO_DO";
+/** Deliberately says nothing about WHO is asking. What to do about it is the
+ * service's call: a member is refused outright, an admin is asked to confirm
+ * and may then override. Folding `isAdmin` in here was the earlier shape, and
+ * it hid the third case — an admin's move sailing through in silence, which
+ * reads as the constraint not existing at all. */
+export function blockedMoveNeedsPermission(input: { blocked: boolean; to: TaskStatus }): boolean {
+  return input.blocked && input.to !== "TO_DO";
+}
+
+/** What an admin is asked before their override lands. A question, because
+ * this is the moment the override becomes a deliberate act rather than a
+ * constraint that quietly did nothing — which is also what makes the activity
+ * log's "who pushed past this" honest. */
+export function blockedOverridePrompt(blockers: BlockerRef[]): string {
+  const open = unfinishedBlockers(blockers);
+  const lead = taskReference(open[0].reference);
+  return open.length === 1
+    ? `${lead} isn't finished yet. Move anyway?`
+    : `${lead} and ${open.length - 1} more aren't finished yet. Move anyway?`;
 }
 
 /** "Blocked by MER-018", "Blocked by MER-018 +2", or null when nothing
@@ -396,8 +407,15 @@ export function blockedTransitionRefused(input: {
  * as a manual field on the project form, and the two render on the same
  * screen — the project detail page shows the health badge above the task
  * list. The preposition is what keeps them distinguishable, and it costs
- * nothing because the reference is the useful part anyway. */
-export function blockedChipLabel(blockers: BlockerRef[]): string | null {
+ * nothing because the reference is the useful part anyway.
+ *
+ * Null for a DONE task whatever its blockers say. The chip answers "can I
+ * start this yet", which a finished task no longer asks — leaving it on
+ * reads as a live constraint on work that is already over. That it was
+ * finished while something it depended on was still open is recorded in the
+ * activity log, which is the honest place for it. */
+export function blockedChipLabel(blockers: BlockerRef[], status: TaskStatus): string | null {
+  if (status === "DONE") return null;
   const open = unfinishedBlockers(blockers);
   if (open.length === 0) return null;
   const lead = `Blocked by ${taskReference(open[0].reference)}`;

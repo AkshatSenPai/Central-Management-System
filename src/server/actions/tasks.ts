@@ -38,6 +38,7 @@ import {
   setTaskStatus,
   addTaskDependency,
   removeTaskDependency,
+  type SetTaskStatusResult,
   setTaskAssignees,
   removeTask,
 } from "@/lib/task-service";
@@ -166,7 +167,7 @@ export async function updateTaskAction(
   }
 }
 
-export async function setTaskStatusAction(formData: FormData): Promise<ActionResult> {
+export async function setTaskStatusAction(formData: FormData): Promise<SetTaskStatusResult> {
   try {
     const user = await requireUser();
     const taskId = String(formData.get("taskId") ?? "");
@@ -181,6 +182,10 @@ export async function setTaskStatusAction(formData: FormData): Promise<ActionRes
       // From the session, never from formData. A client-supplied override
       // flag would make the override universal.
       isAdmin: user.role === "ADMIN",
+      // This one IS from the form, and safely so: it only reaches the write
+      // path after the isAdmin check above, so forging it gains a member
+      // nothing. It carries "the human confirmed", not "the human may".
+      override: formData.get("override") === "1",
     });
     revalidatePath("/my-tasks");
     revalidatePath("/team");

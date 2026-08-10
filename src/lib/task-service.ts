@@ -8,8 +8,9 @@ import {
   taskReference,
   isTaskBlocked,
   unfinishedBlockers,
-  blockedTransitionRefused,
+  blockedMoveNeedsPermission,
   blockedRefusalMessage,
+  blockedOverridePrompt,
   type BlockerRef,
   type TaskStatus,
   type TaskPriority,
@@ -433,10 +434,29 @@ export async function updateTask(
   return ok(undefined);
 }
 
+/** Structurally `ActionResult` plus one optional flag on the failure arm, so
+ * every existing reader that only looks at `.ok`/`.error` keeps working.
+ *
+ * `needsOverride` means: the move was NOT applied, and the caller may retry
+ * with `override: true`. Only ever returned to an admin — a member gets the
+ * plain refusal, so confirming something they cannot do is impossible. The
+ * role is re-read from the session on the retry, so a forged `override` in
+ * the form buys nothing. */
+export type SetTaskStatusResult =
+  | { ok: true; data: undefined }
+  | { ok: false; error: string; needsOverride?: boolean };
+
 export async function setTaskStatus(
   db: PrismaClient,
-  input: { taskId: string; status: TaskStatus; actorId: string; isAdmin: boolean }
-): Promise<ActionResult> {
+  input: {
+    taskId: string;
+    status: TaskStatus;
+    actorId: string;
+    isAdmin: boolean;
+    /** Set only by a retry after the admin confirmed the prompt. */
+    override?: boolean;
+  }
+): Promise<SetTaskStatusResult> {
   const scope = await loadTaskScope(db, input.taskId);
   if (!scope.ok) return err("Task not found");
 
@@ -458,8 +478,15 @@ export async function setTaskStatus(
   const blockers: BlockerRef[] = dependencyRows.map((d) => d.blocker);
   const blocked = isTaskBlocked(blockers);
 
-  if (blockedTransitionRefused({ blocked, to: input.status, isAdmin: input.isAdmin })) {
-    return err(blockedRefusalMessage(blockers));
+  if (blockedMoveNeedsPermission({ blocked, to: input.status })) {
+    // A member is stopped outright.
+    if (!input.isAdmin) return err(blockedRefusalMessage(blockers));
+    // An admin is asked first. Without this the override applies in silence,
+    // which is indistinguishable from the constraint not existing — the exact
+    // confusion that sent the owner back to ask whether the feature worked.
+    if (!input.override) {
+      return { ok: false, error: blockedOverridePrompt(blockers), needsOverride: true };
+    }
   }
 
   // Absent on an ordinary move, present only when an admin actually pushed

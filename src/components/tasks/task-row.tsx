@@ -15,7 +15,7 @@ export function TaskRow({ row }: { row: TaskListRow }) {
   const { shown, extra } = capAssignees(row.assignees);
   // One derivation, one chip, four surfaces: /my-tasks, /all-tasks and the
   // project and client task lists all render this row.
-  const blockedLabel = blockedChipLabel(row.blockers);
+  const blockedLabel = blockedChipLabel(row.blockers, row.status);
 
   return (
     // flex-wrap, not the old grid-cols-[2fr_auto_auto_auto]: on a phone the

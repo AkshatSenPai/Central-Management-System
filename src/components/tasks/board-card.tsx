@@ -33,7 +33,7 @@ export function BoardCard({
   // blocked task is a constraint, not a failure, and `bad` is what overdue
   // already uses — two different problems reading identically is how a colour
   // stops meaning anything.
-  const blockedLabel = blockedChipLabel(row.blockers);
+  const blockedLabel = blockedChipLabel(row.blockers, row.status);
   // Dragging has no CSS pseudo-class, so the held state has to be tracked.
   const [dragging, setDragging] = useState(false);
 
