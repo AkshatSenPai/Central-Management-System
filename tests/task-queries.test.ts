@@ -17,7 +17,7 @@ type TaskRow = {
   dueDate: Date | null;
   projectId: string | null;
   project: { name: string; clientId: string; client: { name: string } } | null;
-  assignees: { user: { id: string; name: string } }[];
+  assignees: { user: { id: string; name: string }; doneAt?: Date | null }[];
   blockedBy: { blocker: { reference: number; status: string } }[];
 };
 
@@ -33,7 +33,7 @@ type DetailRow = {
   project: { name: string; clientId: string; client: { name: string } } | null;
   milestone: { title: string } | null;
   creator: { id: string; name: string };
-  assignees: { user: { id: string; name: string } }[];
+  assignees: { user: { id: string; name: string }; doneAt?: Date | null }[];
   checklist: { id: string; title: string; done: boolean; order: number }[];
   blockedBy: { blocker: { id: string; reference: number; title: string; status: string } }[];
   blocking: { blockedTask: { id: string; reference: number; title: string; status: string } }[];
@@ -104,11 +104,15 @@ function detailRow(overrides: Partial<DetailRow> = {}): DetailRow {
 }
 
 describe("listAssignedTasks", () => {
-  it("returns only tasks assigned to the viewer", async () => {
+  // Assigned to the viewer AND not yet ticked. The `doneAt: null` half is what
+  // makes "my part done" clear the row off this page while leaving it on
+  // everybody else's — asserted on the whole clause so neither half can be
+  // dropped unnoticed.
+  it("returns only tasks assigned to the viewer whose portion is outstanding", async () => {
     const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
     await listAssignedTasks(db, { userId: "u1" });
     expect((findManyArgs[0] as { where: { assignees?: unknown } }).where.assignees).toEqual({
-      some: { userId: "u1" },
+      some: { userId: "u1", doneAt: null },
     });
   });
 
@@ -620,5 +624,50 @@ describe("listAssignedTasks scope filter", () => {
     const where = (findManyArgs[0] as { where: Record<string, unknown> }).where;
     expect(where.status).toBe("DONE");
     expect(where.projectId).toBeNull();
+  });
+});
+
+describe("my portion on the read models", () => {
+  // /all-tasks must NOT filter: the one page whose purpose is that nothing is
+  // dropped cannot start dropping things.
+  it("does not filter portions on the all-tasks query", async () => {
+    const { db, findManyArgs } = fakeDb({ tasks: [taskRow()] });
+    await listAllTasks(db);
+    expect((findManyArgs[0] as { where: Record<string, unknown> }).where).not.toHaveProperty(
+      "assignees"
+    );
+  });
+
+  it("carries the assignee count and the viewer's own tick onto the row", async () => {
+    const { db } = fakeDb({
+      tasks: [
+        taskRow({
+          assignees: [
+            { user: { id: "u1", name: "Dana Reeve" }, doneAt: new Date("2026-08-10T00:00:00.000Z") },
+            { user: { id: "u2", name: "Rohit Thakur" }, doneAt: null },
+          ],
+        }),
+      ],
+    });
+
+    const rows = await listAssignedTasks(db, { userId: "u1" });
+    expect(rows[0].assigneeCount).toBe(2);
+    expect(rows[0].myPortionDone).toBe(true);
+  });
+
+  it("reports myPortionDone false for a viewer who has not ticked", async () => {
+    const { db } = fakeDb({
+      tasks: [
+        taskRow({
+          assignees: [
+            { user: { id: "u1", name: "Dana Reeve" }, doneAt: null },
+            { user: { id: "u2", name: "Rohit Thakur" }, doneAt: null },
+          ],
+        }),
+      ],
+    });
+
+    const rows = await listAssignedTasks(db, { userId: "u1" });
+    expect(rows[0].myPortionDone).toBe(false);
   });
 });

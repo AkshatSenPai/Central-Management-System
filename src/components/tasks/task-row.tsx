@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
-import { TASK_PRIORITY_BADGE, TASK_PRIORITY_LABEL, blockedChipLabel, capAssignees } from "@/lib/task";
+import {
+  TASK_PRIORITY_BADGE,
+  TASK_PRIORITY_LABEL,
+  blockedChipLabel,
+  canMarkPortion,
+  capAssignees,
+} from "@/lib/task";
+import { MyPortionControl } from "@/components/tasks/my-portion-control";
 import type { TaskListRow } from "@/lib/task-queries";
 import { TaskStatusControl } from "@/components/tasks/task-status-control";
 
@@ -55,6 +62,18 @@ export function TaskRow({ row }: { row: TaskListRow }) {
       />
 
       <Badge kind={TASK_PRIORITY_BADGE[row.priority]}>{TASK_PRIORITY_LABEL[row.priority]}</Badge>
+
+      {/* Shared tasks only. On a solo task the status select beside this
+          already marks it done, and two controls doing the same thing is how
+          people learn to distrust both. */}
+      {canMarkPortion(row.assigneeCount) ? (
+        <MyPortionControl
+          taskId={row.id}
+          projectId={row.projectId}
+          clientId={row.clientId}
+          done={row.myPortionDone}
+        />
+      ) : null}
 
       <div className="flex items-center -space-x-2">
         {shown.map((a) => (

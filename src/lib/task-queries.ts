@@ -44,6 +44,13 @@ export type TaskListRow = {
    * that arrived pre-filtered could not tell "no dependencies" from "all
    * satisfied", and the second is worth showing on detail. */
   blockers: BlockerRef[];
+  /** How many people share this task. The per-portion control only appears
+   * from two up — on a solo task the status dropdown already does that job. */
+  assigneeCount: number;
+  /** Whether the *viewer* has ticked their own part. False on every list read
+   * for somebody who is not an assignee, and on the whole-studio views, which
+   * have no single viewer to be about. */
+  myPortionDone: boolean;
 };
 
 /** The shape every list query selects, whatever its where/orderBy — shared so
@@ -57,7 +64,7 @@ const taskRowSelect = {
   dueDate: true,
   projectId: true,
   project: { select: { name: true, clientId: true, client: { select: { name: true } } } },
-  assignees: { select: { user: { select: { id: true, name: true } } } },
+  assignees: { select: { user: { select: { id: true, name: true } }, doneAt: true } },
   // Shared, so /my-tasks, /all-tasks and the project and client task lists
   // all get the chip from this one line.
   blockedBy: { select: { blocker: { select: { reference: true, status: true } } } },
@@ -74,7 +81,7 @@ type TaskRowSource = {
   dueDate: Date | null;
   projectId: string | null;
   project: { name: string; clientId: string; client: { name: string } } | null;
-  assignees: { user: { id: string; name: string } }[];
+  assignees: { user: { id: string; name: string }; doneAt: Date | null }[];
   blockedBy: { blocker: { reference: number; status: TaskStatus } }[];
 };
 
@@ -82,7 +89,7 @@ function mapAssignees(rows: { user: { id: string; name: string } }[]) {
   return rows.map((a) => ({ id: a.user.id, name: a.user.name, initials: clientInitials(a.user.name) }));
 }
 
-function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
+function toTaskListRow(t: TaskRowSource, subtitle: string, viewerId?: string | null): TaskListRow {
   return {
     id: t.id,
     title: t.title,
@@ -97,6 +104,12 @@ function toTaskListRow(t: TaskRowSource, subtitle: string): TaskListRow {
     subtitle,
     assignees: mapAssignees(t.assignees),
     blockers: t.blockedBy.map((d) => d.blocker),
+    assigneeCount: t.assignees.length,
+    // False when there is no viewer — /all-tasks and the calendar are about
+    // everybody, so "my portion" has nobody to be about.
+    myPortionDone: viewerId
+      ? t.assignees.some((a) => a.user.id === viewerId && a.doneAt !== null)
+      : false,
   };
 }
 
@@ -123,7 +136,12 @@ export async function listAssignedTasks(
     scope?: string | null;
   }
 ): Promise<TaskListRow[]> {
-  const where: Prisma.TaskWhereInput = { assignees: { some: { userId: input.userId } } };
+  // `doneAt: null` is what makes "my part done" clear the row off this page.
+  // A task whose portion the viewer has ticked is simply not theirs any more,
+  // for this page's purposes — it stays on everybody else's list unchanged.
+  const where: Prisma.TaskWhereInput = {
+    assignees: { some: { userId: input.userId, doneAt: null } },
+  };
   if (!input.status) where.status = { not: "DONE" };
   else if (input.status !== "ALL") where.status = input.status;
 
@@ -147,7 +165,8 @@ export async function listAssignedTasks(
         clientName: t.project?.client.name ?? null,
         projectName: t.project?.name ?? null,
         dueDate: t.dueDate,
-      })
+      }),
+      input.userId
     )
   );
   return sortMyTasksBy(rows, input.sort ?? null);
@@ -282,7 +301,7 @@ export type TaskDetail = {
   milestoneId: string | null;
   milestoneTitle: string | null;
   creator: { id: string; name: string };
-  assignees: Array<{ id: string; name: string; initials: string }>;
+  assignees: Array<{ id: string; name: string; initials: string; doneAt: Date | null }>;
   checklist: Array<{ id: string; title: string; done: boolean; order: number }>;
   checklistDone: number;
   checklistTotal: number;
@@ -307,7 +326,7 @@ const taskDetailSelect = {
   project: { select: { name: true, clientId: true, client: { select: { name: true } } } },
   milestone: { select: { title: true } },
   creator: { select: { id: true, name: true } },
-  assignees: { select: { user: { select: { id: true, name: true } } } },
+  assignees: { select: { user: { select: { id: true, name: true } }, doneAt: true } },
   checklist: {
     // Deliberately not `as const` at the object level: that would make this
     // array a readonly tuple, which Prisma's OrderBy input (a mutable array)
@@ -349,7 +368,14 @@ export async function getTaskDetail(db: PrismaClient, taskId: string): Promise<T
     milestoneId: task.milestoneId,
     milestoneTitle: task.milestone?.title ?? null,
     creator: { id: task.creator.id, name: task.creator.name },
-    assignees: mapAssignees(task.assignees),
+    // Detail carries doneAt as well as the name, because this is the one
+    // surface that shows who has finished their own part and who has not.
+    assignees: task.assignees.map((a) => ({
+      id: a.user.id,
+      name: a.user.name,
+      initials: clientInitials(a.user.name),
+      doneAt: a.doneAt,
+    })),
     checklist: task.checklist,
     checklistDone: task.checklist.filter((c) => c.done).length,
     checklistTotal: task.checklist.length,
@@ -465,6 +491,8 @@ export async function listMySequences(
 
   return {
     sequences,
-    unsequenced: unsequencedRows.map((t) => toTaskListRow(t, taskDueLabel(t.dueDate))),
+    unsequenced: unsequencedRows.map((t) =>
+      toTaskListRow(t, taskDueLabel(t.dueDate), input.userId)
+    ),
   };
 }

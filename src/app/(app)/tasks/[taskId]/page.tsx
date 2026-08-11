@@ -10,9 +10,13 @@ import { Attachments } from "@/components/attachments/attachments";
 import {
   TASK_PRIORITY_BADGE,
   TASK_PRIORITY_LABEL,
+  allPortionsDone,
+  blockedChipLabel,
+  canMarkPortion,
   mergeAssigneeMembers,
   taskReference,
 } from "@/lib/task";
+import { MyPortionControl } from "@/components/tasks/my-portion-control";
 import { shortDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
@@ -234,15 +238,44 @@ export default async function TaskDetailPage(props: { params: Promise<{ taskId: 
             {task.assignees.length === 0 ? (
               <p className="text-xs text-[var(--text-3)]">Unassigned</p>
             ) : (
-              <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+              <div className="space-y-1.5">
                 {task.assignees.map((a) => (
                   <span key={a.id} className="flex items-center gap-1.5">
                     <InitialsAvatar initials={a.initials} shape="circle" size={22} />
-                    <span className="text-xs text-[var(--text-2)]">{a.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-2)]">
+                      {a.name}
+                    </span>
+                    {/* "part", never "complete" or "finished" — those words
+                        belong to the task, and the whole difficulty here is
+                        that a portion being finished is not the task being
+                        finished. */}
+                    {a.doneAt ? <Badge kind="ok">Part done</Badge> : null}
                   </span>
                 ))}
               </div>
             )}
+
+            {canMarkPortion(task.assignees.length) &&
+            task.assignees.some((a) => a.id === session.user.id) ? (
+              <MyPortionControl
+                taskId={task.id}
+                projectId={task.projectId}
+                clientId={task.clientId}
+                done={task.assignees.some((a) => a.id === session.user.id && a.doneAt !== null)}
+              />
+            ) : null}
+
+            {/* The one place two approved rules genuinely disagree: everybody
+                has finished, but sequencing refuses to close a blocked task.
+                Stated rather than left inferable, or the page just looks
+                broken. */}
+            {allPortionsDone(task.assignees) && task.status !== "DONE" ? (
+              <p className="text-xs text-[var(--text-3)]">
+                {blockedChipLabel(task.blockers, task.status)
+                  ? `Everyone has finished — ${blockedChipLabel(task.blockers, task.status)?.toLowerCase()}.`
+                  : "Everyone has finished — waiting to close."}
+              </p>
+            ) : null}
             <TaskAssigneesForm
               taskId={task.id}
               projectId={task.projectId}

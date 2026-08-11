@@ -38,6 +38,7 @@ import {
   setTaskStatus,
   addTaskDependency,
   removeTaskDependency,
+  markMyPortion,
   type SetTaskStatusResult,
   setTaskAssignees,
   removeTask,
@@ -255,6 +256,35 @@ export async function removeTaskDependencyAction(formData: FormData): Promise<Ac
     });
     revalidateTaskSurfaces(
       blockedTaskId,
+      String(formData.get("projectId") ?? ""),
+      String(formData.get("clientId") ?? "")
+    );
+    return result;
+  } catch (e) {
+    if (e instanceof AuthError) return err(e.message);
+    throw e;
+  }
+}
+
+/** Mark the signed-in person's own part of a shared task finished, or un-mark
+ * it.
+ *
+ * **The actor is the session, never the form.** There is no member-id field to
+ * post, so ticking somebody else's portion is not something the request can
+ * even express. */
+export async function markMyPortionAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const taskId = String(formData.get("taskId") ?? "");
+    if (!taskId) return err("Invalid input");
+
+    const result = await markMyPortion(prisma, {
+      taskId,
+      actorId: user.id,
+      done: formData.get("done") === "1",
+    });
+    revalidateTaskSurfaces(
+      taskId,
       String(formData.get("projectId") ?? ""),
       String(formData.get("clientId") ?? "")
     );
