@@ -29,6 +29,7 @@ export const ICON_NAMES = [
   "lock",
   "campaign",
   "feedback",
+  "description",
   "receipt_long",
   "settings",
   // Shell chrome.
@@ -50,6 +51,7 @@ export const ICON_NAMES = [
   "filter_list",
   "attach_file",
   "download",
+  "print",
   "visibility",
   "visibility_off",
   // Content and state.

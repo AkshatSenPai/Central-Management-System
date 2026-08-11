@@ -12,7 +12,8 @@ export type ActivityEntityType =
   | "ANNOUNCEMENT"
   | "CALENDAR_EVENT"
   | "FEEDBACK"
-  | "ATTENDANCE";
+  | "ATTENDANCE"
+  | "CONTRACT";
 
 /** Stored as a plain String column, never a Prisma enum, so later phases add
  * verbs without a migration. describeActivity must stay total. */
@@ -66,7 +67,15 @@ export type ActivityAction =
      punch-in: that is the app housekeeping, not a person acting. The only
      attendance event worth an audit row is an admin resolving somebody
      else's session, which happens on deactivation. */
-  | "attendance.orphaned";
+  | "attendance.orphaned"
+  /* A draft is working material and its edits are not logged individually —
+     the same reasoning that keeps routine punches out of the timeline. The
+     three moments that matter are the ones a client can see: the document
+     was drafted, it was issued under a number, or it was withdrawn. */
+  | "contract.drafted"
+  | "contract.issued"
+  | "contract.voided"
+  | "contract.draft_discarded";
 
 export type ActivityMeta = Record<string, unknown> | null;
 
@@ -288,6 +297,17 @@ export function describeActivity(entry: {
       return `${who} marked feedback ${humanizeEnum(metaString(entry.meta, "status"))}`;
     case "feedback.removed":
       return `${who} removed a piece of feedback`;
+    // `meta.name` is the document's own description ("Maintenance agreement —
+    // Standard · Meta + Google"), never a price: prices are baked into the
+    // template file and this app never learns one (spec §03).
+    case "contract.drafted":
+      return `${who} drafted ${what}`;
+    case "contract.issued":
+      return `${who} issued ${what} as ${metaString(entry.meta, "agreementNo") ?? "an agreement"}`;
+    case "contract.voided":
+      return `${who} voided ${metaString(entry.meta, "agreementNo") ?? what}`;
+    case "contract.draft_discarded":
+      return `${who} discarded the draft ${what}`;
     // Punching in and out is not logged at all — six people clocking in and
     // out for chai and lunch would be thirty rows before noon, and this feed
     // is unscoped. The AttendanceSession table is already a complete,

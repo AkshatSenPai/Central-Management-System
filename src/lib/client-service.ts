@@ -28,6 +28,12 @@ const DIFFED_FIELDS = [
 
 const DUPLICATE_NAME = "A client with this name already exists";
 const HAS_PROJECTS = "Remove this client's projects before deleting";
+/** Deliberately not "remove the contracts first" — there is no way to remove
+ * one, and there should not be. An issued contract is a legal record whose
+ * agreement number must stay answerable forever (see `Contract.client` in the
+ * schema), so a client who has ever been sent one is a client who is kept. */
+const HAS_CONTRACTS =
+  "This client has contracts on file and cannot be deleted — set them to Former instead";
 
 /** Defensive: the action layer already maps cleared optionals to null, but a
  * stray "" must never reach the column. */
@@ -132,6 +138,9 @@ export async function deleteClient(
   const projectCount = await db.project.count({ where: { clientId: input.clientId } });
   if (projectCount > 0) return err(HAS_PROJECTS);
 
+  const contractCount = await db.contract.count({ where: { clientId: input.clientId } });
+  if (contractCount > 0) return err(HAS_CONTRACTS);
+
   try {
     await db.$transaction(async (tx) => {
       await tx.client.delete({ where: { id: input.clientId } });
@@ -160,9 +169,14 @@ export async function deleteClient(
       await deleteAttachmentObjectsFor(tx, { parentType: "CLIENT", parentId: input.clientId });
     });
   } catch (e) {
-    // A project created between the count and the delete trips the FK.
+    // A project or contract created between the count and the delete trips
+    // the FK. Two RESTRICT relations now point here, so the message is chosen
+    // by which constraint actually fired rather than assuming the older one —
+    // telling someone to remove projects from a client that has none, because
+    // the real obstacle was a contract, is a dead end they cannot act on.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") {
-      return err(HAS_PROJECTS);
+      const constraint = `${e.meta?.constraint ?? e.meta?.field_name ?? ""}`;
+      return err(constraint.includes("Contract") ? HAS_CONTRACTS : HAS_PROJECTS);
     }
     throw e;
   }

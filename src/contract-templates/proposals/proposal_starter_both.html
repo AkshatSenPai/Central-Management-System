@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Proposal — Starter Funnel + Meta + Google Ads</title>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 17mm 16mm 17mm;
+  @top-left { content:"SHAPE ODYSSEY"; font-family:"Source Serif 4",serif; font-size:7.5pt; letter-spacing:2.2px; color:#9aa3ae; }
+  @top-right { content:"PROPOSAL"; font-family:"Source Serif 4",serif; font-size:7.5pt; letter-spacing:1.6px; color:#c8a25a; }
+  @bottom-left { content: string(prepfor); font-family:"Source Serif 4",serif; font-size:7pt; letter-spacing:1.6px; color:#b3b9c2; }
+  @bottom-right { content: counter(page) " / " counter(pages); font-family:"Source Serif 4",serif; font-size:7.5pt; letter-spacing:1.4px; color:#c8a25a; font-weight:600; }
+}
+@page :first { @top-left{content:"";} @top-right{content:"";} @bottom-left{content:"";} }
+* { box-sizing:border-box; }
+html { font-family:"Source Serif 4",serif; font-size:9.7pt; line-height:1.55; color:#2c3540; }
+h1,h2,h3,.display { font-family:"Playfair Display",serif; color:#16263d; }
+
+.cover { background:#16263d; color:#eef1f5; margin:-18mm -17mm 0 -17mm; padding:30mm 17mm 22mm 17mm; min-height:263mm; page-break-after:always; position:relative; }
+.cover .brand { font-family:"Source Serif 4",serif; font-size:13pt; letter-spacing:7px; color:#fff; font-weight:600; }
+.cover .pill { display:inline-block; border:1px solid rgba(255,255,255,.35); border-radius:20px; padding:4px 14px; font-size:7pt; letter-spacing:2.4px; color:#cdd5e0; margin-top:16mm; }
+.cover .kicker { margin-top:10mm; font-size:8pt; letter-spacing:3.4px; color:#c8a25a; }
+.cover .rule { width:52px; height:3px; background:#c8a25a; margin:6px 0 0; }
+.cover h1 { color:#fff; font-size:33pt; line-height:1.15; margin:12mm 0 0; max-width:150mm; font-weight:600; }
+.cover .lede { margin-top:9mm; max-width:140mm; color:#c3ccd8; font-size:10.5pt; line-height:1.65; }
+.cover .forbox { margin-top:16mm; border-top:1px solid rgba(255,255,255,.18); border-bottom:1px solid rgba(255,255,255,.18); padding:7mm 0; display:flex; gap:14mm; }
+.cover .forbox .col { flex:1; }
+.cover .forbox .lbl { font-size:7pt; letter-spacing:2.2px; color:#8f9dae; }
+.cover .forbox .val { font-size:12pt; color:#fff; margin-top:3px; font-family:"Playfair Display",serif; }
+.cover .forbox .sub { font-size:8.5pt; color:#a9b4c2; margin-top:2px; }
+.cover .foot { position:absolute; bottom:16mm; left:17mm; right:17mm; border-top:1px solid rgba(255,255,255,.15); padding-top:5mm; display:flex; justify-content:space-between; font-size:7.5pt; letter-spacing:2px; color:#8b96a5; }
+.cover .foot .gold { color:#c8a25a; font-weight:600; }
+
+.kicker-s { font-size:7.5pt; letter-spacing:3px; color:#c8a25a; margin-bottom:3px; page-break-after:avoid; }
+h2 { font-size:18pt; margin:0 0 3mm; font-weight:600; page-break-after:avoid; page-break-inside:avoid; }
+h3 { font-size:11.5pt; margin:0 0 1.5mm; font-weight:600; page-break-after:avoid; }
+p { margin:0 0 2.8mm; }
+.lead { color:#55606d; margin-bottom:6mm; font-size:10pt; }
+.sec { margin-top:7mm; }
+.sec:first-of-type { margin-top:0; }
+p,li { orphans:3; widows:3; }
+
+.card { background:#fff; border:1px solid #e5e2d9; border-radius:3mm; padding:6mm 7mm; margin:4mm 0; page-break-inside:avoid; }
+.card.navy { background:#16263d; color:#dbe2ea; border:none; }
+.card.navy h3 { color:#fff; }
+.card.gold { background:#f6f2e8; border:1px solid #e6dcc2; }
+.tag { display:inline-block; background:#f0ead9; color:#7a6320; font-size:7pt; letter-spacing:2px; padding:3px 10px; border-radius:12px; margin-bottom:3mm; }
+.tag.pop { background:#c8a25a; color:#16263d; font-weight:700; }
+
+table { width:100%; border-collapse:collapse; margin:3mm 0 4mm; page-break-inside:avoid; }
+thead th { background:#16263d; color:#fff; font-size:7.5pt; letter-spacing:1.4px; text-transform:uppercase; text-align:left; padding:3mm 4mm; font-weight:600; }
+tbody td { padding:2.9mm 4mm; border-bottom:1px solid #e5e2d9; font-size:9.3pt; vertical-align:top; }
+tbody tr:last-child td { border-bottom:none; }
+table.lined { background:#fff; border:1px solid #e5e2d9; }
+td.r,th.r { text-align:right; white-space:nowrap; }
+.total td { background:#16263d; color:#fff; font-weight:600; }
+.total td .display { color:#fff; }
+.sub-row td { background:#f4efe3; font-weight:600; color:#16263d; }
+.strike { text-decoration:line-through; color:#9aa3ae; }
+.save { color:#1f7a4d; font-weight:600; }
+
+ul.feat { list-style:none; margin:2mm 0 3mm; padding:0; }
+ul.feat li { padding:1.6mm 0 1.6mm 8mm; position:relative; border-bottom:1px solid #eee7db; font-size:9.4pt; }
+ul.feat li:last-child { border-bottom:none; }
+ul.feat li:before { content:"\2713"; position:absolute; left:0; color:#c8a25a; font-weight:700; }
+ul.feat li b { color:#16263d; }
+
+.note { background:#f6f2e8; border-left:3px solid #c8a25a; padding:4mm 5mm; font-size:9pt; color:#4a5461; margin:4mm 0; page-break-inside:avoid; }
+.note b { color:#16263d; }
+.small { font-size:8.4pt; color:#6a7480; }
+.two { display:flex; gap:6mm; }
+.two > div { flex:1; }
+b,strong { color:#16263d; }
+.big { font-family:"Playfair Display",serif; font-size:15pt; color:#16263d; }
+.center { text-align:center; }
+
+.force-page { page-break-before: auto; }
+
+table { page-break-inside:auto !important; }
+thead { display:table-header-group; }
+tr { page-break-inside:avoid; }
+.sec { margin-top:6mm; }
+
+.prep-anchor { string-set: prepfor attr(data-prepfor); }
+
+.insh-wrap { page-break-inside: avoid; }
+</style></head><body>
+
+<section class="cover">
+  <div class="brand">SHAPE ODYSSEY</div>
+  <div class="pill">YOUR GROWTH PROPOSAL</div>
+  <div class="kicker">PREPARED FOR {{CLIENT_FIRM_UPPER}}</div>
+  <div class="rule"></div>
+  <h1>Your Lead Engine — Built &amp; Launched</h1>
+  <div class="lede">
+    A complete lead system: a funnel that captures and nurtures every enquiry automatically, powered by meta + google ads —
+    built, launched and handed over to you.
+  </div>
+  <div class="forbox">
+    <div class="col">
+      <div class="lbl">PREPARED FOR</div>
+      <div class="val">{{CLIENT_NAME}}</div>
+      <div class="sub">{{CLIENT_FIRM}}<br>Project: {{PROJECT_NAME}}</div>
+    </div>
+    <div class="col">
+      <div class="lbl">PREPARED BY</div>
+      <div class="val">Shape Odyssey</div>
+      <div class="sub">Delhi NCR, India · shapeodyssey.com<br>shapeodyssey.auto@gmail.com</div>
+    </div>
+  </div>
+  <div class="foot"><div>CRAFTING DIGITAL JOURNEYS, ENGINEERED FOR GROWTH</div><div class="gold">{{MONTH_YEAR}}</div></div>
+</section>
+
+<section>
+  <div class="sec">
+    <div class="kicker-s">THE PLAN</div>
+    <h2>What We're Building For You</h2>
+    <p class="lead">Starter Funnel + Meta + Google Ads — ads bring the traffic; the funnel makes sure not a single lead slips through.</p>
+
+    <div class="card navy">
+      <span class="tag pop">YOUR PACKAGE</span>
+      <h3>Starter Funnel + Meta + Google Ads</h3>
+      <p style="margin-bottom:0">Captures and notifies. It does not run a nurture sequence — clients needing sustained follow-up move to Standard.</p>
+    </div>
+
+    <div class="card">
+      <h3>Starter Funnel — what's included</h3>
+      <ul class="feat">
+          <li>Single-section landing page</li>
+          <li>CRM included — every lead captured and held in one place</li>
+          <li>1-stage automation</li>
+          <li>Email nurture for 7 days</li>
+          <li>Instant lead alerts to WhatsApp</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Your Automated Follow-Up</h3>
+      <p class="small" style="margin-bottom:3mm">Every new lead is followed up automatically, without anyone having to remember.</p>
+      <table class="lined">
+        <thead><tr><th style="width:24%">STAGE</th><th>EMAIL</th><th>WHATSAPP</th></tr></thead>
+        <tbody>
+          <tr><td><b>Stage 1</b></td><td>Email for 7 days</td><td>Instant lead alert to WhatsApp</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>The Advertising — Meta + Google Ads Setup</h3>
+      <p class="small" style="margin-bottom:2mm">Facebook, Instagram and Google Search.</p>
+      <ul class="feat">
+          <li>Business page setup, or audit if one already exists</li>
+          <li>Audience research and build</li>
+          <li>Meta Pixel + Conversions API installed and verified</li>
+          <li>2 video ad creatives + 3 ad copy variants</li>
+          <li>Retargeting audience configured</li>
+          <li>Campaign launched and verified</li>
+          <li>Instant lead alerts to WhatsApp</li>
+          <li>Account setup and full business verification (address, ID, company, GST)</li>
+          <li>Keyword research and negative keyword list</li>
+          <li>5 text ad variants + sitelink, callout and call extensions</li>
+          <li>Conversion tracking installed and verified</li>
+          <li>Campaign launched and verified</li>
+          <li>Instant lead alerts to WhatsApp</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec">
+    <div class="kicker-s">HANDOVER</div>
+    <h2>What You Receive</h2>
+    <div class="card">
+      <ul class="feat">
+        <li>Your <b>live landing page</b> with the lead-capture form working end to end</li>
+        <li><b>CRM access</b>, with every lead flowing into it automatically</li>
+        <li>Your <b>follow-up sequences</b>, built, tested and switched on</li>
+        <li>Your <b>business page and live campaign</b>, on your own ad account</li><li>The <b>ad creatives</b> used in your campaign</li>
+        <li><b>Logins and access</b> to everything, in your name</li>
+        <li>A short <b>walkthrough</b> of the system and how leads reach you</li>
+      </ul>
+    </div>
+
+    <div class="two">
+      <div class="card gold"><h3>Delivery</h3><p style="margin-bottom:0"><b>{{TIMELINE}}</b> from the go-ahead, with progress updates throughout.</p></div>
+      <div class="card gold"><h3>Free Revisions</h3><p style="margin-bottom:0"><b>7 days</b> after delivery for any small changes — at no extra cost.</p></div>
+    </div>
+
+    <div class="note">
+      <b>What we'll need from you:</b> access to your business page and ad account, your brand assets and offer details, a <b>domain</b> for the landing page, an <b>email service provider</b> for the email nurture, and a <b>WhatsApp Business number</b> for the WhatsApp follow-up. We set everything up and connect it — these are third-party services paid for directly by you.
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec force-page">
+    <div class="kicker-s">INVESTMENT</div>
+    <h2>Your Price Breakdown</h2>
+    <p class="lead">Full transparency — every number, and what you save by taking it together.</p>
+
+    <table class="lined">
+      <thead><tr><th style="width:50%">ITEM</th><th class="r">STANDARD</th><th class="r">YOUR PRICE</th></tr></thead>
+      <tbody>
+        <tr><td><b>Starter Funnel</b> <span class="small">(landing page + CRM + automation)</span></td><td class="r">—</td><td class="r"><b>₹4,999</b></td></tr>
+        <tr><td><b>Meta + Google Ads Setup</b> <span class="small">(bundled rate)</span></td><td class="r"><span class="strike">₹24,998</span></td><td class="r"><b>₹17,999</b></td></tr>
+        <tr><td>Your bundle saving</td><td class="r">—</td><td class="r save">₹6,999</td></tr>
+        <tr class="total"><td><span class="display">TOTAL — ONE-TIME</span></td><td class="r">—</td><td class="r"><span class="display" style="font-size:13pt">₹22,998</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <b>About this entry price.</b> The ₹4,999 build price is an introductory offer and comes with a
+      <b>3-month System Care commitment</b> at ₹2,999/month. That commitment is what makes the low build
+      price possible — it means we're set up to look after the system properly rather than handing it over and walking away.
+    </div>
+    <div class="note">
+      <b>Ad budget is separate.</b> Your advertising spend goes directly to the platform from your own ad account — we never collect or hold your ad budget. The price above is for our work, not your ad spend.
+    </div>
+
+    <div class="card">
+      <h3>Monthly — after launch</h3>
+      <p class="small" style="margin-bottom:2mm">Quoted as two independent lines, so either can change without affecting the other.</p>
+      <p style="margin-bottom:0"><b>System Care ₹2,999/month</b> — keeping the funnel, CRM and automation running, with a monthly report.<br>
+      <b>Ad Management ₹14,999/month, or 20% of your ad spend — whichever is higher.</b>
+      <span class="small">For most months this is the flat fee; it only rises once monthly spend passes about ₹75,000. The two lines are separate — you can pause ads without losing System Care.</span></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec">
+    <div class="insh-wrap">
+    <div class="kicker-s">IN SHORT</div>
+    <h2>The Whole Deal, On One Line</h2>
+    <table class="lined">
+      <tbody>
+        <tr><td style="width:40%"><b>What you're getting</b></td><td>Starter Funnel + Meta + Google Ads</td></tr>
+        <tr><td><b>Follow-up built in</b></td><td>Automated email and WhatsApp for every lead</td></tr>
+        <tr><td><b>Delivery</b></td><td>{{TIMELINE}} · 7 days of free tweaks after delivery</td></tr>
+        <tr><td><b>One-time investment</b></td><td><b>₹22,998</b> <span class="small">(saving ₹6,999 versus separately)</span></td></tr>
+        <tr><td><b>Monthly</b></td><td>System Care ₹2,999 · Ad Management ₹14,999 or 20% of spend</td></tr>
+        <tr><td><b>Ad budget</b></td><td>Separate — paid by you directly to the platform</td></tr>
+      </tbody>
+    </table>
+
+    <div class="card navy center" style="margin-top:5mm">
+      <p class="big" style="color:#fff; margin-bottom:2mm">Let's begin the odyssey.</p>
+      <p style="margin-bottom:0; color:#c3ccd8">Shape Odyssey · Delhi NCR, India · shapeodyssey.com · shapeodyssey.auto@gmail.com</p>
+    </div>
+    </div>
+  </div>
+</section>
+</body></html>

@@ -16,6 +16,27 @@ const nextConfig: NextConfig = {
   },
 
   /**
+   * The 74 contract templates.
+   *
+   * File tracing works by following `import` statements, and
+   * `contract-template.ts` reads these files by a path it builds at runtime
+   * from the deal — which is the whole point of spec §03's "build it from the
+   * deal, don't hardcode a lookup table", and is also invisible to the
+   * tracer. Without this entry the directory is simply absent from the
+   * deployment: every contract renders in `next dev` and every one throws
+   * ENOENT in production.
+   *
+   * `/*` rather than a narrower route glob because three server entry points
+   * reach the templates — the register page, the contract detail page and the
+   * print route — and a list of three globs is three chances for the next
+   * page that renders a contract to be the one nobody remembered to add.
+   * 2.2 MB, and the deployment is not sensitive to it.
+   */
+  outputFileTracingIncludes: {
+    "/*": ["src/contract-templates/**/*"],
+  },
+
+  /**
    * The service worker must never be cached.
    *
    * A worker is fetched by the browser, not by the page, and whatever copy it

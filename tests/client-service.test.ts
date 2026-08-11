@@ -29,6 +29,11 @@ type FakeParts = {
   /** Row returned by client.findUnique. */
   client?: unknown;
   projectCount?: number;
+  /** Contracts on file under this client. `deleteClient` refuses while any
+   * exist — a contract register with holes in it cannot be audited, and the
+   * FK is RESTRICT to back it up. Absent means none, the shape every other
+   * test here assumes. */
+  contractCount?: number;
   transactionError?: unknown;
   /** Rows returned by attachment.findMany — what `deleteClient`'s
    * `deleteAttachmentObjectsFor` sweep finds under this client. Absent means
@@ -88,6 +93,7 @@ function fakeDb(parts: FakeParts) {
   const db = {
     client: clientDelegate,
     project: { count: async () => parts.projectCount ?? 0 },
+    contract: { count: async () => parts.contractCount ?? 0 },
     activityLog: { create: logCreate },
     attachment: attachmentDelegate,
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -228,6 +234,37 @@ describe("deleteClient", () => {
       error: "Remove this client's projects before deleting",
     });
     expect(deletes).toHaveLength(0);
+  });
+
+  /** A contract is a legal record whose agreement number must stay
+   * answerable, so a client who has ever been sent one is kept. The message
+   * points at the alternative rather than at a "remove them first" that has
+   * no corresponding action anywhere in the app. */
+  it("refuses to delete a client that has contracts, and says what to do instead", async () => {
+    const { db, deletes } = fakeDb({ client: existingClient, projectCount: 0, contractCount: 1 });
+    expect(await deleteClient(db, { clientId: "c1", actorId: "actor1" })).toEqual({
+      ok: false,
+      error:
+        "This client has contracts on file and cannot be deleted — set them to Former instead",
+    });
+    expect(deletes).toHaveLength(0);
+  });
+
+  /** Two RESTRICT relations now point at Client, so the P2003 handler picks
+   * its message from the constraint that actually fired. Telling somebody to
+   * remove projects from a client that has none is a dead end. */
+  it("names contracts when the racing P2003 came from the contract constraint", async () => {
+    const race = new Prisma.PrismaClientKnownRequestError("Foreign key constraint failed", {
+      code: "P2003",
+      clientVersion: "test",
+      meta: { constraint: "Contract_clientId_fkey" },
+    });
+    const { db } = fakeDb({ client: existingClient, projectCount: 0, transactionError: race });
+    expect(await deleteClient(db, { clientId: "c1", actorId: "actor1" })).toEqual({
+      ok: false,
+      error:
+        "This client has contracts on file and cannot be deleted — set them to Former instead",
+    });
   });
 
   it("deletes an empty client and logs client.deleted with a null client scope and the name in meta", async () => {
