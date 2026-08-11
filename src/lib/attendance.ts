@@ -70,8 +70,13 @@ export function isSameAppDay(a: Date, b: Date): boolean {
  * moving parts.
  *
  * The corollary is deliberate: somebody who punches in at 23:50 shows Offline
- * from midnight. Since nothing counts hours, that costs nothing — and their
- * next punch-in simply clears the old session. */
+ * from midnight, and their next punch-in simply clears the old session.
+ *
+ * **That still costs nothing now that hours are counted**, because presence and
+ * duration answer different questions. A session belongs to the app day of its
+ * `startedAt` and is never split at midnight, so a 23:50 start that ends at
+ * 01:00 is counted in full against the day it began — the admin grid sees the
+ * whole 70 minutes even though the dot said Offline for most of them. */
 export function isActive(session: AttendanceSessionLike, now: Date): boolean {
   return isOpen(session) && isSameAppDay(session.startedAt, now);
 }

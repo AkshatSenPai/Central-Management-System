@@ -26,11 +26,19 @@ function isDuplicateOpenSession(e: unknown): boolean {
 /** Punch in.
  *
  * Absorbs a session left open on an earlier day rather than refusing or
- * interrogating. Since nothing counts hours, there is no question worth asking
- * about when that person actually left — the honest record is "we do not
- * know", which is what a null `endedAt` on a DISCARDED row says. Both writes
- * are one transaction so a tidy-up can never happen without the new session it
- * was clearing the way for.
+ * interrogating. Nobody is asked when they actually left, because **the app
+ * never invents an end time** — the honest record is "we do not know", which is
+ * what a null `endedAt` on a DISCARDED row says.
+ *
+ * That reasoning used to be "nothing counts hours", and it changed on
+ * 2026-08-10 when the admin grid started summing durations. The conclusion did
+ * not change, only its justification: an answer supplied days later would be a
+ * guess, and a guess is exactly what a duration must not be built on. A
+ * discarded session therefore contributes no duration at all — see
+ * `sessionDuration`, which returns null rather than zero.
+ *
+ * Both writes are one transaction so a tidy-up can never happen without the new
+ * session it was clearing the way for.
  *
  * The pre-check is the friendly path only; the partial unique index is the
  * enforcement, because two taps on a slow connection both pass a
