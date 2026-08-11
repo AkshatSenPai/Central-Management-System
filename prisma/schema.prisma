@@ -288,6 +288,23 @@ model TaskAssignee {
   user   User   @relation(fields: [userId], references: [id])
   userId String
 
+  /// When this person marked their own part of a shared task finished. Null
+  /// means not yet.
+  ///
+  /// A fact about ONE person and ONE task — never about the task as a whole.
+  /// `Task.status` keeps its exact current meaning, which is what protects the
+  /// twenty-plus readers of `status === "DONE"` across the board columns,
+  /// progress, the sidebar counts, /team, the calendar and sequencing's blocker
+  /// check. A second notion of "finished" leaking into any of them would change
+  /// what all of them mean.
+  ///
+  /// The tick is a one-way trigger, not a derived state: the last one to be set
+  /// completes the task through `setTaskStatus`, and clearing one never reopens
+  /// it. There is deliberately no `portionsDone` count and no `allDone` flag on
+  /// Task — both are derivable from these rows, and both would need updating on
+  /// every assignee change.
+  doneAt DateTime?
+
   @@id([taskId, userId])
   @@index([userId])
 }

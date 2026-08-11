@@ -11,6 +11,7 @@ import {
   blockedMoveNeedsPermission,
   blockedRefusalMessage,
   blockedOverridePrompt,
+  allPortionsDone,
   type BlockerRef,
   type TaskStatus,
   type TaskPriority,
@@ -725,4 +726,78 @@ export async function setTaskAssignees(
   // the earlier save just created. Last writer wins, which is the intended
   // semantics of a set replacement.
   return attemptTaskAssigneeDiff(db, scope, input);
+}
+
+/** Mark the actor's own part of a shared task finished, or un-mark it.
+ *
+ * **The tick is a one-way trigger, not a derived state** (owner rulings,
+ * 2026-08-10). Setting the last outstanding portion completes the task;
+ * clearing one never reopens it. Everything here follows from that.
+ *
+ * **Self-only.** There is no member-id parameter — the actor's own row is the
+ * only one this can write, the same shape attendance uses for punching, which
+ * makes "you cannot tick for somebody else" a property of the code rather than
+ * a rule somebody has to remember.
+ *
+ * **The completion goes through `setTaskStatus`**, never a direct
+ * `task.update`. That is the app's only writer of status, so routing through it
+ * means the auto-completion writes the same activity row, fires the same
+ * notifications, and respects the same blocking rule as a human clicking Done.
+ * A direct update would be a second writer and would silently skip all three.
+ *
+ * **A refused completion is not a failure.** If sequencing refuses the move
+ * because the task is blocked, the tick still stands and this returns ok — the
+ * block wins, the task stays open, and task detail says why. Auto-completing
+ * past a blocker would silently defeat the constraint. */
+export async function markMyPortion(
+  db: PrismaClient,
+  input: { taskId: string; actorId: string; done: boolean }
+): Promise<ActionResult> {
+  const scope = await loadTaskScope(db, input.taskId);
+  if (!scope.ok) return err("Task not found");
+
+  const portions = await db.taskAssignee.findMany({
+    where: { taskId: input.taskId },
+    select: { userId: true, doneAt: true },
+  });
+
+  // Not a no-op to tolerate: it means the caller is confused about whose task
+  // this is, and silently succeeding would hide that.
+  if (!portions.some((p) => p.userId === input.actorId)) {
+    return err("That task is not assigned to you");
+  }
+
+  const now = new Date();
+
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.taskAssignee.update({
+        where: { taskId_userId: { taskId: input.taskId, userId: input.actorId } },
+        data: { doneAt: input.done ? now : null },
+      });
+    });
+  } catch (e) {
+    if (isRowGoneRace(e)) return err("Task not found");
+    throw e;
+  }
+
+  // Un-ticking stops here, always. Ruling 2.
+  if (!input.done) return ok(undefined);
+
+  const after = portions.map((p) =>
+    p.userId === input.actorId ? { ...p, doneAt: now } : p
+  );
+  if (!allPortionsDone(after)) return ok(undefined);
+
+  // Everyone is finished. Attempt the completion, and swallow a refusal: the
+  // only thing that refuses here is the blocked check, and that is a legitimate
+  // outcome rather than an error the person who ticked can act on.
+  await setTaskStatus(db, {
+    taskId: input.taskId,
+    status: "DONE",
+    actorId: input.actorId,
+    isAdmin: false,
+  });
+
+  return ok(undefined);
 }

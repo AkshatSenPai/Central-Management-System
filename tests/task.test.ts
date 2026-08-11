@@ -21,6 +21,8 @@ import {
   sortMyTasksBy,
   parseMyTaskSort,
   parseMyTaskScope,
+  allPortionsDone,
+  canMarkPortion,
   MY_TASK_SORTS,
   MY_TASK_SORT_LABEL,
   parseTaskStatusFilter,
@@ -897,5 +899,40 @@ describe("parseMyTaskScope", () => {
 
   it("takes the first of a repeated parameter", () => {
     expect(parseMyTaskScope(["PERSONAL", "CLIENT"])).toBe("PERSONAL");
+  });
+});
+
+describe("allPortionsDone", () => {
+  it("is false when nobody has ticked", () => {
+    expect(allPortionsDone([{ doneAt: null }, { doneAt: null }])).toBe(false);
+  });
+
+  it("is false when only some have ticked", () => {
+    expect(allPortionsDone([{ doneAt: new Date() }, { doneAt: null }])).toBe(false);
+  });
+
+  it("is true when everyone has ticked", () => {
+    expect(allPortionsDone([{ doneAt: new Date() }, { doneAt: new Date() }])).toBe(true);
+  });
+
+  // A task with nobody on it must never auto-complete. `every` on an empty
+  // array is true, so this needs its own guard and its own test — it is the
+  // one input that would silently close unassigned work.
+  it("is false for a task with no assignees at all", () => {
+    expect(allPortionsDone([])).toBe(false);
+  });
+});
+
+describe("canMarkPortion", () => {
+  // On a solo task the status dropdown already does this job, and two controls
+  // meaning the same thing is how people learn to distrust both.
+  it("is false for nobody and for one person", () => {
+    expect(canMarkPortion(0)).toBe(false);
+    expect(canMarkPortion(1)).toBe(false);
+  });
+
+  it("is true from two people up", () => {
+    expect(canMarkPortion(2)).toBe(true);
+    expect(canMarkPortion(4)).toBe(true);
   });
 });

@@ -21,7 +21,14 @@ vi.mock("@/lib/r2", () => ({
 }));
 
 import { deleteObjects } from "@/lib/r2";
-import { createTask, updateTask, setTaskStatus, removeTask, setTaskAssignees } from "@/lib/task-service";
+import {
+  createTask,
+  updateTask,
+  setTaskStatus,
+  removeTask,
+  setTaskAssignees,
+  markMyPortion,
+} from "@/lib/task-service";
 
 const mockDeleteObjects = vi.mocked(deleteObjects);
 
@@ -57,6 +64,10 @@ type FakeParts = {
    * is what every pre-existing test in this file assumes and why none of
    * them needed touching. */
   blockers?: { blocker: { reference: number; status: TaskStatus } }[];
+  /** Rows returned by taskAssignee.findMany when markMyPortion asks who is on
+   * the task and who has ticked. Separate from `currentAssignees`, which is
+   * setTaskAssignees' shape and carries names rather than doneAt. */
+  portions?: { userId: string; doneAt: Date | null }[];
 };
 
 type Sink = {
@@ -66,6 +77,8 @@ type Sink = {
   activity: Record<string, unknown>[];
   assigneesCreated: Record<string, unknown>[];
   assigneesDeleted: Record<string, unknown>[];
+  /** `taskAssignee.update` calls — how a portion tick is written. */
+  assigneesUpdated: Record<string, unknown>[];
   /** Rows handed to notification.createMany, flattened. Phase 4: a
    * notification must be written in the SAME transaction as the mutation
    * that caused it, so this sink proves which client it was called on. */
@@ -85,6 +98,7 @@ function emptySink(): Sink {
     activity: [],
     assigneesCreated: [],
     assigneesDeleted: [],
+    assigneesUpdated: [],
     notifications: [],
     notificationsCleared: [],
     attachmentsDeleted: [],
@@ -137,8 +151,12 @@ function fakeDb(parts: FakeParts) {
       },
     },
     taskAssignee: {
-      findMany: async (a: { where: unknown }) => {
+      findMany: async (a: { where: unknown; select?: Record<string, unknown> }) => {
         args.taskAssigneeFindManyWhere = a.where;
+        // markMyPortion asks for doneAt; setTaskAssignees asks for names. The
+        // select tells them apart, so one fake serves both without either
+        // caller having to know about the other.
+        if (a.select && "doneAt" in a.select) return parts.portions ?? [];
         return parts.currentAssignees ?? [];
       },
     },
@@ -185,6 +203,10 @@ function fakeDb(parts: FakeParts) {
       deleteMany: async (a: Record<string, unknown>) => {
         sink.assigneesDeleted.push(a);
         return { count: 0 };
+      },
+      update: async (a: Record<string, unknown>) => {
+        sink.assigneesUpdated.push(a);
+        return {};
       },
     },
     activityLog: {
@@ -238,6 +260,7 @@ function fakeDb(parts: FakeParts) {
         activity: txW.activity.length,
         assigneesCreated: txW.assigneesCreated.length,
         assigneesDeleted: txW.assigneesDeleted.length,
+        assigneesUpdated: txW.assigneesUpdated.length,
         notifications: txW.notifications.length,
         notificationsCleared: txW.notificationsCleared.length,
         attachmentsDeleted: txW.attachmentsDeleted.length,
@@ -261,6 +284,7 @@ function fakeDb(parts: FakeParts) {
         txW.activity.length = before.activity;
         txW.assigneesCreated.length = before.assigneesCreated;
         txW.assigneesDeleted.length = before.assigneesDeleted;
+        txW.assigneesUpdated.length = before.assigneesUpdated;
         txW.notifications.length = before.notifications;
         txW.notificationsCleared.length = before.notificationsCleared;
         txW.attachmentsDeleted.length = before.attachmentsDeleted;
@@ -1382,5 +1406,121 @@ describe("notifications on task creation", () => {
       assigneeIds: ["actor1"],
     });
     expect(txW.notifications).toEqual([]);
+  });
+});
+
+describe("markMyPortion", () => {
+  const shared = { ...taskWithProject, status: "TO_DO" as const };
+
+  it("writes doneAt for the actor only", async () => {
+    const { db, txW } = fakeDb({
+      task: shared,
+      portions: [
+        { userId: "u1", doneAt: null },
+        { userId: "u2", doneAt: null },
+      ],
+    });
+
+    const result = await markMyPortion(db, { taskId: "t1", actorId: "u1", done: true });
+
+    expect(result.ok).toBe(true);
+    expect(txW.assigneesUpdated).toHaveLength(1);
+    expect(txW.assigneesUpdated[0]).toMatchObject({
+      where: { taskId_userId: { taskId: "t1", userId: "u1" } },
+    });
+  });
+
+  it("does not touch the task status when others are still working", async () => {
+    const { db, txW } = fakeDb({
+      task: shared,
+      portions: [
+        { userId: "u1", doneAt: null },
+        { userId: "u2", doneAt: null },
+      ],
+    });
+
+    await markMyPortion(db, { taskId: "t1", actorId: "u1", done: true });
+
+    expect(txW.updated).toHaveLength(0);
+  });
+
+  it("completes the task when the last portion is ticked", async () => {
+    const { db, txW } = fakeDb({
+      task: shared,
+      portions: [
+        { userId: "u1", doneAt: null },
+        { userId: "u2", doneAt: new Date("2026-08-10T00:00:00.000Z") },
+      ],
+    });
+
+    const result = await markMyPortion(db, { taskId: "t1", actorId: "u1", done: true });
+
+    expect(result.ok).toBe(true);
+    expect(txW.updated).toHaveLength(1);
+    expect(txW.updated[0]).toMatchObject({ status: "DONE" });
+  });
+
+  // Ruling 2: the tick causes the close, but status belongs to people
+  // afterwards. A stray un-tick must not un-finish work for everyone.
+  it("never reopens the task when a portion is un-ticked", async () => {
+    const { db, txW } = fakeDb({
+      task: { ...taskWithProject, status: "DONE" },
+      portions: [
+        { userId: "u1", doneAt: new Date("2026-08-10T00:00:00.000Z") },
+        { userId: "u2", doneAt: new Date("2026-08-10T00:00:00.000Z") },
+      ],
+    });
+
+    const result = await markMyPortion(db, { taskId: "t1", actorId: "u1", done: false });
+
+    expect(result.ok).toBe(true);
+    expect(txW.assigneesUpdated).toHaveLength(1);
+    expect(txW.updated).toHaveLength(0);
+  });
+
+  // Spec §6, and the assertion most likely to be "fixed" by somebody who
+  // thinks a refused completion is a failure. The block wins: the tick
+  // records, the status does not move, and the caller gets ok.
+  it("records the tick but leaves a blocked task open", async () => {
+    const { db, txW } = fakeDb({
+      task: shared,
+      portions: [
+        { userId: "u1", doneAt: null },
+        { userId: "u2", doneAt: new Date("2026-08-10T00:00:00.000Z") },
+      ],
+      blockers: [{ blocker: { reference: 18, status: "TO_DO" } }],
+    });
+
+    const result = await markMyPortion(db, { taskId: "t1", actorId: "u1", done: true });
+
+    expect(result.ok).toBe(true);
+    expect(txW.assigneesUpdated).toHaveLength(1);
+    expect(txW.updated).toHaveLength(0);
+  });
+
+  it("errors on an unknown task", async () => {
+    const { db } = fakeDb({});
+    expect(await markMyPortion(db, { taskId: "ghost", actorId: "u1", done: true })).toEqual({
+      ok: false,
+      error: "Task not found",
+    });
+  });
+
+  // The actor must be on the task. Ticking a portion you do not have is not a
+  // no-op to be tolerated — it means the caller is confused about whose task
+  // this is.
+  it("refuses somebody who is not an assignee", async () => {
+    const { db, txW } = fakeDb({
+      task: shared,
+      portions: [
+        { userId: "u1", doneAt: null },
+        { userId: "u2", doneAt: null },
+      ],
+    });
+
+    const result = await markMyPortion(db, { taskId: "t1", actorId: "stranger", done: true });
+
+    expect(result.ok).toBe(false);
+    expect(txW.assigneesUpdated).toHaveLength(0);
   });
 });

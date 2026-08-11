@@ -455,3 +455,24 @@ export function parseMyTaskScope(raw: string | string[] | undefined): string | n
   if (!value || value === MY_TASK_SCOPE_ALL) return null;
   return value;
 }
+
+/** Has every assignee marked their own part finished?
+ *
+ * **False for an empty list**, deliberately: `every` on an empty array is true,
+ * and without this guard a task with nobody on it would satisfy the
+ * auto-completion trigger and close itself. */
+export function allPortionsDone(assignees: { doneAt: Date | null }[]): boolean {
+  if (assignees.length === 0) return false;
+  return assignees.every((a) => a.doneAt !== null);
+}
+
+/** Whether a task is shared enough for the per-portion control to mean
+ * anything.
+ *
+ * On a solo task the status dropdown already marks it done, and two controls
+ * that do the same thing is how people learn to distrust both. The feature is
+ * for work "given to 3-4 people", which is where one person finishing is a
+ * different claim from the task finishing. */
+export function canMarkPortion(assigneeCount: number): boolean {
+  return assigneeCount >= 2;
+}
