@@ -150,6 +150,12 @@ export async function getContractDetail(db: PrismaClient, contractId: string) {
       voidReason: true,
       createdBy: { select: { name: true } },
       createdAt: true,
+      /// Not displayed anywhere. It is the cache key the preview frame hangs
+      /// off — see the note on the iframe in the detail page. Without it the
+      /// frame keeps showing the document as it was before the last save,
+      /// which after issuing means a contract that appears to have no
+      /// agreement number.
+      updatedAt: true,
     },
   });
 }

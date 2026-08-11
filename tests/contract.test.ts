@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  contractFormValues,
   contractSchema,
   dealProblem,
   dealSummary,
@@ -203,6 +204,90 @@ describe("the four-type picker", () => {
     expect(typeChoiceFor("PROPOSAL", false)).toBe("PROPOSAL");
     expect(typeChoiceFor("ONE_TIME", true)).toBe("TRIAL");
     expect(typeChoiceFor("MAINTENANCE", true)).toBe("TRIAL");
+  });
+});
+
+/** The seam between the form and the schema, and the one nothing covered
+ * until a browser found it.
+ *
+ * The form renders only the fields the chosen template needs, so on a
+ * maintenance agreement `timeline`, `paidAmount`, `paidDate` and
+ * `websiteTier` are simply not in the DOM. `formData.get()` returns `null`
+ * for those, `.optional()` admits `undefined` but not `null`, and every
+ * single draft was refused with zod's fallback "Invalid input" — naming no
+ * field, because the failure was a union branch rather than a named rule.
+ *
+ * These tests build the FormData the browser actually submits, verified by
+ * reading it out of the live form. */
+describe("contractFormValues", () => {
+  function maintenanceForm(): FormData {
+    const fd = new FormData();
+    // Exactly what a trial maintenance agreement posts — note the four keys
+    // that are absent rather than blank.
+    fd.set("kind", "MAINTENANCE");
+    fd.set("trial", "on");
+    fd.set("plan", "STANDARD");
+    fd.set("ads", "META");
+    fd.set("realEstate", "on");
+    fd.set("clientName", "Mr. Sandeep Singh");
+    fd.set("clientFirm", "Magus Realty, Lucknow");
+    fd.set("clientPhone", "+91 73909 38686");
+    fd.set("clientEmail", "sandeep@example.com");
+    fd.set("projectName", "Wave City Plots");
+    fd.set("documentDate", "2026-08-11");
+    fd.set("campaignStartDate", "2026-08-15");
+    fd.set("gracePeriod", "48 hours");
+    fd.set("counterpartAgreementNo", "");
+    return fd;
+  }
+
+  it("parses a maintenance form whose optional fields were never rendered", () => {
+    const parsed = contractSchema.safeParse(contractFormValues(maintenanceForm()));
+    expect(parsed.success, parsed.error?.issues[0]?.message).toBe(true);
+    expect(parsed.data?.kind).toBe("MAINTENANCE");
+    expect(parsed.data?.trial).toBe(true);
+    expect(parsed.data?.realEstate).toBe(true);
+  });
+
+  it("turns an absent key into a blank, not a null", () => {
+    const values = contractFormValues(maintenanceForm());
+    for (const absent of ["timeline", "paidAmount", "paidDate", "websiteTier"]) {
+      expect(values[absent], absent).toBe("");
+    }
+  });
+
+  it("parses a proposal form, which renders fewer fields still", () => {
+    const fd = new FormData();
+    fd.set("kind", "PROPOSAL");
+    fd.set("plan", "STANDARD");
+    fd.set("ads", "META");
+    fd.set("clientName", "Mr. Sandeep Singh");
+    fd.set("clientFirm", "Magus Realty, Lucknow");
+    fd.set("projectName", "Wave City Plots");
+    fd.set("documentDate", "2026-08-11");
+    fd.set("timeline", "7 to 10 working days");
+    const parsed = contractSchema.safeParse(contractFormValues(fd));
+    expect(parsed.success, parsed.error?.issues[0]?.message).toBe(true);
+    expect(parsed.data?.trial).toBe(false);
+    expect(parsed.data?.realEstate).toBe(false);
+  });
+
+  /** An unticked checkbox omits its key entirely; presence is the answer. */
+  it("reads an unticked checkbox as false rather than missing", () => {
+    const fd = maintenanceForm();
+    fd.delete("trial");
+    fd.delete("realEstate");
+    const values = contractFormValues(fd);
+    expect(values.trial).toBe(false);
+    expect(values.realEstate).toBe(false);
+  });
+
+  /** A file input posted under a field name would otherwise reach zod as a
+   * File and fail with the same unnamed union error. */
+  it("treats a non-string value as blank", () => {
+    const fd = maintenanceForm();
+    fd.set("timeline", new Blob(["x"]), "x.txt");
+    expect(contractFormValues(fd).timeline).toBe("");
   });
 });
 

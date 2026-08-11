@@ -22,7 +22,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { err, type ActionResult } from "@/lib/action-result";
 import { AuthError, requireUser } from "@/server/guards";
-import { contractSchema, type ContractDeal } from "@/lib/contract";
+import { contractFormValues, contractSchema, type ContractDeal } from "@/lib/contract";
 import {
   createContract,
   updateContract,
@@ -33,39 +33,20 @@ import {
 } from "@/lib/contract-service";
 import { parseDateInput } from "@/lib/dates";
 
-/** `<input type="checkbox">` submits "on" when ticked and nothing at all when
- * not, so a missing key is false rather than invalid. */
-function checked(formData: FormData, name: string): boolean {
-  return formData.get(name) !== null;
-}
-
 /** The shared FormData -> service-input mapping for create and update. Two
  * copies of this would be two chances for the editor to store a different
  * field set from the creator, and the difference would only surface as a
- * token that renders blank on the second save. */
+ * token that renders blank on the second save.
+ *
+ * The `FormData` reading itself is `contractFormValues`, over in `contract.ts`
+ * — this form renders only the fields the chosen template needs, so an absent
+ * key is normal and has to be turned into `""` rather than handed to zod as
+ * `null`. See that function's comment; getting it wrong made every draft
+ * refuse with "Invalid input". */
 function parseForm(
   formData: FormData
 ): { ok: true; input: Omit<ContractWriteInput, "clientId"> } | { ok: false; error: string } {
-  const parsed = contractSchema.safeParse({
-    kind: formData.get("kind"),
-    trial: checked(formData, "trial"),
-    plan: formData.get("plan"),
-    ads: formData.get("ads"),
-    websiteTier: formData.get("websiteTier"),
-    realEstate: checked(formData, "realEstate"),
-    clientName: formData.get("clientName"),
-    clientFirm: formData.get("clientFirm"),
-    clientPhone: formData.get("clientPhone"),
-    clientEmail: formData.get("clientEmail"),
-    projectName: formData.get("projectName"),
-    documentDate: formData.get("documentDate"),
-    timeline: formData.get("timeline"),
-    campaignStartDate: formData.get("campaignStartDate"),
-    gracePeriod: formData.get("gracePeriod"),
-    paidAmount: formData.get("paidAmount"),
-    paidDate: formData.get("paidDate"),
-    counterpartAgreementNo: formData.get("counterpartAgreementNo"),
-  });
+  const parsed = contractSchema.safeParse(contractFormValues(formData));
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }

@@ -501,6 +501,57 @@ export const contractSchema = z.object({
 
 export type ContractInput = z.infer<typeof contractSchema>;
 
+/** Reads the form into the shape `contractSchema` parses.
+ *
+ * **`formData.get()` returns `null` for a key the form never rendered, and
+ * `null` is not `undefined`.** Zod's `.optional()` admits `undefined`; it
+ * rejects `null`. Every other form in this app gets away with reading
+ * `FormData` inline because every one of its fields is always present — but
+ * this form deliberately renders only the fields the chosen template needs
+ * (see `tokensFor`), so on a maintenance agreement `timeline`, `paidAmount`,
+ * `paidDate` and `websiteTier` are genuinely absent, arrive as `null`, and
+ * fail the schema. The symptom is the whole form refusing with zod's
+ * fallback message, "Invalid input", naming no field — which is how this was
+ * found: in a browser, on the first draft anyone tried to create.
+ *
+ * Absent and blank mean the same thing here — the person did not fill it in,
+ * or was never asked — so both become `""`, which is what the optional
+ * branches are already written to accept.
+ *
+ * Lives here rather than in the action because a `"use server"` module may
+ * only export async functions, and this needs to be callable from a test
+ * that builds a `FormData` by hand. */
+export function contractFormValues(formData: FormData): Record<string, unknown> {
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" ? value : "";
+  };
+  // A checkbox submits "on" when ticked and omits the key entirely when not,
+  // so presence is the answer and the value is noise.
+  const checked = (name: string) => formData.get(name) !== null;
+
+  return {
+    kind: text("kind"),
+    trial: checked("trial"),
+    plan: text("plan"),
+    ads: text("ads"),
+    websiteTier: text("websiteTier"),
+    realEstate: checked("realEstate"),
+    clientName: text("clientName"),
+    clientFirm: text("clientFirm"),
+    clientPhone: text("clientPhone"),
+    clientEmail: text("clientEmail"),
+    projectName: text("projectName"),
+    documentDate: text("documentDate"),
+    timeline: text("timeline"),
+    campaignStartDate: text("campaignStartDate"),
+    gracePeriod: text("gracePeriod"),
+    paidAmount: text("paidAmount"),
+    paidDate: text("paidDate"),
+    counterpartAgreementNo: text("counterpartAgreementNo"),
+  };
+}
+
 /** The house standard, stated in the spec's own notes column for
  * `{{GRACE_PERIOD}}`. Prefilled, and editable, because it is a term of the
  * deal rather than a constant of the document. */

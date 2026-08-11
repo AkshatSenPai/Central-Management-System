@@ -171,17 +171,34 @@ export default async function ContractDetailPage(props: {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <SectionCard
-          title={isDraft ? "Preview" : "The issued document"}
-          meta={row.templatePath ?? preview.templatePath}
-        >
+        {/* The template path used to sit here as `meta` and was moved to the
+            Trail card. At 375px it is 46 characters of filename beside a
+            three-word title, and the title is what loses — "The issued
+            document" rendered as "The issued …". It is provenance rather than
+            a heading qualifier, so it belongs with drafted-by and issued-by. */}
+        <SectionCard title={isDraft ? "Preview" : "The issued document"}>
           {/* 1123px is A4's height at 96dpi, so a page of the document is a
               page of the frame and the reader is not scrolling through a
               letterbox. `title` is what a screen reader announces before
-              entering it. */}
+              entering it.
+
+              **`?v=` is load-bearing and is not cache-busting superstition.**
+              A Server Action calls `router.refresh()`, which re-renders this
+              server component — but an <iframe> whose `src` string is
+              unchanged is not reloaded by that, so the frame goes on showing
+              whatever it fetched first. Found in QA: issuing a contract left
+              the preview displaying the draft, agreement number and all, so a
+              freshly-numbered SO/MT/2026/001 appeared on screen as
+              `SO/__/____/___`. The stored document was correct the whole
+              time; only the frame lied — which is the worse failure, because
+              the natural response is to issue it again and burn a second
+              number.
+
+              `updatedAt` changes on every write to the row, so the src
+              changes exactly when the document does, and never otherwise. */}
           <iframe
             id={FRAME_ID}
-            src={`/contracts/${row.id}/print`}
+            src={`/contracts/${row.id}/print?v=${row.updatedAt.getTime()}`}
             title={`${CONTRACT_KIND_LABEL[deal.kind]} for ${row.clientName}`}
             className="h-[1123px] w-full rounded-md border border-[var(--border)] bg-[var(--surface)]"
           />
@@ -214,6 +231,16 @@ export default async function ContractDetailPage(props: {
               <Row label="Drafted" value={longDate(row.createdAt)} />
               <Row label="Issued by" value={row.issuedBy?.name ?? null} />
               <Row label="Issued" value={row.issuedAt ? longDate(row.issuedAt) : null} />
+              {/* Which of the 72 files produced this. Recorded at issue and
+                  never re-derived, so it answers "what did we actually send"
+                  even after the resolver changes. `break-all` because it is a
+                  path with no spaces in it and would otherwise push the card
+                  wider than the column on a phone. */}
+              <Row
+                label="Template"
+                value={row.templatePath ?? preview.templatePath}
+                className="break-all font-mono text-xs"
+              />
             </dl>
             {isDraft ? (
               <div className="mt-4 border-t border-[var(--border)] pt-4">
@@ -234,12 +261,25 @@ export default async function ContractDetailPage(props: {
 /** A field that is absent is left out entirely rather than rendered blank —
  * an empty row invites the reader to wonder whether the value is missing or
  * the field does not apply, and on a contract those are different problems. */
-function Row({ label, value }: { label: string; value: string | null }) {
+function Row({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | null;
+  className?: string;
+}) {
   if (!value) return null;
   return (
     <div className="flex gap-3">
       <dt className="w-28 flex-none text-[var(--text-3)]">{label}</dt>
-      <dd className="text-[var(--text-2)]">{value}</dd>
+      {/* `min-w-0` is what lets a long value wrap instead of forcing the flex
+          row wider than its parent — an email address and a template path
+          both overflowed the sidebar card without it. */}
+      <dd className={`min-w-0 break-words text-[var(--text-2)]${className ? ` ${className}` : ""}`}>
+        {value}
+      </dd>
     </div>
   );
 }
