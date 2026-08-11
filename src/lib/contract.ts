@@ -4,10 +4,13 @@
  * React. The two files that do touch the world are `contract-template.ts`
  * (reads the 74 vendored HTML files) and `contract-service.ts` (writes rows).
  *
- * The domain is the one described by `docs/contracts/IMPLEMENTATION-SPEC.md`,
- * the owner's own build spec, and the vocabulary below is deliberately its
- * vocabulary rather than a prettier one invented here — a term that differs
- * from the spec is a term somebody has to translate every time they read both.
+ * The domain is the one described by the owner's own build spec, delivered as
+ * `CMS_Implementation_Spec.pdf` alongside the template package; `§` references
+ * throughout these files are its section numbers, and `docs/contracts/
+ * README.md` explains where it was followed and where it was not. The
+ * vocabulary below is deliberately the spec's rather than a prettier one
+ * invented here — a term that differs is a term somebody has to translate
+ * every time they read both.
  *
  * ## Why there is no price anywhere in this file
  *
