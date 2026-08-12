@@ -7,7 +7,7 @@ import {
   issueContractAction,
   voidContractAction,
 } from "@/server/actions/contracts";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { FormError } from "@/components/ui/form-error";
 import { Icon } from "@/components/ui/icon";
@@ -226,32 +226,43 @@ export function DiscardControl({
   );
 }
 
-/** Prints the previewed document rather than the page around it.
+/** Downloads the contract as a finished A4 PDF.
  *
- * `iframe.contentWindow.print()` targets the frame, so what reaches the print
- * dialog is the contract's own A4 paged-media CSS with none of the app's
- * chrome — no sidebar, no header, no need for a print stylesheet on this
- * page at all. The frame is same-origin, so reaching into it is allowed.
+ * **This used to call `print()` on the preview frame, and that was the bug.**
+ * The first real export came back on US Letter with `http://localhost:3000/…`
+ * across every page, 6.5 MB, and font encoding mangled badly enough that WPS
+ * refused to open it — because the print dialog's destination was "Microsoft
+ * Print to PDF", a virtual printer that uses its own paper size and ignores
+ * `@page { size: A4 }`. A legal document cannot depend on an operator getting
+ * four settings right in an OS dialog, so the server renders it now and this
+ * button just fetches the result.
  *
- * Falls back to opening the document in its own tab if the frame is not
- * reachable, which is also the honest answer for anyone who wants the file
- * itself rather than a printout. */
-export function PrintButton({ frameId, href }: { frameId: string; href: string }) {
-  function print() {
-    const frame = document.getElementById(frameId);
-    const win = frame instanceof HTMLIFrameElement ? frame.contentWindow : null;
-    if (win) {
-      win.focus();
-      win.print();
-      return;
-    }
-    window.open(href, "_blank", "noopener");
-  }
+ * A plain link, not a fetch-and-blob: the browser downloads it natively, it
+ * works with JavaScript off, and the filename comes from the response's
+ * `content-disposition` rather than being guessed at here. `pending` exists
+ * only because the render takes a couple of seconds on a cold function and a
+ * button that looks inert is a button people click twice. */
+export function DownloadPdfButton({ href }: { href: string }) {
+  const [pending, setPending] = useState(false);
 
   return (
-    <Button onClick={print} variant="primary" size="sm" className="gap-1.5">
-      <Icon name="print" size="sm" />
-      Print / Save as PDF
-    </Button>
+    // `buttonClass` on an anchor rather than <Button>, the same pattern as
+    // push-explainer.tsx: this navigates, so it has to be a link, and
+    // wrapping a link in a button nests interactive elements.
+    <a
+      href={href}
+      className={buttonClass({ variant: "primary", size: "sm", className: "gap-1.5" })}
+      onClick={() => {
+        setPending(true);
+        // Nothing tells a page that a native download finished, so this is a
+        // timer rather than a real signal. It is honest about what it is:
+        // long enough to cover a cold render, short enough that the button
+        // comes back if something went wrong and the user wants another go.
+        window.setTimeout(() => setPending(false), 6000);
+      }}
+    >
+      <Icon name="download" size="sm" />
+      {pending ? "Preparing…" : "Download PDF"}
+    </a>
   );
 }

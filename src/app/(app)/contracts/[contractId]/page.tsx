@@ -17,8 +17,8 @@ import { SectionCard } from "@/components/ui/section-card";
 import { ContractForm } from "@/components/contracts/contract-form";
 import {
   DiscardControl,
+  DownloadPdfButton,
   IssueControl,
-  PrintButton,
   VoidControl,
 } from "@/components/contracts/contract-actions";
 
@@ -106,7 +106,7 @@ export default async function ContractDetailPage(props: {
         </div>
 
         <div className="flex flex-wrap items-start gap-2">
-          <PrintButton frameId={FRAME_ID} href={`/contracts/${row.id}/print`} />
+          <DownloadPdfButton href={`/contracts/${row.id}/pdf`} />
           {isDraft ? (
             <>
               <ContractForm

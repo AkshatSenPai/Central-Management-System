@@ -47,16 +47,39 @@ const UA =
  * documents would be missing a glyph in tomorrow's. The full latin range is
  * the correct trade here — it is about 100 KB per face, downloaded once and
  * cached by the browser. */
+/** The rupee sign, and the reason three of these faces exist.
+ *
+ * **Neither Source Serif 4 nor Playfair Display ships U+20B9 in any Google
+ * subset.** Not latin, not latin-ext, not anywhere — their latin range
+ * enumerates U+20AC (€) and U+2122 (™) and simply omits the rupee. So every
+ * `₹` in every contract fell through to the generic `serif` and rendered in
+ * Times New Roman: a Times rupee sign against Source Serif digits, on every
+ * page with a figure on it. Found by reading the fonts out of a rendered PDF,
+ * not by looking at the screen, where it is easy to miss.
+ *
+ * The fix needs no template edit. `@font-face` may map a *second* file to a
+ * narrow `unicode-range` under the **same family name**, and the browser will
+ * use it for exactly those codepoints — which is the mechanism Google Fonts
+ * itself is built on. So a rupee-only cut of Noto Serif is declared as
+ * "Source Serif 4" and as "Playfair Display", and only the ₹ comes from it.
+ *
+ * Google serves single-glyph subsets via `&text=`; each of these is well
+ * under 2 KB. Noto Serif is the match because it is a transitional serif of
+ * broadly similar colour and it actually has the glyph. */
+const RUPEE = "₹";
+
 const FACES = [
   { family: "Playfair Display", weights: [600], file: "playfair-display-600" },
   { family: "Source Serif 4", weights: [400], file: "source-serif-4-400" },
   { family: "Source Serif 4", weights: [600], file: "source-serif-4-600" },
+  { family: "Noto Serif", weights: [400], file: "rupee-400", text: RUPEE },
+  { family: "Noto Serif", weights: [600], file: "rupee-600", text: RUPEE },
 ];
 
 async function fetchFace(face) {
   const url =
     `https://fonts.googleapis.com/css2?family=${encodeURIComponent(face.family)}:wght@${face.weights.join(";")}` +
-    "&display=swap";
+    (face.text ? `&text=${encodeURIComponent(face.text)}` : "&display=swap");
   const cssResponse = await fetch(url, { headers: { "user-agent": UA } });
   if (!cssResponse.ok) {
     throw new Error(`${face.family}: CSS request failed with ${cssResponse.status}`);
@@ -65,9 +88,15 @@ async function fetchFace(face) {
 
   // Google returns one @font-face per unicode-range (latin, latin-ext,
   // cyrillic, …). The latin block is the last one it emits and the only one
-  // these documents need; taking the last woff2 URL is how the icon script
-  // picks its single file too.
-  const urls = [...css.matchAll(/url\((https:\/\/[^)]+\.woff2)\)/g)].map((m) => m[1]);
+  // these documents need; taking the last one is how the icon script picks
+  // its single file too. A `&text=` request returns exactly one block.
+  //
+  // The URL is matched by its `format('woff2')` rather than by a `.woff2`
+  // extension: a `&text=` subset is served from `/l/font?kit=…` with no
+  // extension at all, and an extension-anchored pattern silently finds
+  // nothing — which is how the first attempt at this "proved" that no serif
+  // on Google Fonts had the rupee sign.
+  const urls = [...css.matchAll(/url\((https:\/\/[^)]+)\)\s*format\('woff2'\)/g)].map((m) => m[1]);
   if (urls.length === 0) throw new Error(`${face.family}: no woff2 in the CSS response`);
 
   const fontResponse = await fetch(urls[urls.length - 1], { headers: { "user-agent": UA } });

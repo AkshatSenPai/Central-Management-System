@@ -18,6 +18,7 @@ import {
   typeChoiceFor,
   type ContractDeal,
 } from "@/lib/contract";
+import { pdfFileName } from "@/lib/contract-pdf";
 
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
 
@@ -194,6 +195,35 @@ describe("dealSummary", () => {
     expect(dealSummary({ ...base, plan: "WEBSITE", websiteTier: "FLAGSHIP" })).toBe(
       "Flagship website"
     );
+  });
+});
+
+/** `SO/MT/2026/001` is a fine identifier and an illegal filename everywhere. */
+describe("pdfFileName", () => {
+  it("turns an agreement number into something a filesystem accepts", () => {
+    expect(
+      pdfFileName({
+        agreementNo: "SO/MT/2026/001",
+        kindLabel: "Maintenance agreement",
+        clientName: "Mr. Sandeep Singh",
+      })
+    ).toBe("Shape_Odyssey_SO-MT-2026-001_Mr_Sandeep_Singh.pdf");
+  });
+
+  it("names a draft for what it is, since it has no number", () => {
+    expect(
+      pdfFileName({ agreementNo: null, kindLabel: "Proposal", clientName: "Magus Realty" })
+    ).toBe("Shape_Odyssey_DRAFT-Proposal_Magus_Realty.pdf");
+  });
+
+  it("strips punctuation that would break a download", () => {
+    const name = pdfFileName({
+      agreementNo: "SO/OT/2026/012",
+      kindLabel: "One-time agreement",
+      clientName: 'Harlow & Fitch, "Retail" / Apparel',
+    });
+    expect(name).toBe("Shape_Odyssey_SO-OT-2026-012_Harlow_Fitch_Retail_Apparel.pdf");
+    expect(name).not.toMatch(/[/\\:*?"<>|]/);
   });
 });
 

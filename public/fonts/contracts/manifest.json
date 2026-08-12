@@ -16,5 +16,17 @@
     "weight": 600,
     "sha256": "f2b7e1cf1d277b76",
     "bytes": 21532
+  },
+  "rupee-400": {
+    "family": "Noto Serif",
+    "weight": 400,
+    "sha256": "c679ba992effbc15",
+    "bytes": 852
+  },
+  "rupee-600": {
+    "family": "Noto Serif",
+    "weight": 600,
+    "sha256": "b154162e285886eb",
+    "bytes": 856
   }
 }
