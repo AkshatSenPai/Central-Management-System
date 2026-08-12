@@ -48,6 +48,8 @@ type FakeParts = {
   milestone?: unknown;
   /** Rows returned by user.findMany Ã¢â‚¬â€ resolveAssignees. */
   activeUsers?: { id: string; name: string }[];
+  /** Recipients notify() should treat as deactivated and skip. */
+  deactivated?: string[];
   /** Rows returned by taskAssignee.findMany Ã¢â‚¬â€ setTaskAssignees' current set,
    * carrying names so the remove side never needs an active-user lookup. */
   currentAssignees?: { userId: string; user: { name: string } }[];
@@ -144,7 +146,17 @@ function fakeDb(parts: FakeParts) {
       },
     },
     user: {
-      findMany: async (a: { where: unknown }) => {
+      // Two callers now, told apart by their `select`. `resolveAssignees`
+      // asks for names and is what `activeUsers` models. `notify` asks for
+      // ids only, to drop deactivated recipients — it treats everyone as
+      // active unless a test names someone in `deactivated`, because
+      // returning `activeUsers` there would silently mute every notification
+      // in this file.
+      findMany: async (a: { where: { id: { in: string[] } }; select?: Record<string, unknown> }) => {
+        if (!a.select?.name) {
+          const gone = parts.deactivated ?? [];
+          return a.where.id.in.filter((id) => !gone.includes(id)).map((id) => ({ id }));
+        }
         calls.userFindMany++;
         args.userFindManyWhere = a.where;
         return parts.activeUsers ?? [];
