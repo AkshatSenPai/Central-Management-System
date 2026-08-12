@@ -88,41 +88,76 @@ the prose's 28mm, the colour stays defined in one place, and no colour literal
 has to live in this app's source — which gate 1 forbids and which has exactly
 two standing exemptions that this was not good enough to join.
 
-## The open question: PDF
+## PDF: the app renders it, the browser never does
 
-**The app does not produce a PDF. It produces the document, and the browser
-prints it.** `/contracts/{id}/print` serves the contract as standalone HTML
-with its own A4 paged-media CSS; the detail page frames it and the Print button
-calls `print()` on the frame, so Save-as-PDF gives an A4 PDF of the contract
-with none of the app around it.
+**`/contracts/{id}/pdf` runs headless Chromium server-side and returns a
+finished A4 file.** `src/lib/contract-pdf.ts` does the work;
+`@sparticuz/chromium` supplies the browser on Vercel and a locally-installed
+Chrome does it in `next dev`. About two seconds.
 
-**What this loses, and it is worth a decision:** the templates use CSS margin
-boxes — `@top-left`, `@bottom-right`, `counter(page)`, `string(prepfor)` — to
-draw the running header, the running footer and the **page numbers**.
-**Chromium does not implement margin boxes.** WeasyPrint and PrinceXML do;
-Chrome and wkhtmltopdf do not. So a browser-printed contract has the right
-content, the right typography and the right page breaks, and no "Page 3 of 7".
+**This replaced a print button, and the replacement was not optional.** The
+first version served the document and let the operator print it. The first
+real export came back on **US Letter** — so every page break landed wrong —
+with `http://localhost:3000/…` and a timestamp stamped across every page of a
+client agreement, at 6.5 MB, with font encoding mangled badly enough that WPS
+Office refused to open the file. The print dialog's destination had been
+"Microsoft Print to PDF", a virtual *printer*, which uses its own paper size
+and ignores `@page { size: A4 }` entirely.
 
-Three ways forward, in increasing cost:
+The lesson was not "choose the other destination". A legal document cannot
+depend on four settings being right in an OS dialog. Same contract, before and
+after:
 
-1. **Accept it.** The body is complete and correct; page numbers are a
-   nicety on a document that is e-signed rather than shuffled on a desk.
-2. **Paged.js** — an MIT JavaScript polyfill for exactly these features,
-   injected into the print route. Cheapest real fix, but it repaginates the
-   document client-side and would need checking against all 72 templates
-   before going anywhere near a client.
-3. **A real paged-media engine.** WeasyPrint as a small Python function
-   renders these templates as designed. Most faithful, and a new runtime.
+| | print dialog | server-side |
+|---|---|---|
+| paper | 215.9 × 279.4 mm (Letter) | 209.9 × 297.0 mm (A4) |
+| size | 6.45 MB | 0.19 MB |
+| localhost URL on every page | yes | no |
+| fonts | `/CIDFont+F1`, `/CIDFont+F2` | real named subsets |
 
-Nothing in the code assumes the answer: `renderContract` returns HTML and the
-print route is the only thing that turns it into pixels.
+Two settings in `renderContractPdf` are load-bearing and must not be removed:
+`printBackground: true`, without which the navy cover and every shaded table
+print white; and `preferCSSPageSize: true`, which takes A4 from the templates'
+own `@page` rather than asserting it here, so a future package that changes
+paper is not silently overridden.
 
-**Fonts are handled.** Spec §01 warns that Playfair Display and Source Serif 4
-must be "installed on the rendering server, or the output will fall back to
-system fonts and look wrong", and the self-contained templates ship none.
-`scripts/fetch-contract-fonts.mjs` downloads them and the print route injects
-an `@font-face` block, which is this app's version of installing them. The
-stored document is not modified.
+`/contracts/{id}/print` still exists and still serves HTML — it is what the
+preview iframe displays. Both routes read the same two sources: the frozen
+`issuedHtml` for an issued contract, a live render for a draft. What is
+approved and what is sent are the same bytes through two renderers.
+
+### What is still missing: page numbers
+
+The templates draw their running header, running footer and **page numbers**
+with CSS margin boxes — `@top-left`, `@bottom-right`, `counter(page)`,
+`string(prepfor)`. **Chromium does not implement margin boxes**, so none of
+that renders. Everything inside the page does.
+
+WeasyPrint does implement them, and was rejected after checking: it needs
+Pango, which Vercel's Python runtime does not provide, so it would mean a
+second service on another host. That was judged not worth it for page numbers
+on an e-signed document. **Paged.js remains the cheap route if this is ever
+wanted** — an MIT polyfill injected into the print route — but it repaginates
+client-side and would need validating against all 72 templates first.
+
+### Fonts
+
+Spec §01 warns the fonts must be "installed on the rendering server, or the
+output will fall back to system fonts and look wrong", and the self-contained
+templates ship none. `scripts/fetch-contract-fonts.mjs` downloads them;
+`contract-print.ts` declares them once and serves them two ways — by URL for
+the browser preview, inlined as `data:` URIs for the renderer, which therefore
+makes no network request at all.
+
+**The rupee sign needed its own fix.** Neither Source Serif 4 nor Playfair
+Display contains U+20B9 in any subset Google serves — their latin range lists
+U+20AC (€) and U+2122 (™) and omits ₹ — so every figure in every contract was
+falling through to the generic serif and rendering in Times New Roman. A
+rupee-only cut of Noto Serif (852 bytes) is declared under both family names
+with `unicode-range: U+20B9`, which wins for exactly that codepoint and
+disturbs nothing else. No template edit. It was found by reading the font list
+out of a rendered PDF — on screen it looks like a slightly odd rupee sign and
+nothing more, which is worth remembering next time something "looks fine".
 
 ## A smaller observation
 
