@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/lib/icons";
@@ -47,6 +47,10 @@ export function Modal({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Stable across renders, unique per mounted Modal, and identical between
+  // the server and client renders — which a counter or a random id would not
+  // be, and hydration would complain.
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -70,7 +74,19 @@ export function Modal({
     <dialog
       ref={ref}
       data-modal
-      aria-labelledby="modal-title"
+      // Unique per instance, and it has to be.
+      //
+      // This was a hardcoded `id="modal-title"` on both the heading and this
+      // attribute. Several Modals are mounted at once on a real page — a
+      // client page has six, all closed but all in the DOM — so those ids
+      // were duplicated, and `aria-labelledby` resolves to the FIRST matching
+      // element in the document. Chrome's accessibility tree reported the
+      // accessible name of all six as "Edit client": opening "New contract"
+      // announced "Edit client", and so did every other one.
+      //
+      // Invisible in a screenshot and invisible to anyone not using a screen
+      // reader, which is why it survived six modals and several months.
+      aria-labelledby={titleId}
       // The browser's own Escape handling closes the dialog without telling
       // React, which would leave `open` true and the modal unable to reopen.
       // Listening for `close` is what keeps the two in step, whoever closed
@@ -93,7 +109,7 @@ export function Modal({
         <div className="flex flex-none items-center gap-2.5 border-b border-[var(--border)] px-4 py-3">
           <Icon name={icon} size="sm" className="text-[var(--text-3)]" />
           <h2
-            id="modal-title"
+            id={titleId}
             className="flex-1 text-[14.5px] font-bold tracking-[-0.01em] text-[var(--text)]"
           >
             {title}

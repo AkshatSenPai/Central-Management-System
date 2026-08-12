@@ -11,10 +11,19 @@ import {
 /** Captures what notify() hands to createManyAndReturn, in the shape Prisma
  * would get, and hands back ids the way the real client does — push depends on
  * those ids, so a fake that returned nothing would hide a broken fan-out. */
-function fakeDb() {
+function fakeDb(parts: { deactivated?: string[] } = {}) {
   const created: Record<string, unknown>[] = [];
   const deleted: unknown[] = [];
+  const gone = new Set(parts.deactivated ?? []);
   const db = {
+    // notify() drops deactivated recipients, so it reads the user table. The
+    // fake honours `active: true` rather than returning everything, because a
+    // fake that ignored the filter would pass whether or not the filter was
+    // there — which is the whole thing under test.
+    user: {
+      findMany: async (a: { where: { id: { in: string[] } } }) =>
+        a.where.id.in.filter((id) => !gone.has(id)).map((id) => ({ id })),
+    },
     notification: {
       createManyAndReturn: async (a: { data: Record<string, unknown>[] }) => {
         created.push(...a.data);
@@ -41,6 +50,31 @@ describe("notify", () => {
     const { db, created } = fakeDb();
     await notify(db, { ...base, recipientIds: ["a", "b"] });
     expect(created.map((r) => r.recipientId)).toEqual(["a", "b"]);
+  });
+
+  /** Someone who has left keeps the notifications they already had — the bell
+   * is their history — but stops collecting new ones. Push subscriptions are
+   * already deleted on deactivation, so the bell was the last channel still
+   * reaching a deactivated account, quietly accumulating rows nobody would
+   * ever open. */
+  it("does not notify a deactivated member", async () => {
+    const { db, created } = fakeDb({ deactivated: ["gone"] });
+    await notify(db, { ...base, recipientIds: ["a", "gone", "b"] });
+    expect(created.map((r) => r.recipientId)).toEqual(["a", "b"]);
+  });
+
+  it("writes nothing at all when every recipient has been deactivated", async () => {
+    const { db, created } = fakeDb({ deactivated: ["a", "b"] });
+    expect(await notify(db, { ...base, recipientIds: ["a", "b"] })).toEqual([]);
+    expect(created).toHaveLength(0);
+  });
+
+  /** The rows must come back in the order the caller supplied, not the order
+   * the user lookup happened to return them in. */
+  it("keeps the caller's recipient order", async () => {
+    const { db, created } = fakeDb({ deactivated: ["x"] });
+    await notify(db, { ...base, recipientIds: ["c", "x", "a", "b"] });
+    expect(created.map((r) => r.recipientId)).toEqual(["c", "a", "b"]);
   });
 
   // Assigning yourself a task must not light up your own bell. Enforced here

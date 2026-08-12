@@ -9,6 +9,8 @@ type FakeParts = {
   project?: unknown;
   /** Rows returned by user.findMany — resolveAttendees. */
   activeUsers?: { id: string; name: string }[];
+  /** Recipients notify() should treat as deactivated and skip. */
+  deactivated?: string[];
   /** Row returned by calendarEvent.findUnique — the load in update/remove. */
   event?: unknown;
   /** Rows returned by calendarEventAttendee.findMany — the attendee diff's
@@ -69,7 +71,15 @@ function fakeDb(parts: FakeParts) {
       },
     },
     user: {
-      findMany: async (a: { where: unknown }) => {
+      // Two callers now, told apart by their `select` — see the same note in
+      // tests/task-service.test.ts. `notify` reads ids only, to drop
+      // deactivated recipients, and must not be handed `activeUsers` or every
+      // notification assertion in this file would mute itself.
+      findMany: async (a: { where: { id: { in: string[] } }; select?: Record<string, unknown> }) => {
+        if (!a.select?.name) {
+          const gone = parts.deactivated ?? [];
+          return a.where.id.in.filter((id) => !gone.includes(id)).map((id) => ({ id }));
+        }
         calls.userFindMany++;
         args.userFindManyWhere = a.where;
         return parts.activeUsers ?? [];

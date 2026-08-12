@@ -5,7 +5,7 @@ import { Prisma, type PrismaClient, type NotificationType } from "@prisma/client
  * the mutation that caused them. Widening it to PrismaClient would force every
  * caller to notify outside its transaction — and then a rolled-back assignment
  * would still have told somebody it happened. */
-export type NotificationDb = Pick<PrismaClient, "notification">;
+export type NotificationDb = Pick<PrismaClient, "notification" | "user">;
 
 export type NotificationMeta = Record<string, unknown> | null;
 
@@ -26,9 +26,15 @@ export type NotificationEntity = "TASK" | "COMMENT" | "ANNOUNCEMENT" | "CALENDAR
  * 2. **Recipients are deduplicated.** Mentioning the same person twice in one
  *    comment is one notification, matching how `extractMentionedUserIds`
  *    already dedupes.
+ * 3. **Deactivated members are not notified.** Someone who has left keeps
+ *    every notification they already had — the bell is their history, not a
+ *    live feed — but stops collecting new ones. Their push subscriptions are
+ *    already deleted on deactivation, so this was the one channel still
+ *    reaching them: a pile of unread rows nobody would ever open, growing for
+ *    as long as the account existed.
  *
- * A no-op when nothing is left after those two filters — `createMany` with an
- * empty array is a pointless round trip inside someone's transaction.
+ * A no-op when nothing is left after those three filters — `createMany` with
+ * an empty array is a pointless round trip inside someone's transaction.
  *
  * **Returns the ids of the rows it wrote, which is the handle push needs.**
  * It deliberately returns ids rather than recipient ids: the fan-out re-reads
@@ -59,8 +65,25 @@ export async function notify(
   const recipients = [...new Set(input.recipientIds)].filter((id) => id !== input.actorId);
   if (recipients.length === 0) return [];
 
+  /* One indexed lookup by primary key, inside the caller's transaction. That
+   * is a different thing from the network call this function's header forbids
+   * — it is the same database, on the same connection, and skipping it would
+   * mean pushing this rule out to every call site, which is exactly what
+   * rules 1 and 2 exist here to avoid.
+   *
+   * Filtered by re-reading `recipients` rather than by using the query's own
+   * order, so the rows are written in the order the caller supplied and a
+   * test asserting on them stays deterministic. */
+  const active = await db.user.findMany({
+    where: { id: { in: recipients }, active: true },
+    select: { id: true },
+  });
+  const stillHere = new Set(active.map((user) => user.id));
+  const live = recipients.filter((id) => stillHere.has(id));
+  if (live.length === 0) return [];
+
   const created = await db.notification.createManyAndReturn({
-    data: recipients.map((recipientId) => ({
+    data: live.map((recipientId) => ({
       recipientId,
       actorId: input.actorId,
       type: input.type,

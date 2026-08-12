@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
 import { ContractForm } from "@/components/contracts/contract-form";
+import { ContractPreview } from "@/components/contracts/contract-preview";
 import {
   DiscardControl,
   DownloadPdfButton,
@@ -35,8 +36,9 @@ const FRAME_ID = "contract-preview";
  *      styles `html`, `h1`, `p` and a dozen classes with names like `.num`
  *      and `.sec`. Inlined, those rules would apply to the CMS around it. A
  *      frame is a document boundary, which is exactly what is wanted.
- *   2. **Printing the frame prints the contract**, with its A4 paged-media
- *      CSS and none of the sidebar — see `PrintButton`.
+ *   2. **It is the same bytes the PDF is rendered from.** Both this and
+ *      `./pdf` read the frozen `issuedHtml` for an issued contract and render
+ *      live for a draft, so approving the preview means something.
  *   3. **Nothing has to trust the HTML.** It would otherwise reach React as
  *      `dangerouslySetInnerHTML`, and while the substitution layer escapes
  *      every typed value, "the document is only safe because a function three
@@ -183,10 +185,10 @@ export default async function ContractDetailPage(props: {
             document" rendered as "The issued …". It is provenance rather than
             a heading qualifier, so it belongs with drafted-by and issued-by. */}
         <SectionCard title={isDraft ? "Preview" : "The issued document"}>
-          {/* 1123px is A4's height at 96dpi, so a page of the document is a
-              page of the frame and the reader is not scrolling through a
-              letterbox. `title` is what a screen reader announces before
-              entering it.
+          {/* Sized and scaled by <ContractPreview>, which is a client
+              component only because it needs to measure its own width — see
+              the note there about why a millimetre-laid-out document cannot
+              simply be given a narrower frame.
 
               **`?v=` is load-bearing and is not cache-busting superstition.**
               A Server Action calls `router.refresh()`, which re-renders this
@@ -202,11 +204,10 @@ export default async function ContractDetailPage(props: {
 
               `updatedAt` changes on every write to the row, so the src
               changes exactly when the document does, and never otherwise. */}
-          <iframe
-            id={FRAME_ID}
+          <ContractPreview
+            frameId={FRAME_ID}
             src={`/contracts/${row.id}/print?v=${row.updatedAt.getTime()}`}
             title={`${CONTRACT_KIND_LABEL[deal.kind]} for ${row.clientName}`}
-            className="h-[1123px] w-full rounded-md border border-[var(--border)] bg-[var(--surface)]"
           />
         </SectionCard>
 
