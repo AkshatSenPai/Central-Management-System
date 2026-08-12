@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import type { BadgeKind } from "@/lib/badges";
 
 export const CLIENT_STATUSES = ["ACTIVE", "PAUSED", "FORMER"] as const;
@@ -30,7 +31,7 @@ export const clientSchema = z.object({
   engagementType: z.string().trim().max(60).optional().or(z.literal("")),
   clientSince: z.string().trim().optional().or(z.literal("")),
   accountLeadId: z.string().trim().optional().or(z.literal("")),
-  notes: z.string().trim().max(4000).optional().or(z.literal("")),
+  notes: z.string().trim().max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE).optional().or(z.literal("")),
 });
 
 export type ClientInput = z.infer<typeof clientSchema>;

@@ -54,6 +54,8 @@ model User {
   attendance        AttendanceSession[]     @relation("AttendanceMember")
   attendanceFixed   AttendanceSession[]     @relation("AttendanceResolver")
   pushSubscriptions PushSubscription[]
+  contractsCreated  Contract[]              @relation("ContractCreator")
+  contractsIssued   Contract[]              @relation("ContractIssuer")
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
 }
@@ -147,6 +149,7 @@ model Client {
   contacts       ClientContact[]
   projects       Project[]
   calendarEvents CalendarEvent[]
+  contracts      Contract[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -847,4 +850,152 @@ model Attachment {
   createdAt DateTime @default(now())
 
   @@index([parentType, parentId, createdAt])
+}
+
+/// The three document families of the contract template package. `trial` is a
+/// separate boolean on Contract rather than a fourth member here — see the
+/// long note on CONTRACT_KINDS in src/lib/contract.ts for why, and for how
+/// this maps onto the four types the owner names.
+enum ContractKind {
+  PROPOSAL
+  ONE_TIME
+  MAINTENANCE
+}
+
+/// Funnel tier, or WEBSITE for the website line, which is graded by
+/// ContractWebsiteTier instead of by ad setup.
+enum ContractPlan {
+  STARTER
+  STANDARD
+  ADVANCED
+  WEBSITE
+}
+
+enum ContractAdSetup {
+  NONE
+  META
+  GOOGLE
+  BOTH
+}
+
+enum ContractWebsiteTier {
+  BUSINESS
+  PREMIUM
+  FLAGSHIP
+}
+
+enum ContractStatus {
+  DRAFT
+  ISSUED
+  VOID
+}
+
+/// A generated client document — proposal, one-time agreement, maintenance
+/// agreement, or either agreement with a trial first month.
+///
+/// ## There is no price column, on purpose
+///
+/// Spec §03: prices are baked into each of the 72 template files, and
+/// choosing the right file is how the price is set. A price column here would
+/// be a second source of truth for a number the document states three times
+/// over — in figures, in words, and in the liability cap — and the two would
+/// disagree the first time pricing changed. `paidAmount` is not a price; it
+/// is a receipt of what actually arrived.
+///
+/// ## An issued contract is frozen
+///
+/// `TODO.md` §O asked whether an issued contract becomes immutable and
+/// answered "almost certainly yes: a document sent to a client must not
+/// silently change afterwards, so the rendered output is the record, not a
+/// re-render from the current template." That is what `issuedHtml` is.
+///
+/// It is a column rather than an R2 object, which is the one place this model
+/// departs from §O's suggestion, and the reason is transactionality. Issuing
+/// allocates an agreement number and freezes a document, and those two facts
+/// must land together or not at all. A bucket cannot join a Postgres
+/// transaction: write the object first and a rolled-back issue leaks a file
+/// nobody will ever look for; write it after and a committed issue can be
+/// left pointing at an object that never arrived — a numbered contract with
+/// no document, which is the exact failure the register exists to prevent.
+/// The documents are 30-90 KB of HTML and Postgres TOASTs them out of the
+/// row automatically, so the cost of keeping them here is small and the
+/// guarantee is absolute.
+model Contract {
+  id String @id @default(cuid())
+
+  /// RESTRICT, not Cascade. A contract is a legal record and the register it
+  /// sits in is only auditable if it has no holes — "what happened to
+  /// SO/OT/2026/055" must always have an answer. Cascading would let a
+  /// tidy-up of a former client silently delete signed agreements, which is
+  /// the same reasoning that makes ten relations on `User` RESTRICT and
+  /// deactivates members rather than deleting them. `deleteClient` refuses
+  /// with a message naming the count; this is the backstop.
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  clientId String
+
+  /// The deal — the six fields that pick one of the 72 files. Nothing else
+  /// in this model affects which template is used.
+  kind        ContractKind
+  trial       Boolean              @default(false)
+  plan        ContractPlan
+  ads         ContractAdSetup      @default(NONE)
+  websiteTier ContractWebsiteTier?
+  realEstate  Boolean              @default(false)
+
+  status ContractStatus @default(DRAFT)
+
+  /// The register. Null while DRAFT — a number is spent at issue, never
+  /// reserved, so an abandoned draft costs nothing.
+  ///
+  /// Unique on its own AND on (kind, year, sequence). The first stops a
+  /// duplicate string; the second is what the allocator races against, so
+  /// two simultaneous issues cannot both take 055.
+  agreementNo String? @unique
+  year        Int?
+  sequence    Int?
+
+  /// The typed token values, stored so a draft reopens as it was left and an
+  /// issued contract records what it was actually built from.
+  clientName             String
+  clientFirm             String
+  clientPhone            String?
+  clientEmail            String?
+  projectName            String
+  documentDate           DateTime
+  timeline               String?
+  campaignStartDate      DateTime?
+  gracePeriod            String?
+  paidAmount             String?
+  paidDate               DateTime?
+  /// The other half of a pair: the maintenance agreement's number on a
+  /// one-time document, and the one-time agreement's number on a maintenance
+  /// document. Each names the OTHER document — see tokensFor.
+  counterpartAgreementNo String?
+
+  /// Recorded at issue, not derived at read time. Which file produced this
+  /// document is a fact about the past, and re-deriving it from the deal
+  /// would quietly change the answer if the resolver ever changed.
+  templatePath String?
+  /// The frozen document. Null while DRAFT.
+  issuedHtml   String?
+
+  issuedAt   DateTime?
+  issuedBy   User?     @relation("ContractIssuer", fields: [issuedById], references: [id])
+  issuedById String?
+
+  /// A withdrawn contract keeps its row and its number. A register with holes
+  /// in it cannot be audited, and "what happened to 055" is a question that
+  /// gets asked.
+  voidedAt   DateTime?
+  voidReason String?
+
+  createdBy   User   @relation("ContractCreator", fields: [createdById], references: [id])
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, year, sequence])
+  @@index([clientId, createdAt])
+  @@index([status, createdAt])
 }

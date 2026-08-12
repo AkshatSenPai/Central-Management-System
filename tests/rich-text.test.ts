@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LONG_TEXT_MAX } from "@/lib/text-limits";
 import { segmentBody, extractMentionedUserIds, commentSchema } from "@/lib/rich-text";
 
 const MEMBERS = [
@@ -174,7 +175,7 @@ describe("commentSchema", () => {
     expect(parsed.body).toBe("hi");
   });
 
-  it("rejects a body over 4000 characters", () => {
-    expect(commentSchema.safeParse({ body: "x".repeat(4001) }).success).toBe(false);
+  it("rejects a body over the shared long-text limit", () => {
+    expect(commentSchema.safeParse({ body: "x".repeat(LONG_TEXT_MAX + 1) }).success).toBe(false);
   });
 });

@@ -29,6 +29,7 @@ export const ICON_NAMES = [
   "lock",
   "campaign",
   "feedback",
+  "description",
   "receipt_long",
   "settings",
   // Shell chrome.

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>One-Time Service Agreement</title>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 18mm 16mm 18mm;
+  @top-left { content: "SHAPE ODYSSEY"; font-family:"Source Serif 4",serif; font-size:7.5pt; letter-spacing:2.2px; color:#9aa3ae; }
+  @top-right { content: string(doctitle); font-family:"Source Serif 4",serif; font-size:7.5pt; letter-spacing:1.6px; color:#c8a25a; }
+  @bottom-left { content:"SHAPE ODYSSEY · CONFIDENTIAL"; font-family:"Source Serif 4",serif; font-size:7pt; letter-spacing:1.6px; color:#b3b9c2; }
+  @bottom-right { content: counter(page) " / " counter(pages); font-family:"Source Serif 4",serif; font-size:7.5pt; letter-spacing:1.4px; color:#c8a25a; font-weight:600; }
+}
+@page :first { @top-left{content:"";} @top-right{content:"";} }
+* { box-sizing:border-box; }
+html { font-family:"Source Serif 4",serif; font-size:9.5pt; line-height:1.52; color:#2c3540; }
+.doctitle-anchor { string-set: doctitle attr(data-title); }
+h1,h2,h3,.display { font-family:"Playfair Display",serif; color:#16263d; }
+
+.cover { background:#16263d; color:#eef1f5; margin:-18mm -18mm 0 -18mm; padding:26mm 18mm 20mm 18mm; min-height:263mm; page-break-after:always; position:relative; }
+.cover .brand { font-family:"Source Serif 4",serif; font-size:13pt; letter-spacing:7px; color:#fff; font-weight:600; }
+.cover .pill { display:inline-block; border:1px solid rgba(255,255,255,.35); border-radius:20px; padding:4px 14px; font-size:7pt; letter-spacing:2.4px; color:#cdd5e0; margin-top:14mm; }
+.cover .kicker { margin-top:9mm; font-size:8pt; letter-spacing:3.4px; color:#c8a25a; }
+.cover .rule { width:52px; height:3px; background:#c8a25a; margin:6px 0 0; }
+.cover h1 { color:#fff; font-size:30pt; line-height:1.18; margin:12mm 0 0; max-width:145mm; font-weight:600; }
+.cover .lede { margin-top:8mm; max-width:140mm; color:#c3ccd8; font-size:10pt; line-height:1.65; }
+.cover .partybox { margin-top:14mm; border-top:1px solid rgba(255,255,255,.18); border-bottom:1px solid rgba(255,255,255,.18); padding:7mm 0; display:flex; gap:14mm; }
+.cover .partybox .col { flex:1; }
+.cover .partybox .lbl { font-size:7pt; letter-spacing:2.2px; color:#8f9dae; }
+.cover .partybox .val { font-size:11pt; color:#fff; margin-top:3px; font-family:"Playfair Display",serif; }
+.cover .partybox .sub { font-size:8.5pt; color:#a9b4c2; margin-top:2px; }
+.cover .foot { position:absolute; bottom:16mm; left:18mm; right:18mm; border-top:1px solid rgba(255,255,255,.15); padding-top:5mm; display:flex; justify-content:space-between; font-size:7.5pt; letter-spacing:2px; color:#8b96a5; }
+.cover .foot .gold { color:#c8a25a; font-weight:600; }
+
+.kicker-s { font-size:7.5pt; letter-spacing:3px; color:#c8a25a; margin-bottom:3px; page-break-after:avoid; }
+h2 { font-size:17pt; margin:0 0 3mm; font-weight:600; page-break-after:avoid; page-break-inside:avoid; }
+h3 { font-size:11pt; margin:0 0 1.5mm; font-weight:600; page-break-after:avoid; }
+p { margin:0 0 2.6mm; }
+.lead { color:#55606d; margin-bottom:6mm; }
+p,li { orphans:3; widows:3; }
+.clause { margin-bottom:5mm; page-break-inside:auto; }
+.clause .num { font-family:"Playfair Display",serif; color:#c8a25a; font-size:12pt; font-weight:600; margin-right:6px; }
+.clause h3 { display:inline; }
+.clause p,.clause ul { margin-top:1.5mm; }
+ul { margin:0 0 2.6mm; padding-left:5mm; }
+li { margin-bottom:1.2mm; }
+
+table { width:100%; border-collapse:collapse; margin:3mm 0 4mm; page-break-inside:avoid; }
+thead th { background:#16263d; color:#fff; font-size:7.5pt; letter-spacing:1.6px; text-transform:uppercase; text-align:left; padding:3mm 4mm; font-weight:600; }
+tbody td { padding:2.8mm 4mm; border-bottom:1px solid #e5e2d9; font-size:9.2pt; vertical-align:top; }
+tbody tr:last-child td { border-bottom:none; }
+table.lined { background:#fff; border:1px solid #e5e2d9; }
+td.num-r,th.num-r { text-align:right; white-space:nowrap; }
+.total-row td { background:#f4efe3; font-weight:600; color:#16263d; }
+.strike { text-decoration:line-through; color:#9aa3ae; }
+.save { color:#1f7a4d; font-weight:600; }
+.note { background:#f6f2e8; border-left:3px solid #c8a25a; padding:4mm 5mm; font-size:8.8pt; color:#4a5461; margin:4mm 0 5mm; page-break-inside:avoid; }
+.note b { color:#16263d; }
+.callout { background:#16263d; color:#d6dde6; border-radius:3mm; padding:5mm 6mm; margin:4mm 0 5mm; font-size:9pt; page-break-inside:avoid; }
+.callout h3 { color:#c8a25a; margin-bottom:2mm; display:block; }
+.callout b, .callout strong { color:#ffffff; }
+.cover b, .cover strong, .cover .lede b { color:#ffffff; }
+.total-row td b, .total-row td strong { color:#16263d; }
+.blank { display:inline-block; min-width:45mm; border-bottom:1px dotted #8f9aa6; }
+.blank.sm { min-width:28mm; }
+.blank.lg { min-width:75mm; }
+.parties td { font-size:9.2pt; }
+.parties td.lbl { width:34mm; color:#7c8794; font-size:7.5pt; letter-spacing:1.4px; text-transform:uppercase; padding-top:3.4mm; }
+.exec-block { page-break-inside:avoid; }
+.small { font-size:8.4pt; color:#6a7480; }
+b,strong { color:#16263d; }
+.sec-head { page-break-inside:avoid; page-break-after:avoid; }
+
+table.flow { page-break-inside: auto; }
+table.flow thead { display: table-header-group; }
+table.flow tr { page-break-inside: avoid; }
+
+.exec-wrap { page-break-inside: avoid; }
+
+</style></head><body>
+<div class="doctitle-anchor" data-title="ONE-TIME SERVICE AGREEMENT"></div>
+
+<section class="cover">
+  <div class="brand">SHAPE ODYSSEY</div>
+  <div class="pill">CLIENT AGREEMENT · CONFIDENTIAL</div>
+  <div class="kicker">ONE-TIME SERVICE AGREEMENT</div>
+  <div class="rule"></div>
+  <h1 style="font-size:27pt">Starter Funnel &amp; Meta Ads Setup</h1>
+  <div class="lede">A one-time engagement for the build and launch of a starter funnel with CRM and automated follow-up, together with meta ads setup, for a single project.</div>
+  <div class="partybox">
+    <div class="col">
+      <div class="lbl">SERVICE PROVIDER</div>
+      <div class="val">Shape Odyssey</div>
+      <div class="sub">Delhi NCR, India<br>shapeodyssey.auto@gmail.com · shapeodyssey.com</div>
+    </div>
+    <div class="col">
+      <div class="lbl">CLIENT</div>
+      <div class="val">{{CLIENT_NAME}}</div>
+      <div class="sub">Agreement No. <b style="color:#fff">{{AGREEMENT_NO}}</b><br>Executed electronically (e-signature)</div>
+    </div>
+  </div>
+  <div class="foot"><div>PREPARED BY SHAPE ODYSSEY · FOR EXECUTION BY BOTH PARTIES</div><div class="gold">{{MONTH_YEAR}}</div></div>
+</section>
+
+<section>
+  <div class="kicker-s">AGREEMENT</div>
+  <h2>Parties &amp; Engagement</h2>
+  <p class="lead">This One-Time Service Agreement (the “Agreement”) is made on the Effective Date — the date on which the last Party e-signs it — between:</p>
+
+  <div style="page-break-inside:avoid">
+  <table class="lined parties">
+    <thead><tr><th colspan="2">THE SERVICE PROVIDER — “SHAPE ODYSSEY” / “THE COMPANY”</th></tr></thead>
+    <tbody>
+      <tr><td class="lbl">Business Name</td><td>Shape Odyssey</td></tr>
+      <tr><td class="lbl">Contracting Party</td><td><b>Mr. Bhavya Itkan</b>, carrying on business under the trade name “Shape Odyssey”</td></tr>
+      <tr><td class="lbl">Based at</td><td>Delhi NCR, India</td></tr>
+      <tr><td class="lbl">Contact</td><td>shapeodyssey.auto@gmail.com · shapeodyssey.com</td></tr>
+      <tr><td class="lbl">Signed by</td><td><b>Mr. Bhavya Itkan</b> <span class="small">— Proprietor</span></td></tr>
+    </tbody>
+  </table>
+
+  <table class="lined parties">
+    <thead><tr><th colspan="2">THE CLIENT</th></tr></thead>
+    <tbody>
+      <tr><td class="lbl">Name</td><td><b>{{CLIENT_NAME}}</b></td></tr>
+      <tr><td class="lbl">Agreement No.</td><td><b>{{AGREEMENT_NO}}</b></td></tr>
+      <tr><td class="lbl">Business / Firm</td><td>{{CLIENT_FIRM}}</td></tr>
+      <tr><td class="lbl">Contact</td><td>Phone <b>{{CLIENT_PHONE}}</b> · Email <b>{{CLIENT_EMAIL}}</b></td></tr>
+      <tr><td class="lbl">Project / Campaign</td><td>{{PROJECT_NAME}}</td></tr>
+      <tr><td class="lbl">Effective Date</td><td>The date on which the last Party e-signs this Agreement <span class="small">(Clause 17)</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Shape Odyssey and the Client are individually referred to as a “Party” and together as the “Parties”. This Agreement governs the <b>one-time build and launch only</b>. Ongoing work is governed by the <b>Maintenance &amp; Care Agreement ({{MAINTENANCE_AGREEMENT_NO}})</b> between the same Parties.</p>
+</section>
+
+<section>
+  <div class="kicker-s">CLAUSE 01</div>
+  <h2>Scope of Services</h2>
+  <p class="lead">The Company shall deliver the following for a <b>single Project</b>.</p>
+
+  <table class="lined flow">
+    <thead><tr><th style="width:34%">SERVICE</th><th>WHAT THE COMPANY WILL GIVE</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Starter Funnel</b><br><span class="small">Funnel &amp; marketing automation</span></td>
+        <td><ul style="margin-bottom:0">
+          <li>Single-section landing page</li>
+          <li>CRM included — every lead captured and held in one place</li>
+          <li>1-stage automation</li>
+          <li>Email nurture for 7 days</li>
+          <li>Instant lead alerts to WhatsApp</li>
+        </ul><p class="small" style="margin:2mm 0 0">Captures and notifies. It does not run a nurture sequence — clients needing sustained follow-up move to Standard.</p></td>
+      </tr>
+      <tr>
+        <td><b>Meta Ads Setup</b><br><span class="small">Facebook &amp; Instagram</span></td>
+        <td><ul style="margin-bottom:0">
+          <li>Business page setup, or audit if one already exists</li>
+          <li>Audience research and build</li>
+          <li>Meta Pixel + Conversions API installed and verified</li>
+          <li>2 video ad creatives + 3 ad copy variants</li>
+          <li>Retargeting audience configured</li>
+          <li>Campaign launched and verified</li>
+          <li>Instant lead alerts to WhatsApp</li>
+        </ul></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <h3>Entry offer — 3-month care commitment</h3>
+    The Starter Funnel build price of <b>₹4,999</b> is an entry offer and is conditional on the Client
+    taking <b>System Care for a minimum of 3 months</b> at ₹2,999 per month, under the
+    Maintenance &amp; Care Agreement. If the Client ends System Care before 3 months, the balance of
+    the committed months becomes immediately payable.
+  </div>
+
+  <div class="note">
+    <b>Scope limit.</b> Each advertising package covers <b>one campaign for a single Project</b>, and each funnel package delivers <b>one funnel for a single Project</b>. Additional projects are quoted separately, or at the concessional rates in the Maintenance &amp; Care Agreement where one is in force.
+  </div>
+
+  <div class="clause">
+    <span class="num">02</span><h3>Delivery Timeline</h3>
+    <p>The <b>expected delivery timeline is {{TIMELINE}}</b>, counted from the later of (a) receipt of the fee under Clause 03, and (b) receipt of all access, content and requirements from the Client under Clause 06. The Company will <b>keep the Client updated on progress</b> throughout.</p>
+    <p>This is an estimate given in good faith, not a fixed deadline. It extends by the period of any delay attributable to the Client or to a third-party platform (e.g. Meta or Google review, business verification, domain or hosting delays).</p>
+  </div>
+</section>
+
+<section>
+  <div class="kicker-s">CLAUSE 03</div>
+  <h2>Fees &amp; Commercials</h2>
+  <p class="lead">Bundled pricing — lower than booking each service separately.</p>
+
+  <table class="lined">
+    <thead><tr><th style="width:50%">ITEM</th><th class="num-r">STANDARD</th><th class="num-r">PAYABLE</th></tr></thead>
+    <tbody>
+      <tr><td><b>Starter Funnel</b> <span class="small">(landing page + CRM + automation)</span></td><td class="num-r">₹4,999</td><td class="num-r"><b>₹4,999</b></td></tr>
+      <tr><td><b>Meta Ads Setup</b> <span class="small">(bundled rate)</span></td><td class="num-r">₹9,999</td><td class="num-r"><b>₹7,999</b></td></tr>
+      <tr><td>Bundle saving to the Client</td><td class="num-r">—</td><td class="num-r save">₹2,000</td></tr>
+      <tr class="total-row"><td><b>TOTAL ONE-TIME FEE</b></td><td class="num-r">—</td><td class="num-r"><b>₹12,998</b></td></tr>
+    </tbody>
+  </table>
+
+  <p><b>Amount in words:</b> Rupees Twelve Thousand Nine Hundred Ninety-Eight only (₹12,998/-).</p>
+
+  <div class="clause">
+    <span class="num">04</span><h3>Payment — Mode &amp; Receipt</h3>
+    <p>The total fee of <b>₹12,998</b> is payable <b>in full, in advance</b>. Work commences once payment has been received and the access and requirements under Clause 06 are in hand.</p>
+    <p><b>All payments under this Agreement shall be made by electronic bank transfer only</b> — by <b>UPI, NEFT, RTGS, IMPS or direct bank transfer</b> to the Company’s bank or UPI details shared with the Client in writing. <b>The Company does not accept payment in cash.</b> Cash will not be received, and any cash tendered will not be treated as payment or credited against the amount due. Payment must come from an account held in the Client’s own name.</p>
+    <p>The Company shall issue a written receipt or acknowledgement for every amount received.</p>
+  </div>
+
+  <table class="lined">
+    <thead><tr><th colspan="3">PAYMENT RECORD</th></tr></thead>
+    <tbody>
+      <tr>
+        <td style="width:34%"><span class="small">AMOUNT RECEIVED</span><br>{{PAID_AMOUNT}}</td>
+        <td style="width:33%"><span class="small">DATE RECEIVED</span><br>{{PAID_DATE}}</td>
+        <td style="width:33%"><span class="small">MODE</span><br>Bank transfer / UPI</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="clause">
+    <span class="num">05</span><h3>Ad Budget is Separate</h3>
+    <p>The fee under Clause 03 <b>excludes ad spend</b>. The advertising budget is borne by the Client and paid <b>directly to the platform</b> from the Client’s own ad account. The Company does not collect, hold or fund the Client’s ad budget at any time. Campaign delivery, reach and results depend on the budget the Client sets and funds.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">05A</span><h3>Minimum Recommended Ad Spend</h3>
+    <p>For a campaign to deliver stable and consistent results, the platform needs sufficient budget and data to optimise on. The Company <b>recommends a minimum advertising spend of ₹1,000 per day</b> on each active campaign. Below this level delivery tends to be inconsistent and cost per lead unpredictable, and <b>where spend is kept below this level the Company cannot be held responsible for reduced, inconsistent or absent results</b>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="kicker-s">CLAUSES 06 — 09</div>
+  <h2>Responsibilities, Revisions &amp; Results</h2>
+
+  <div class="clause">
+    <span class="num">06</span><h3>Client Responsibilities</h3>
+    <p>To enable delivery within the expected timeline, the Client shall provide, promptly and at no cost to the Company:</p>
+    <ul>
+      <li>Access to the business page and Meta Business Manager / Google Ads account (or authority to create them on the Client’s behalf);</li>
+      <li>Business details required for setup and verification, and a funded payment method on the ad account;</li>
+      <li>Brand assets, photographs, videos, offer details, pricing and any content or claims to be used;</li>
+      <li><b>A domain</b> — provided and paid for by the Client, with the access needed to point it to the funnel;</li>
+      <li><b>An email service provider (ESP)</b> — provided and paid for by the Client, with verified sender details; and</li>
+      <li><b>A WhatsApp Business number</b> — provided by the Client, together with any WhatsApp Business API account, credits and verification required.</li>
+    </ul>
+    <p>The Client warrants that all content and claims it supplies are true, lawful and owned by (or licensed to) the Client, and that its business, offer and advertising comply with platform policy and applicable Indian law.</p>
+    <p class="small"><b>Third-party costs:</b> the domain, hosting, ESP, WhatsApp number and its charges, all software and any paid tools are <b>third-party costs borne by the Client</b> and are not included in the fee under Clause 03.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">07</span><h3>Revisions &amp; Small Changes — 7-Day Window</h3>
+    <p>The Client has <b>7 (seven) days</b> from delivery to request small changes and tweaks, which the Company shall carry out at no extra cost. After that window, further changes are chargeable — an extra revision round is <b>₹2,999</b>. This 7-day window does not apply while a Maintenance &amp; Care plan is active; ongoing changes are handled under that plan instead.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">08</span><h3>No Guarantee of Results</h3>
+    <p>The Company will do its very best to deliver excellent results, but gives <b>no guarantee of any outcome</b> — including leads, enquiries, conversions, cost per lead, reach or sales. Lead quality and quantity depend on many variables outside the Company’s control.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">09</span><h3>Platform Dependence</h3>
+    <p>Delivery depends on third-party platforms. The Company is not responsible for account restrictions, ad disapprovals, verification delays, policy changes, downtime or price changes imposed by those platforms, but will use reasonable efforts to resolve them with the Client.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">09A</span><h3>Add-Ons</h3>
+    <p>The following may be added at any time, at the rates below, on written confirmation:</p>
+    <table class="lined flow">
+      <thead><tr><th>ADD-ON</th><th class="num-r">PRICE</th></tr></thead>
+      <tbody>
+      <tr><td>Extra video creative</td><td class="num-r">₹999 each</td></tr>
+      <tr><td>Extra ad copy variant set</td><td class="num-r">₹999</td></tr>
+      <tr><td>Extra landing page</td><td class="num-r">₹4,999</td></tr>
+      <tr><td>Additional language version</td><td class="num-r">₹6,999</td></tr>
+      <tr><td>Extra ad campaign (same project)</td><td class="num-r">₹4,999</td></tr>
+      <tr><td>Google Business Profile optimisation</td><td class="num-r">₹4,999</td></tr>
+      <tr><td>Extra revision round (after the 7-day window)</td><td class="num-r">₹2,999</td></tr>
+      <tr><td>Rush delivery (50% faster)</td><td class="num-r">+30% of package price</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<section>
+  <div class="kicker-s">GENERAL TERMS</div>
+  <h2>Information, Legality &amp; Indemnity</h2>
+
+  <div class="clause">
+    <span class="num">10A</span><h3>Client Information — Supplied As-Is, Not Verified</h3>
+    <p>All information, content, documents, claims, offers, prices, approvals, titles, permissions, licences, registrations and representations used in the Services are <b>supplied by the Client</b>.</p>
+    <p><b>The Company does not verify, authenticate, audit, investigate or independently check any of it</b>, and is under <b>no duty to do so</b>. It acts on what the Client provides, at face value and in good faith. The Client warrants that everything it supplies is <b>true, accurate, lawful, not misleading, and owned by or properly licensed to the Client</b>, and that it holds every consent, approval, registration and legal right required to advertise and offer what it is advertising and offering.</p>
+    <p>Any consequence arising from information supplied by the Client — including where it is false, incomplete, misleading, unauthorised, or used in any fraud, misrepresentation or unlawful act — is <b>the sole responsibility of the Client</b>.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">10B</span><h3>Legality of the Client’s Business, Projects &amp; Conduct</h3>
+    <p>The <b>legality of the Client’s business, projects, offers, products and conduct is solely the Client’s responsibility</b>. The Client warrants that its business and every project it markets are lawful, properly authorised and compliant with all applicable Indian law, regulation and platform policy.</p>
+    <p>The Company is engaged only to provide <b>marketing and technical services</b>. It gives no legal, financial, regulatory, title or investment advice, and provides <b>no assurance or endorsement</b> as to the legality, genuineness, viability or merit of what the Client sells or advertises.</p>
+    <p>The Client shall <b>not</b> use the campaigns, funnel, CRM, automation, creatives or lead data for any fraudulent, deceptive, misleading or unlawful purpose. Should the Client do so — during this engagement or at any time afterwards — <b>the Company accepts no responsibility or liability whatsoever</b>, and such use is a material breach entitling the Company to terminate immediately, without notice and without refund.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">10C</span><h3>Indemnity</h3>
+    <p>The Client shall <b>indemnify, defend and hold harmless</b> the Company, its proprietor, employees, contractors and associates against <b>all claims, demands, proceedings, investigations, penalties, fines, losses, damages, costs and legal fees</b> arising out of or connected with: any information or document supplied by the Client; the Client’s business, projects, offers or conduct, or the legality of any of them; any fraud, misrepresentation or unlawful act by the Client; any claim brought by a lead, customer, buyer, investor, authority or third party in relation to the Client’s business; and any breach by the Client of this Agreement or of applicable law or platform policy.</p>
+    <p>This indemnity is <b>uncapped and survives</b> the expiry or termination of this Agreement.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">10D</span><h3>Channels of Communication &amp; Record of Instructions</h3>
+    <p>All information, instructions, content and approvals are received from the Client through <b>these channels only</b>: <b>WhatsApp</b>, <b>email</b>, <b>Google Form</b> (or another written form shared by the Company), and <b>telephone call</b>. Anything communicated by any other means, or by any person not authorised by the Client, is <b>not binding on the Company</b>.</p>
+    <p><b>Records.</b> The Client acknowledges and <b>consents</b> that the Company may keep a record of all communications — including chat histories, emails, form submissions, and recordings or notes of telephone calls — to maintain an accurate record of what was instructed, supplied and approved. Such records may be <b>retained after this Agreement ends</b> and produced as evidence in any dispute, claim, investigation or proceeding.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">10E</span><h3>Disclosure of Affiliation</h3>
+    <p>For full transparency, the Company discloses that <b>Shape Odyssey is an affiliate of Arkquen</b>. The two operate as <b>separate businesses</b> with separate services, agreements and billing: Arkquen provides the software platform, and Shape Odyssey provides marketing and funnel services.</p>
+    <p>This does not alter anything in this Agreement. The Client’s software subscription remains a <b>separate arrangement</b> on the Client’s own plan and billing and is <b>not included</b> in the fee here; the Company builds and maintains the <b>funnel, not the software</b>; and the Client is <b>free to use any software platform it chooses</b>. The Company may receive a referral or affiliate benefit in connection with the Client’s subscription — paid by the software provider, not by the Client, and it <b>does not increase what the Client pays</b>.</p>
+  </div>
+{{REAL_ESTATE_CLAUSES}}</section>
+
+<section>
+  <div class="kicker-s">GENERAL TERMS</div>
+  <h2>Term, Refunds &amp; Legal</h2>
+
+  <div class="clause">
+    <span class="num">11</span><h3>Ownership, Leads &amp; Data</h3>
+    <p>On receipt of the full fee, the Client owns the content and creatives delivered, and <b>all leads and lead data generated belong solely to the Client</b>. Accounts held with third-party platforms remain the Client’s property. The Company retains ownership of its own tools, templates, systems and know-how, and may reference the work in its portfolio unless the Client objects in writing.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">11A</span><h3>Confidentiality</h3>
+    <p>Each Party shall keep confidential all non-public information of the other Party and shall not disclose it to any third party except as required to deliver the Services or by law.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">12</span><h3>Term, Completion &amp; Termination</h3>
+    <p>This Agreement begins on the Effective Date and completes on the expiry of the 7-day revision window under Clause 07. Either Party may terminate earlier for material breach not cured within 7 days of written notice. Refunds are governed by Clause 12A.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">12A</span><h3>Refunds &amp; Cancellation</h3>
+    <p><b>(a) When work is deemed to have commenced.</b> On the earliest of: the Company requesting access, content or credentials; the Company beginning setup of the ad account, business page or funnel; or the Company beginning production of the creatives. The Company will confirm commencement in writing.</p>
+    <p><b>(b) No refund once work has commenced.</b> The fee paid is <b>final, non-refundable and non-transferable, in full</b>, whether or not the Project is completed or the campaign launched.</p>
+    <p><b>(c) Cancellation before work commences.</b> The fee is refunded in full within <b>15 working days</b>, by the same route through which payment was received.</p>
+    <p><b>(d) No refund for results.</b> Dissatisfaction with results is not a ground for refund, in whole or in part.</p>
+    <p><b>(e) No refund for Client-side delay.</b> Where delivery is delayed or prevented because the Client has not provided access, content, approvals, the domain, the email service provider or the WhatsApp Business number, or has not funded its ad account.</p>
+    <p><b>(f) No refund for third-party platform actions</b> — restrictions, rejections, suspensions or delays imposed on the Client’s account, page, campaign or creatives.</p>
+    <p><b>(g) Termination for the Client’s breach</b> — no refund is due.</p>
+    <p><b>(h) Failure by the Company.</b> Where the Client terminates because the Company has materially failed to deliver and has not cured within 7 days of written notice, the Client is entitled to a <b>pro-rata refund</b> for the parts not delivered. This is the Client’s sole and exclusive financial remedy.</p>
+    <p><b>(i) Ad spend</b> is paid directly to the platform and is never refundable by the Company.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">13</span><h3>Limitation of Liability</h3>
+    <p>The Company’s total liability under this Agreement, whatever the cause, shall not exceed the total fee actually paid by the Client under Clause 03 (₹12,998). Neither Party is liable for indirect, incidental or consequential loss. Nothing here limits liability that cannot be limited by law, and <b>this cap does not apply to the Client’s indemnity obligations</b>.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">14</span><h3>Force Majeure</h3>
+    <p>Neither Party is liable for delay or failure caused by events beyond its reasonable control, including acts of God, government action, internet or platform outages, strikes, or natural disaster.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">15</span><h3>Governing Law &amp; Jurisdiction</h3>
+    <p>This Agreement is governed by the laws of India. The Parties shall first attempt to resolve any dispute amicably; failing which, the courts at <b>Delhi</b> shall have exclusive jurisdiction.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">16</span><h3>Entire Agreement &amp; Amendments</h3>
+    <p>This Agreement is the entire understanding between the Parties on its subject matter and supersedes all prior discussions, quotations and proposals. Any amendment must be in writing and confirmed by both Parties.</p>
+  </div>
+
+  <div class="clause">
+    <span class="num">17</span><h3>Electronic Signature &amp; Effective Date</h3>
+    <p>This Agreement is executed <b>electronically</b>. Both Parties agree to sign through an e-signature service (including OTP- or Aadhaar-based e-sign), and agree that such a signature is <b>valid, binding and enforceable</b>, with the same legal effect as a handwritten signature, as recognised under the Information Technology Act, 2000.</p>
+    <p><b>Order of signing:</b> (1) the Company shares this Agreement for review; (2) the <b>Client reviews it and e-signs first</b>; (3) the Company’s signatory then e-signs, and the executed copy is returned to the Client.</p>
+    <p>The <b>Effective Date</b> is the date on which the <b>last Party e-signs</b>. A signed PDF, scan or e-sign completion certificate is treated as an original. Notices may be given by <b>email or WhatsApp</b> to the contacts recorded above.</p>
+  </div>
+</section>
+
+
+<section>
+  <div class="exec-wrap">
+  <div class="kicker-s">EXECUTION</div>
+  <h2>Signed &amp; Agreed</h2>
+  <p class="lead">By signing below, both Parties confirm they have read, understood and accepted every clause of this Agreement — in particular Clause 04 (payment), Clause 05 (ad spend excluded), Clause 08 (no guarantee), Clauses 10A–10E (client information, legality, indemnity, communication records and affiliation), Clause 12A (refunds) and Clause 17 (electronic execution).</p>
+
+  <div class="exec-block">
+  <table class="lined">
+    <thead><tr><th style="width:50%">FOR SHAPE ODYSSEY</th><th>THE CLIENT</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>
+          <span class="small">NAME</span><br><b>Mr. Bhavya Itkan</b><br><br>
+          <span class="small">DESIGNATION</span><br>Proprietor<br><br>
+          <span class="small">SIGNED ELECTRONICALLY ON</span><br><span class="blank sm">&nbsp;</span><br><br>
+          <span class="small">E-SIGN REFERENCE / EMAIL</span><br><span class="blank">&nbsp;</span>
+        </td>
+        <td>
+          <span class="small">NAME</span><br><b>{{CLIENT_NAME}}</b><br>
+          <span class="small">must match the name on the e-signature</span><br><br>
+          <span class="small">BUSINESS / FIRM</span><br>{{CLIENT_FIRM}}<br><br>
+          <span class="small">SIGNED ELECTRONICALLY ON</span><br><span class="blank sm">&nbsp;</span><br><br>
+          <span class="small">E-SIGN REFERENCE / EMAIL</span><br><span class="blank">&nbsp;</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <h3>E-signature</h3>
+    This Agreement is signed electronically — the Client e-signs first, after reviewing it, and the Company’s signatory e-signs thereafter. The e-sign completion certificate forms part of this Agreement and evidences execution. The <b style="color:#c8a25a">Effective Date</b> is the date of the last e-signature above.
+  </div>
+  </div>
+  </div>
+
+  <p class="small" style="page-break-before:avoid; margin-top:4mm">Shape Odyssey · Delhi NCR, India · shapeodyssey.auto@gmail.com · shapeodyssey.com — <i>“Crafting digital journeys, engineered for growth.”</i></p>
+</section>
+
+</body></html>

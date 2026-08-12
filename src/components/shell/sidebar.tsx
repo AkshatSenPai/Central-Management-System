@@ -29,6 +29,7 @@ export const NAV_ITEMS: ReadonlyArray<{
   { href: "/team", label: "Team", icon: "groups" },
   { href: "/vault", label: "Vault", icon: "lock" },
   { href: "/announcements", label: "Announcements", icon: "campaign" },
+  { href: "/contracts", label: "Contracts", icon: "description" },
   { href: "/feedback", label: "Feedback", icon: "feedback" },
   { href: "/invoices", label: "Invoices", icon: "receipt_long" },
   { href: "/settings", label: "Settings", icon: "settings", ruleAbove: true },

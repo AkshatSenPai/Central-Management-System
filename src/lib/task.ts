@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import type { BadgeKind } from "@/lib/badges";
 import { clientInitials } from "@/lib/client";
 import { shortDate, isOverdue } from "@/lib/dates";
@@ -65,7 +66,7 @@ export const TASK_PRIORITY_RANK: Record<TaskPriority, number> = {
  * only. */
 export const taskSchema = z.object({
   title: z.string().trim().min(1, "Task title is required").max(200),
-  description: z.string().trim().max(4000).optional().or(z.literal("")),
+  description: z.string().trim().max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE).optional().or(z.literal("")),
   projectId: z.string().trim().optional().or(z.literal("")),
   milestoneId: z.string().trim().optional().or(z.literal("")),
   priority: z.enum(TASK_PRIORITIES),

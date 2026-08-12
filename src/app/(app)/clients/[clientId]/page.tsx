@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getClientDetail } from "@/lib/client-queries";
 import { listClientActivity } from "@/lib/activity";
 import { listAttachments } from "@/lib/attachment-queries";
+import { listAgreementNumbers, listClientContracts } from "@/lib/contract-queries";
 import { CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from "@/lib/client";
 import { isProjectActive } from "@/lib/project";
 import { monthYear } from "@/lib/dates";
@@ -21,22 +22,28 @@ import { ContactForm } from "@/components/clients/contact-form";
 import { ProjectRow } from "@/components/projects/project-row";
 import { ProjectForm } from "@/components/projects/project-form";
 import { Attachments } from "@/components/attachments/attachments";
+import { ContractForm } from "@/components/contracts/contract-form";
+import { ContractRow } from "@/components/contracts/contract-row";
 
 const CHIP = "text-xs text-[var(--text-3)]";
 
 export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await props.params;
-  const [client, activity, session, members, attachments] = await Promise.all([
-    getClientDetail(prisma, clientId),
-    listClientActivity(prisma, { clientId }),
-    auth(),
-    prisma.user.findMany({
-      where: { active: true },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    listAttachments(prisma, { parentType: "CLIENT", parentId: clientId }),
-  ]);
+  const [client, activity, session, members, attachments, contracts, agreementNumbers] =
+    await Promise.all([
+      getClientDetail(prisma, clientId),
+      listClientActivity(prisma, { clientId }),
+      auth(),
+      prisma.user.findMany({
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      listAttachments(prisma, { parentType: "CLIENT", parentId: clientId }),
+      listClientContracts(prisma, clientId),
+      listAgreementNumbers(prisma, { clientId }),
+    ]);
+  const issuedCount = contracts.filter((c) => c.status === "ISSUED").length;
   if (!client) notFound();
   // The layout already redirects. Repeated here because the file list needs
   // `session.user.id` — not just the optional-chained role this page read
@@ -149,6 +156,29 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               <EmptyState message="No projects for this client yet." />
             ) : (
               client.projects.map((row) => <ProjectRow key={row.id} row={row} />)
+            )}
+          </SectionCard>
+
+          {/* §O's framing, from the owner: "From a client's page there should
+              be an option to create a contract." Above Files because a
+              contract is the engagement's defining document, not one of its
+              attachments. */}
+          <SectionCard
+            title="Contracts"
+            meta={contracts.length > 0 ? `${issuedCount} issued` : null}
+            action={
+              <ContractForm
+                clientId={client.id}
+                client={{ name: client.name, sector: client.sector }}
+                agreementNumbers={agreementNumbers}
+              />
+            }
+            flush={contracts.length > 0}
+          >
+            {contracts.length === 0 ? (
+              <EmptyState message="No contracts yet. A proposal, a one-time agreement, a maintenance agreement, or either with a trial first month." />
+            ) : (
+              contracts.map((row) => <ContractRow key={row.id} row={row} />)
             )}
           </SectionCard>
 

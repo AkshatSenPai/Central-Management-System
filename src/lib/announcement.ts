@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import { APP_TIMEZONE, startOfAppDay } from "@/lib/dates";
 
 /** Pure announcement rules — no Prisma, no session, so they unit-test without
@@ -6,7 +7,7 @@ import { APP_TIMEZONE, startOfAppDay } from "@/lib/dates";
 
 export const announcementSchema = z.object({
   title: z.string().trim().min(1, "Give the announcement a title").max(140),
-  body: z.string().trim().min(1, "Write something first").max(4000),
+  body: z.string().trim().min(1, "Write something first").max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE),
   /** "YYYY-MM-DD" or empty. Empty means not pinned. */
   pinnedUntil: z.string().trim().optional().or(z.literal("")),
 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import type { BadgeKind } from "@/lib/badges";
 import { shortDate } from "@/lib/dates";
 
@@ -59,7 +60,7 @@ export const PROJECT_HEALTH_BADGE: Record<ProjectHealth, BadgeKind> = {
 export const projectSchema = z
   .object({
     name: z.string().trim().min(1, "Project name is required").max(120),
-    description: z.string().trim().max(4000).optional().or(z.literal("")),
+    description: z.string().trim().max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE).optional().or(z.literal("")),
     status: z.enum(PROJECT_STATUSES),
     health: z.enum(PROJECT_HEALTHS),
     startDate: z.string().trim().optional().or(z.literal("")),

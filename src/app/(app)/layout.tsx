@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { listNotifications, countUnreadNotifications } from "@/lib/notification-queries";
 import { getPunchState } from "@/lib/attendance-queries";
+import { WhatsNew } from "@/components/releases/whats-new";
 
 /** The sidebar's collapsed preference. A cookie rather than localStorage
  * because the server has to know it: localStorage is unreadable during a
@@ -115,6 +116,18 @@ export default async function AppLayout({
           isAdmin={session.user.role === "ADMIN"}
           punch={punch}
         />
+        {/* In the shell, not on a page, because `/` redirects to `/my-tasks`
+            and this used to be mounted only on `/dashboard` — so the one
+            screen carrying the announcement was a screen nobody was sent to.
+            It was reported as "I never saw the What's New pop-up", and it had
+            been invisible to anyone who did not happen to click Dashboard.
+
+            Outside <main>, so the ViewTransition wrapping page content cannot
+            animate or remount it. A <dialog> renders in the browser's top
+            layer regardless of where it sits in the DOM, so this position
+            costs nothing visually and buys stability across navigation. */}
+        <WhatsNew />
+
         {/* `update`, not `enter`/`exit`. Those two fire when a ViewTransition
             mounts or unmounts; this one lives in the layout and stays mounted
             across every route, so a navigation only ever changes its children

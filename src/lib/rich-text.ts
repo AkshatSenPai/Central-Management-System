@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 
 /** Comment bodies are plain text (spec 3c D1). Nothing in this file produces
  * HTML, or a string that will later be interpreted as HTML — it produces a
@@ -10,7 +11,7 @@ import { z } from "zod";
  * construction, and the moment a sanitiser becomes mandatory. */
 
 export const commentSchema = z.object({
-  body: z.string().trim().min(1, "Write something first").max(4000),
+  body: z.string().trim().min(1, "Write something first").max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE),
 });
 
 export type CommentInput = z.infer<typeof commentSchema>;

@@ -1,5 +1,5 @@
 {
-  "signature": "c7bd4b839a140512",
+  "signature": "8acda1a0259c1fd8",
   "icons": [
     "add",
     "alternate_email",
@@ -15,6 +15,7 @@
     "close",
     "dark_mode",
     "delete",
+    "description",
     "download",
     "drag_indicator",
     "edit",
@@ -43,5 +44,5 @@
     "visibility",
     "visibility_off"
   ],
-  "bytes": 6164
+  "bytes": 6260
 }

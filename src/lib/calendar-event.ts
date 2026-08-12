@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import { appTimeLabel, startOfAppDay } from "@/lib/dates";
 import type { CalendarEventRow } from "@/lib/calendar-event-queries";
 
@@ -22,7 +23,7 @@ import type { CalendarEventRow } from "@/lib/calendar-event-queries";
  * way `resolveAssignees` already is for tasks. */
 export const calendarEventSchema = z.object({
   title: z.string().trim().min(1, "Give the event a title").max(200),
-  description: z.string().trim().max(4000).optional().or(z.literal("")),
+  description: z.string().trim().max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE).optional().or(z.literal("")),
   projectId: z.string().trim().optional().or(z.literal("")),
   clientId: z.string().trim().optional().or(z.literal("")),
 });
