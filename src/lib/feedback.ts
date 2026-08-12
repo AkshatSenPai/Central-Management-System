@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import type { BadgeKind } from "@/lib/badges";
 
 /** Pure feedback rules — no Prisma, no session, so they unit-test without a
@@ -52,7 +53,7 @@ export const feedbackSchema = z.object({
     .string()
     .trim()
     .min(1, "Write something first")
-    .max(4000, "Keep it under 4000 characters"),
+    .max(LONG_TEXT_MAX, LONG_TEXT_MESSAGE),
 });
 
 export type FeedbackInput = z.infer<typeof feedbackSchema>;

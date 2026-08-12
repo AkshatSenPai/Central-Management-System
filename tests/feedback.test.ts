@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LONG_TEXT_MAX, LONG_TEXT_MESSAGE } from "@/lib/text-limits";
 import {
   FEEDBACK_KINDS,
   FEEDBACK_KIND_LABEL,
@@ -57,13 +58,21 @@ describe("feedbackSchema", () => {
     expect(feedbackSchema.safeParse({ kind: "RANT", body: "hi" }).success).toBe(false);
   });
 
-  it("rejects a body over 4000 characters", () => {
-    expect(feedbackSchema.safeParse({ kind: "SUGGESTION", body: "x".repeat(4001) }).success).toBe(
-      false
-    );
-    expect(feedbackSchema.safeParse({ kind: "SUGGESTION", body: "x".repeat(4000) }).success).toBe(
-      true
-    );
+  /** The bound comes from `LONG_TEXT_MAX` rather than a literal, so raising
+   * the shared limit does not leave this test asserting the old one. */
+  it("rejects a body over the shared long-text limit", () => {
+    const over = { kind: "SUGGESTION", body: "x".repeat(LONG_TEXT_MAX + 1) };
+    const atLimit = { kind: "SUGGESTION", body: "x".repeat(LONG_TEXT_MAX) };
+    expect(feedbackSchema.safeParse(over).success).toBe(false);
+    expect(feedbackSchema.safeParse(atLimit).success).toBe(true);
+  });
+
+  it("names the limit rather than leaving zod's default message", () => {
+    const parsed = feedbackSchema.safeParse({
+      kind: "SUGGESTION",
+      body: "x".repeat(LONG_TEXT_MAX + 1),
+    });
+    expect(parsed.error?.issues[0]?.message).toBe(LONG_TEXT_MESSAGE);
   });
 });
 
