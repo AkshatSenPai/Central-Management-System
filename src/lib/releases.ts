@@ -14,6 +14,18 @@ export type Release = { id: string; date: string; title: string; items: string[]
 
 export const RELEASES: Release[] = [
   {
+    id: "2026-08-12",
+    date: "12 August 2026",
+    title: "Contracts, and marking your own part done",
+    items: [
+      "You can now generate a client document from the CMS — a proposal, a one-time agreement, a maintenance agreement, or either agreement with a trial first month. Start one from a client's page, under Contracts.",
+      "Fill in the client and the plan; the app picks the right document, fills it in, and checks it for blanks and numbering before it will let you issue it.",
+      "Issuing gives the contract its agreement number and freezes it — an issued contract is the record of what was sent and cannot be edited afterwards, only voided and replaced.",
+      "Download the finished contract as a PDF from the same page. Every contract you have made is listed together under Contracts in the sidebar.",
+      "On a shared task, you can tick off just your own part with “My part done”. The task closes when everybody has ticked theirs.",
+    ],
+  },
+  {
     id: "2026-08-10",
     date: "10 August 2026",
     title: "Task sequencing, and a few smaller things",

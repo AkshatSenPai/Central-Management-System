@@ -14,7 +14,6 @@ import { WeekStatsCard } from "@/components/dashboard/week-stats";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { PushExplainer } from "@/components/notifications/push-explainer";
-import { WhatsNew } from "@/components/releases/whats-new";
 
 const SWATCH: Record<number, string> = {
   1: "bg-[var(--pj1)]",
@@ -54,10 +53,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pb-10 pt-5 sm:px-6">
-      {/* Both draw nothing until the browser has answered — the modal lives in
-          the top layer, and the bar is absent rather than empty when push is
-          already on. Neither pushes the greeting down for most people. */}
-      <WhatsNew />
+      {/* Draws nothing until the browser has answered whether push is already
+          on, and is absent rather than empty when it is — so for most people
+          it never pushes the greeting down. (`WhatsNew` used to sit here too;
+          it moved to the app shell, because `/` lands on `/my-tasks` and an
+          announcement mounted only on this page was one most people never
+          reached.) */}
       <div className="mb-5 empty:mb-0">
         <PushExplainer />
       </div>

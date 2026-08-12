@@ -126,19 +126,47 @@ preview iframe displays. Both routes read the same two sources: the frozen
 `issuedHtml` for an issued contract, a live render for a draft. What is
 approved and what is sent are the same bytes through two renderers.
 
-### What is still missing: page numbers
+### Page numbers and running headers do render
 
-The templates draw their running header, running footer and **page numbers**
-with CSS margin boxes — `@top-left`, `@bottom-right`, `counter(page)`,
-`string(prepfor)`. **Chromium does not implement margin boxes**, so none of
-that renders. Everything inside the page does.
+**Chromium implements the `@page` margin boxes.** The running header
+(`@top-left`), the running footer (`@bottom-left`) and the page number
+(`@bottom-right`, `counter(page) " / " counter(pages)`) all come out — page 2
+of a rendered contract reads "2 / 10" in gold, verified by rasterising it.
 
-WeasyPrint does implement them, and was rejected after checking: it needs
-Pango, which Vercel's Python runtime does not provide, so it would mean a
-second service on another host. That was judged not worth it for page numbers
-on an e-signed document. **Paged.js remains the cheap route if this is ever
-wanted** — an MIT polyfill injected into the print route — but it repaginates
-client-side and would need validating against all 72 templates first.
+This document previously said the opposite, and so did the code and two
+handoffs. The claim came from checking the *end* of a page's extracted text
+for a footer and finding body text. PDF text extraction emits margin-box
+content **first**, so the footer had been there all along. It cost a
+WeasyPrint-versus-Chromium decision that never needed making. Recorded here
+because the failure was not the wrong answer, it was a single weak probe
+treated as proof.
+
+### The cover has to be bled deliberately
+
+`.cover` gets its full-bleed navy by cancelling the page margin with
+`margin: -18mm -17mm 0 -17mm`. That is correct paged-media CSS and it works in
+WeasyPrint. **Chromium clips page content to the margin box**, so the overhang
+is discarded and the paper shows through — the cover printed as a navy panel
+with a white border.
+
+`COVER_BLEED_CSS` in `contract-pdf.ts` fixes it with three rules, and all
+three are needed:
+
+| rule | why |
+|---|---|
+| `body { margin: 0 }` | No template sets a `body` rule, so the UA default 8px applies. 8px is enough to keep the cover off the paper edge whatever the page margin is — zeroing the page margin alone changes nothing visible |
+| `@page :first { margin: 0 }` | Gives the cover a full-sheet page box. Body pages keep their margins |
+| `.cover { margin: 0; min-height: 100vh }` | Stops the negative margin pulling it off the sheet, and fills the full 297mm — the template's `263mm` is the *content box* height and leaves 34mm white at the bottom once the margins are gone |
+
+Removing `body { margin: 0 }` narrows body pages by ~2mm a side and changes
+pagination — this document is 10 pages with it and 9 without. Both are
+correct; the 10-page version is the one with the working cover.
+
+**To verify after changing the templates or this CSS:** render a contract,
+rasterise page 1, and sample the four corners — all four must be `#16263d`.
+Sampling pixels is the only check that has ever caught this class of bug; unit
+tests, types, lint, gates and a production build were green through every one
+of them.
 
 ### Fonts
 

@@ -17,13 +17,20 @@
  *
  * ## Why Chromium and not WeasyPrint
  *
- * WeasyPrint implements CSS paged media properly, including the margin boxes
- * these templates use for running headers and page numbers, which Chromium
- * does not. It also needs Pango, which Vercel's Python runtime does not
- * provide — it would mean a second service on another host. That was judged
- * not worth it for page numbers on an e-signed document. **The page numbers
- * and running headers in the templates' `@page` blocks therefore do not
- * render.** Everything inside the page does.
+ * WeasyPrint needs Pango, which Vercel's Python runtime does not provide, so
+ * it would mean a second service on another host.
+ *
+ * **It would also buy nothing. Chromium renders the `@page` margin boxes.**
+ * The running header, the running footer and `counter(page) " / "
+ * counter(pages)` all come out — verified by rasterising page 2 of a real
+ * contract and reading "2 / 10" off it in gold.
+ *
+ * This file previously claimed the opposite, twice, and the claim reached the
+ * owner as a trade-off they were asked to accept. It came from checking the
+ * *end* of a page's extracted text for a footer: pdf text extraction emits
+ * margin-box content **first**, so the footer was there all along and the
+ * check was looking in the wrong place. Worth remembering — an absence proved
+ * by a single weak probe is not an absence.
  */
 
 import puppeteer, { type Browser } from "puppeteer-core";
@@ -87,11 +94,55 @@ async function launch(): Promise<Browser> {
   });
 }
 
+/** The cover page is meant to be solid navy, edge to edge, and in Chromium it
+ * was not — it came out inset by the page margin with a white border around
+ * it, which is what the owner reported.
+ *
+ * The templates get a full-bleed cover the standard paged-media way: the page
+ * carries `margin: 18mm 17mm 16mm 17mm`, and `.cover` cancels it with
+ * `margin: -18mm -17mm 0 -17mm` so its background reaches the paper. That is
+ * correct CSS and it works in WeasyPrint and Prince. **Chromium clips page
+ * content to the margin box**, so the overhang is simply cut off and the
+ * paper shows through.
+ *
+ * The fix is per-page margins, which Chromium does support: give the first
+ * page no margin at all, and cancel the cover's negative margin to match.
+ * `.cover` then fills the sheet on its own and its existing
+ * `padding: 30mm 17mm 22mm 17mm` supplies the inset the design wants. Body
+ * pages are untouched and keep their margins.
+ *
+ * Injected at render time rather than edited into 72 files — spec §06 puts
+ * the templates off limits, and this is a property of the renderer, not of
+ * the document.
+ *
+ * `min-height: 100vh` replaces the template's `263mm`, which is the height of
+ * the *content box* on a margined page. With the first page's margins removed
+ * the sheet is the full 297mm, and 263mm of navy leaves 34mm of white along
+ * the bottom edge — the same bug as the sides, one step later. `100vh`
+ * resolves to the page box in print layout, so it stays correct if the paper
+ * ever changes. `* { box-sizing: border-box }` is set globally, so the
+ * cover's own `padding: 30mm 17mm 22mm 17mm` sits inside that height.
+ *
+ * **`body { margin: 0 }` is the part that is easy to miss.** No template sets
+ * a `body` rule, so the browser default of 8px applies, and 8px of body
+ * margin is enough to keep the cover off the paper edge no matter what the
+ * page margin is. Zeroing the page margin alone does nothing visible, which
+ * is exactly how the first attempt at this fix "worked" and changed nothing.
+ * Only the cover is affected: `body`'s margin sits outside the `@page`
+ * margin box, so body pages keep the 17mm the template asks for either way.
+ */
+export const COVER_BLEED_CSS = `
+body { margin: 0; }
+@page :first { margin: 0; }
+.cover { margin: 0 !important; min-height: 100vh !important; }
+`.trim();
+
 /** Inserted before `</head>`, exactly as the print route does it — see the
  * note there about anchoring on the closing tag rather than on any of the
- * template's internal structure. */
+ * template's internal structure. Last in the head, so these rules win over
+ * the template's own without needing to out-specify them. */
 async function installFonts(html: string): Promise<string> {
-  const style = `<style>\n${await contractFontFacesInline()}\n</style>`;
+  const style = `<style>\n${await contractFontFacesInline()}\n${COVER_BLEED_CSS}\n</style>`;
   const head = html.lastIndexOf("</head>");
   if (head === -1) return `${style}\n${html}`;
   return `${html.slice(0, head)}${style}\n${html.slice(head)}`;
