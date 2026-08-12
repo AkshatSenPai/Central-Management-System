@@ -138,7 +138,13 @@ export default async function ContractDetailPage(props: {
               <IssueControl
                 contractId={row.id}
                 clientId={row.clientId}
-                blocked={preview.problems.length > 0}
+                blockedReason={
+                  preview.problems.length > 0
+                    ? `Not ready to issue — ${preview.problems
+                        .map((p) => `${p.check}: ${p.detail}`)
+                        .join("; ")}`
+                    : null
+                }
               />
             </>
           ) : null}

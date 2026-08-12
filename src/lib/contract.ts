@@ -383,6 +383,37 @@ export type ContractToken = (typeof CONTRACT_TOKENS)[number];
 
 export type TokenMap = Partial<Record<ContractToken, string>>;
 
+/** The form field a token comes from, for when one is left unsubstituted and
+ * somebody has to be told which box to go and fill in.
+ *
+ * **Several tokens map to the same field, and that is the useful part.** A
+ * trial maintenance agreement with no campaign start leaves four tokens
+ * standing — `CAMPAIGN_START_DATE`, `DUE_DATE_DAY`, `TRIAL_START_DATE` and
+ * `TRIAL_END_DATE` — because all four are derived from that one input. Naming
+ * the tokens produces a message no one can act on; naming the field, once,
+ * produces "Campaign start". */
+export const TOKEN_FIELD_LABEL: Record<ContractToken, string> = {
+  CLIENT_NAME: "Client name",
+  CLIENT_FIRM: "Firm and city",
+  CLIENT_FIRM_UPPER: "Firm and city",
+  CLIENT_PHONE: "Phone",
+  CLIENT_EMAIL: "Email",
+  PROJECT_NAME: "Project",
+  AGREEMENT_NO: "Agreement number",
+  ONETIME_AGREEMENT_NO: "Cross-reference to the one-time agreement",
+  MAINTENANCE_AGREEMENT_NO: "Cross-reference to the maintenance agreement",
+  MONTH_YEAR: "Document date",
+  TIMELINE: "Timeline",
+  CAMPAIGN_START_DATE: "Campaign start",
+  DUE_DATE_DAY: "Campaign start",
+  GRACE_PERIOD: "Grace period",
+  TRIAL_START_DATE: "Campaign start",
+  TRIAL_END_DATE: "Campaign start",
+  PAID_AMOUNT: "Amount paid",
+  PAID_DATE: "Date paid",
+  REAL_ESTATE_CLAUSES: "Real-estate clauses",
+};
+
 /** Which tokens each document family actually contains.
  *
  * Declared rather than discovered, so the form can ask for exactly the right

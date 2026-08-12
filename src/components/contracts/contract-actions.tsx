@@ -19,18 +19,26 @@ import { Modal } from "@/components/ui/modal";
  * "used to apply in silence, which is indistinguishable from the constraint
  * not existing".
  *
- * `blocked` is the validation state the detail page already computed and is
- * showing beside the preview. Passing it in rather than recomputing means the
- * button is disabled for exactly the reasons listed on screen. */
+ * `blockedReason` is the validation state the detail page already computed
+ * and is showing beside the preview. Passing it in rather than recomputing
+ * means the button is disabled for exactly the reasons listed on screen.
+ *
+ * It is a string rather than a boolean because a disabled control that does
+ * not say why is a dead end. This was reported as "the Issue button is greyed
+ * out, I can't issue it" — the explanation was already on the page, in a card
+ * headed "Before this can be issued", and the connection between the two was
+ * not made. Chrome shows `title` on a disabled button, so the reason is now
+ * on the thing that refuses. */
 export function IssueControl({
   contractId,
   clientId,
-  blocked,
+  blockedReason,
 }: {
   contractId: string;
   clientId: string;
-  blocked: boolean;
+  blockedReason: string | null;
 }) {
+  const blocked = blockedReason !== null;
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -65,6 +73,7 @@ export function IssueControl({
         size="sm"
         className="gap-1.5"
         disabled={blocked}
+        title={blockedReason ?? undefined}
       >
         <Icon name="check_circle" size="sm" />
         Issue

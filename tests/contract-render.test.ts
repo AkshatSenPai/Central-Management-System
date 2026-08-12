@@ -159,8 +159,26 @@ describe("check 1 — unsubstituted tokens", () => {
 
   it("is what validateRendered blocks on", () => {
     const problems = validateRendered("{{CLIENT_NAME}}", {}, maintenance);
-    expect(problems[0].check).toBe("Unsubstituted tokens");
-    expect(problems[0].detail).toBe("{{CLIENT_NAME}}");
+    expect(problems[0].check).toBe("Missing field");
+    expect(problems[0].detail).toBe("Client name");
+  });
+
+  /** The message names the box to go and fill in, not the token. A trial
+   * maintenance agreement with no campaign start leaves four tokens standing
+   * — all four derived from that one input — and reporting four of them makes
+   * one empty field look like four problems, none of which is a thing anybody
+   * can act on. */
+  it("names the field once, however many tokens it left behind", () => {
+    const html = "{{CAMPAIGN_START_DATE}} {{DUE_DATE_DAY}} {{TRIAL_START_DATE}} {{TRIAL_END_DATE}}";
+    const problems = validateRendered(html, {}, { ...maintenance, trial: true });
+    expect(problems[0].check).toBe("Missing field");
+    expect(problems[0].detail).toBe("Campaign start");
+  });
+
+  it("lists several distinct fields when several are genuinely missing", () => {
+    const problems = validateRendered("{{CLIENT_NAME}} {{GRACE_PERIOD}}", {}, maintenance);
+    expect(problems[0].check).toBe("Missing fields");
+    expect(problems[0].detail).toBe("Client name, Grace period");
   });
 });
 

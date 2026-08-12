@@ -16,6 +16,7 @@ import {
   longMonthYear,
   ordinalDay,
   parseAgreementNo,
+  TOKEN_FIELD_LABEL,
   trialEndDate,
   type ContractDeal,
   type ContractToken,
@@ -378,9 +379,18 @@ export function validateRendered(
 
   const left = unsubstitutedTokens(html);
   if (left.length > 0) {
+    // Named by the field somebody fills in, not by the token. Four tokens are
+    // derived from "Campaign start" alone, so the token list reads as four
+    // problems when it is one empty box — and `{{DUE_DATE_DAY}}` is not a
+    // thing anybody can go and fix. Deduplicated, in first-seen order.
+    const fields = [
+      ...new Set(
+        left.map((token) => TOKEN_FIELD_LABEL[token as ContractToken] ?? `{{${token}}}`)
+      ),
+    ];
     problems.push({
-      check: "Unsubstituted tokens",
-      detail: left.map((t) => `{{${t}}}`).join(", "),
+      check: fields.length === 1 ? "Missing field" : "Missing fields",
+      detail: fields.join(", "),
     });
   }
 

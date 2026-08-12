@@ -427,11 +427,20 @@ export function ContractForm({
               />
             ) : null}
             {needs("CAMPAIGN_START_DATE") ? (
+              // Required, and it is the only optional-looking field that is
+              // not optional. A maintenance agreement derives three printed
+              // values from it — the campaign start, the due day, and on a
+              // trial both trial dates — so a blank one leaves four tokens
+              // unsubstituted and the contract cannot be issued. It used to
+              // be an ordinary field, and the first person to leave it empty
+              // met a greyed-out Issue button with the explanation somewhere
+              // further down the page.
               <Field
                 label="Campaign start"
                 className="w-full"
                 type="date"
                 name="campaignStartDate"
+                required
                 value={values.campaignStartDate}
                 onChange={(e) => set("campaignStartDate", e.target.value)}
               />

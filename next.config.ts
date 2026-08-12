@@ -32,8 +32,48 @@ const nextConfig: NextConfig = {
    * page that renders a contract to be the one nobody remembered to add.
    * 2.2 MB, and the deployment is not sensitive to it.
    */
+  /**
+   * The headless browser that renders contract PDFs.
+   *
+   * `@sparticuz/chromium` is a Node package wrapped around a ~50 MB
+   * brotli-compressed Chromium in its own `bin/` directory, which it locates
+   * at runtime from `__dirname` and unpacks into `/tmp`. Both halves of that
+   * sentence are hostile to a bundler.
+   *
+   * It ships in Next's own default external list, and it was bundled anyway —
+   * the production stack trace put it inside
+   * `.next/server/chunks/[root-of-the-server]__*.js`. Once bundled, its
+   * `__dirname` points at the chunk rather than at the package, and it fails
+   * with "The input directory /var/task/node_modules/@sparticuz/chromium/bin
+   * does not exist". Naming it here is explicit rather than redundant: the
+   * default list did not hold under Turbopack.
+   *
+   * `puppeteer-core` is listed for the same reason — it resolves its own
+   * files by path — and because a bundled client talking to an external
+   * browser package is a version-skew waiting to happen.
+   */
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
+
   outputFileTracingIncludes: {
     "/*": ["src/contract-templates/**/*"],
+
+    /**
+     * Externalising the package is necessary and not sufficient: file tracing
+     * still has to be told the binary exists. The tracer follows `import`
+     * statements, and nothing imports `bin/chromium.br` — it is opened from a
+     * path built at runtime, exactly like the contract templates two lines
+     * up.
+     *
+     * Scoped to this one route rather than `/*`. The templates are 2.2 MB and
+     * ride along everywhere harmlessly; this is ~50 MB, and putting it in
+     * every function would push each one toward the 250 MB unzipped limit for
+     * a browser only this route launches.
+     *
+     * The brackets are escaped because these keys are picomatch globs, where
+     * `[contractId]` would otherwise be a character class matching a single
+     * letter from that set.
+     */
+    "/contracts/\\[contractId\\]/pdf": ["node_modules/@sparticuz/chromium/bin/**"],
   },
 
   /**
